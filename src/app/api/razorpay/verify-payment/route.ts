@@ -1,7 +1,5 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
-import { db } from "@/utils/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,27 +44,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Signature is valid — attempt to persist payment record to Firestore
-    if (eventId && userId) {
-      try {
-        const paymentRef = doc(db, "payments", `${razorpay_order_id}`);
-        await setDoc(paymentRef, {
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-          eventId,
-          userId,
-          status: "paid",
-          paidAt: serverTimestamp(),
-          ...metadata,
-        });
-      } catch (dbErr) {
-        console.warn(
-          "Firestore server write skipped (insufficient client SDK permissions on server):",
-          dbErr
-        );
-      }
-    }
+    // Signature is valid. The client now completes the event registration
+    // in Firestore using the authenticated Firebase user.
 
     return Response.json({
       success: true,

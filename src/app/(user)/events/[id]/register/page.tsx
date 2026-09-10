@@ -74,7 +74,10 @@ export default function Register() {
 
     const checkDeadline = () => {
       try {
-        if (!event.regFinalDate) return;
+        if (!event.regFinalDate) {
+          setIsRegistrationClosed(event.registrationOpen === false);
+          return;
+        }
 
         // Parse DD-MM-YYYY
         const [day, month, year] = event.regFinalDate.split("-").map(Number);
@@ -91,11 +94,11 @@ export default function Register() {
         }
 
         const now = new Date();
-        if (now > deadline) {
-          setIsRegistrationClosed(true);
-        }
+        setIsRegistrationClosed(
+          event.registrationOpen === false || now > deadline
+        );
       } catch (err) {
-        console.error("Error checking deadline:", err);
+        console.error("Error checking registration status:", err);
       }
     };
 
@@ -221,6 +224,10 @@ export default function Register() {
     setLoading(true);
 
     try {
+      const isFreeEvent =
+        event.isFree === true ||
+        Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, "")) === 0;
+
       const registrationData = {
         eventId: event.id,
         eventTitle: event.title,
@@ -229,6 +236,8 @@ export default function Register() {
         userName: user?.displayName || formData.leaderName,
         ...formData,
         teamMembers: event.eveType === 'team' ? teamMembers : [],
+        status: isFreeEvent ? "registered" : "pending",
+        paymentStatus: isFreeEvent ? "free" : "pending",
         updatedAt: new Date()
       };
 
@@ -240,7 +249,6 @@ export default function Register() {
         // Create
         await addDoc(collection(db, "registrations"), {
           ...registrationData,
-          status: "pending",
           createdAt: new Date()
         });
 

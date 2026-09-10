@@ -26,6 +26,8 @@ export type Event = {
     totalParticipation?: string;
     eveType?: "ind" | "team"
     registrationFee: string;
+    isFree?: boolean;
+    registrationOpen?: boolean;
     firstPrize: string;
     secondPrize?: string;
     thirdPrize?: string;

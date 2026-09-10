@@ -325,7 +325,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
               <InfoCard
                 icon={<LuIndianRupee size={18} />}
                 title="Registration Fee"
-                value={event.registrationFee || "Free"}
+                value={event.isFree ? "Free" : (event.registrationFee || "Free")}
                 delay={0.4}
               />
               {(event.maxParticipation || event.memberMaxCount > 0) && (

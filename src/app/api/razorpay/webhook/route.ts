@@ -72,11 +72,12 @@ export async function POST(request: NextRequest) {
                 .update(rawBody)
                 .digest("hex");
 
+        const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+        const receivedBuffer = Buffer.from(signature, "utf8");
+
         if (
-            !crypto.timingSafeEqual(
-                Buffer.from(expectedSignature),
-                Buffer.from(signature)
-            )
+            expectedBuffer.length !== receivedBuffer.length ||
+            !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
         ) {
             console.error(
                 "Razorpay webhook signature mismatch"

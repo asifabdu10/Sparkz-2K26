@@ -63,9 +63,25 @@ service cloud.firestore {
       // Public read access
       allow read: if true;
 
-      // Authenticated users can write
-      // Development/setup access is also allowed
-      allow write: if isAuthenticated() || true;
+      // Only event admins can create/update/delete events.
+      // Department admins may only modify events belonging to their department.
+      allow create: if isSuperAdmin() || (
+        isAuthenticated() &&
+        getUserData().role == 'admin' &&
+        request.resource.data.department == getUserData().department
+      );
+
+      allow update: if isSuperAdmin() || (
+        isAuthenticated() &&
+        getUserData().role == 'admin' &&
+        request.resource.data.department == getUserData().department
+      );
+
+      allow delete: if isSuperAdmin() || (
+        isAuthenticated() &&
+        getUserData().role == 'admin' &&
+        resource.data.department == getUserData().department
+      );
     }
 
 
@@ -75,26 +91,31 @@ service cloud.firestore {
 
     match /registrations/{regId} {
 
-      // Authenticated users can create registrations
-      allow create: if isAuthenticated();
+      // A logged-in user can register only themselves, and only while
+      // the selected event is open. Free and paid registrations are both supported.
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
+        && (
+          !('registrationOpen' in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data)
+          || get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationOpen == true
+        )
+        && request.resource.data.status in ['registered', 'paid', 'pending'];
 
-      // User can read their own registration
-      // Admin and Super Admin can read all registrations
+      // Users can read their own registration; admins can read their events.
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         isSuperAdmin() ||
         getUserData().role == 'admin'
       );
 
-      // User can update their own registration
-      // Admin and Super Admin can update registrations
+      // Users can update their own registration; admins can update registrations.
       allow update: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         isSuperAdmin() ||
         getUserData().role == 'admin'
       );
 
-      // Only Super Admin can delete
       allow delete: if isSuperAdmin();
     }
 

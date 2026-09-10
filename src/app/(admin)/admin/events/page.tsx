@@ -2,9 +2,9 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments } from "@/utils/constants/Constants";
 import { Event } from "@/utils/types/event";
@@ -27,6 +27,8 @@ export default function EventsManagement() {
         date: "",
         regFinalDate: "",
         registrationFee: "",
+        isFree: false,
+        registrationOpen: true,
         firstPrize: "",
         memberMaxCount: 1,
         memberMinCount: 1,
@@ -158,6 +160,40 @@ export default function EventsManagement() {
 
 
 
+    const toggleEventRegistration = async (event: Event) => {
+        const nextOpen = event.registrationOpen === false;
+        try {
+            await updateDoc(doc(db, "events", event.id), {
+                registrationOpen: nextOpen,
+            });
+            setEvents(prev => prev.map(e => e.id === event.id ? { ...e, registrationOpen: nextOpen } : e));
+            toastSuccess(nextOpen ? `${event.title}: Registration opened` : `${event.title}: Registration closed`);
+        } catch (error) {
+            console.error("Registration toggle failed:", error);
+            toastError("Failed to change registration status");
+        }
+    };
+
+    const toggleAllRegistrations = async () => {
+        if (events.length === 0) return;
+        const shouldOpen = !events.every(e => e.registrationOpen !== false);
+        try {
+            await Promise.all(
+                events.map(event =>
+                    updateDoc(doc(db, "events", event.id), {
+                        registrationOpen: shouldOpen,
+                    })
+                )
+            );
+            setEvents(prev => prev.map(e => ({ ...e, registrationOpen: shouldOpen })));
+            toastSuccess(shouldOpen ? "Registration opened for all events" : "Registration closed for all events");
+        } catch (error) {
+            console.error("All registration toggle failed:", error);
+            toastError("Failed to update all event registrations");
+        }
+    };
+
+
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this event? This action cannot be undone.")) return;
         try {
@@ -172,7 +208,11 @@ export default function EventsManagement() {
 
     const startEdit = (event?: Event) => {
         if (event) {
-            setFormData(event);
+            setFormData({
+                ...event,
+                registrationOpen: event.registrationOpen !== false,
+                isFree: event.isFree === true || Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, "")) === 0,
+            });
         } else {
             // Default to admin's department if not superAdmin
             const defaultDept = userData?.role !== 'superAdmin' && userData?.department
@@ -240,7 +280,7 @@ export default function EventsManagement() {
         if (!formData.description?.trim()) return toastError("Description is required");
         if (!formData.date) return toastError("Event Date is required");
         if (!formData.regFinalDate) return toastError("Registration Closing Date is required");
-        if (!formData.registrationFee) return toastError("Registration Fee is required");
+        if (!formData.isFree && !formData.registrationFee) return toastError("Registration Fee is required");
 
         if (!formData.coordinators || formData.coordinators.length === 0 || !formData.coordinators[0].name || !formData.coordinators[0].phone) {
             return toastError("At least one Coordinator is required");
@@ -297,6 +337,9 @@ export default function EventsManagement() {
                 id: eventId,
                 imageUrl,
                 bgImageUrl,
+                isFree: Boolean(formData.isFree),
+                registrationOpen: formData.registrationOpen !== false,
+                registrationFee: formData.isFree ? "0" : formData.registrationFee,
                 // Ensure numbers are numbers
                 memberMaxCount: Number(formData.memberMaxCount),
                 memberMinCount: Number(formData.memberMinCount),
@@ -329,7 +372,15 @@ export default function EventsManagement() {
                     <h1 className="text-3xl font-bold bg-linear-to-r from-indigo-400 to-fuchsia-400 bg-clip-text text-transparent">Event Management</h1>
                     <p className="text-gray-400 text-sm mt-1">Manage and organize all college events</p>
                 </div>
-                <div className="flex gap-4 w-full md:w-auto">
+                <div className="flex gap-3 w-full md:w-auto">
+                    <button
+                        onClick={toggleAllRegistrations}
+                        disabled={events.length === 0}
+                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${events.length > 0 && events.every(e => e.registrationOpen !== false) ? "bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30" : "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"}`}
+                    >
+                        <FiPower size={18} />
+                        {events.length > 0 && events.every(e => e.registrationOpen !== false) ? "Close All Registrations" : "Open All Registrations"}
+                    </button>
                     <button
                         onClick={() => startEdit()}
                         className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors shadow-lg shadow-indigo-500/20"
@@ -616,13 +667,34 @@ export default function EventsManagement() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-indigo-400 border-b border-gray-800 pb-2">Financials</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <label className="flex items-center gap-3 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(formData.isFree)}
+                                            onChange={(e) => setFormData({ ...formData, isFree: e.target.checked, registrationFee: e.target.checked ? "0" : (formData.registrationFee === "0" ? "" : formData.registrationFee) })}
+                                            className="h-4 w-4 accent-indigo-500"
+                                        />
+                                        <span className="text-sm text-gray-200">Free Event (no payment)</span>
+                                    </label>
+                                    <label className="flex items-center gap-3 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.registrationOpen !== false}
+                                            onChange={(e) => setFormData({ ...formData, registrationOpen: e.target.checked })}
+                                            className="h-4 w-4 accent-emerald-500"
+                                        />
+                                        <span className="text-sm text-gray-200">Registration Open</span>
+                                    </label>
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm text-gray-400 mb-1">Fee <span className="text-red-500">*</span></label>
                                         <input
                                             type="text"
                                             required
-                                            value={formData.registrationFee}
+                                            value={formData.isFree ? "0" : (formData.registrationFee || "")}
+                                            disabled={Boolean(formData.isFree)}
                                             onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
@@ -815,6 +887,17 @@ export default function EventsManagement() {
                                 <div className="flex justify-between text-sm text-gray-500 mb-4">
                                     <span>{event.type}</span>
                                     <span>{event.date}</span>
+                                </div>
+                                <div className="flex items-center justify-between mt-4 mb-3">
+                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${event.registrationOpen === false ? "text-red-300 bg-red-950/40 border-red-500/30" : "text-emerald-300 bg-emerald-950/40 border-emerald-500/30"}`}>
+                                        {event.registrationOpen === false ? "Registration Closed" : "Registration Open"}
+                                    </span>
+                                    <button
+                                        onClick={() => toggleEventRegistration(event)}
+                                        className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${event.registrationOpen === false ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-red-300 border-red-500/30 hover:bg-red-500/10"}`}
+                                    >
+                                        {event.registrationOpen === false ? "Open" : "Close"}
+                                    </button>
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button

@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Script from "next/script";
 import { toastSuccess, toastError } from "@/utils/common/Toast";
-import { db } from "@/utils/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 // ─── Razorpay window type ──────────────────────────────────────────────────
 declare global {
@@ -31,7 +29,7 @@ interface RazorpayButtonProps {
   /** User's phone (pre-fills Razorpay modal) */
   userPhone?: string;
   /** Called after payment is successfully verified on the server */
-  onSuccess?: (paymentId: string, orderId: string) => void;
+  onSuccess?: (paymentId: string, orderId: string) => void | Promise<void>;
   /** Additional metadata to store alongside the payment in Firestore */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
@@ -184,30 +182,14 @@ export default function RazorpayButton({
               );
             }
 
-            try {
-              const paymentRef = doc(
-                db,
-                "payments",
-                response.razorpay_order_id
-              );
-              await setDoc(paymentRef, {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                eventId,
-                userId,
-                status: "paid",
-                paidAt: serverTimestamp(),
-                ...metadata,
-              });
-            } catch (clientDbErr) {
-              console.warn("Client payment record save error:", clientDbErr);
-            }
-
-            toastSuccess("Payment successful! You are registered 🎉");
-            onSuccess?.(
+            // The parent component records the paid registration in Firestore.
+            // This happens only after the server has verified the Razorpay signature.
+            await onSuccess?.(
               response.razorpay_payment_id,
               response.razorpay_order_id
             );
+
+            toastSuccess("Payment successful! You are registered 🎉");
           } catch (err: any) {
             toastError(err?.message || "Payment verification failed");
           } finally {
