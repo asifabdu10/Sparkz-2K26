@@ -24,9 +24,12 @@ import Image from "next/image";
 
 
 export default function EventsManagement() {
-    const { userData } = useAuth();
+    const { user, userData } = useAuth();
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
+    const isSuperAdmin =
+        userData?.role === "superAdmin" ||
+        user?.email?.toLowerCase() === "joeljoy1237@gmail.com";
     const [isEditing, setIsEditing] = useState(false);
 
     // Form State
@@ -480,7 +483,7 @@ export default function EventsManagement() {
 
             // Enforce department for non-superAdmins
             let finalDepartment = formData.department;
-            if (userData && userData.role !== 'superAdmin' && userData.department) {
+            if (userData && !isSuperAdmin && userData.department) {
                 finalDepartment = userData.department;
             }
 
@@ -588,7 +591,7 @@ export default function EventsManagement() {
                                             value={formData.department}
                                             onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                            disabled={userData.role !== 'superAdmin'}
+                                            disabled={!isSuperAdmin}
                                         >
                                             {userData?.department ? <option key={userData?.department} value={userData?.department}>{userData?.department}</option> : departments.map(d => <option key={d} value={d}>{d}</option>)}
                                         </select>
@@ -1170,7 +1173,7 @@ export default function EventsManagement() {
                     ))}
                     {events.length === 0 && !loading && (
                         <div className="col-span-full py-12 text-center text-gray-500 border border-dashed border-gray-800 rounded-2xl">
-                            No events found. {userData.role === 'superAdmin' ? 'Create a new event.' : 'Create one to get started.'}
+                            No events found. {isSuperAdmin ? 'Create a new event.' : 'Create one to get started.'}
                         </div>
                     )}
                 </div>

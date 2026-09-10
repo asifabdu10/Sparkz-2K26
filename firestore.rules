@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // =========================================================
-    // Helper Functions
+    // HELPER FUNCTIONS
     // =========================================================
 
     function isAuthenticated() {
@@ -12,7 +12,8 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isAuthenticated()
+        && request.auth.uid == userId;
     }
 
     function getUserData() {
@@ -21,18 +22,45 @@ service cloud.firestore {
       ).data;
     }
 
+    // =========================================================
+    // SUPER ADMIN
+    // =========================================================
+    //
+    // Super Admin is recognized either by:
+    //
+    // 1. users/{uid}.role == "superAdmin"
+    //
+    // OR
+    //
+    // 2. The configured Super Admin email.
+    //
+    // =========================================================
+
     function isSuperAdmin() {
-      return isAuthenticated() && (
-        getUserData().role == 'superAdmin' ||
-        request.auth.token.email in ['joeljoy1237@gmail.com']
-      );
+      return isAuthenticated()
+        && (
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'superAdmin'
+          ||
+          request.auth.token.email
+            in ['joeljoy1237@gmail.com']
+        );
     }
 
+    // =========================================================
+    // ABHERI ADMIN
+    // =========================================================
+
     function isAbheriAdmin() {
-      return isAuthenticated() && (
-        isSuperAdmin() ||
-        getUserData().role == 'abheriAdmin'
-      );
+      return isAuthenticated()
+        && (
+          isSuperAdmin()
+          ||
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'abheriAdmin'
+        );
     }
 
 
@@ -42,16 +70,38 @@ service cloud.firestore {
 
     match /users/{userId} {
 
-      // Authenticated users can read profiles
+      // -------------------------------------------------------
+      // READ
+      // -------------------------------------------------------
+      //
+      // Authenticated users can read profiles.
+      //
+
       allow read: if isAuthenticated();
 
-      // User can create/update their own profile.
-      // Super Admin can create/update any profile.
+
+      // -------------------------------------------------------
+      // CREATE / UPDATE
+      // -------------------------------------------------------
+      //
+      // A user can create/update their own profile.
+      //
+      // Super Admin can create/update any user profile.
+      //
+
       allow create, update: if
-        isOwner(userId) ||
+        isOwner(userId)
+        ||
         isSuperAdmin();
 
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+      //
       // Only Super Admin can delete users.
+      //
+
       allow delete: if isSuperAdmin();
     }
 
@@ -62,51 +112,94 @@ service cloud.firestore {
 
     match /events/{eventId} {
 
+      // -------------------------------------------------------
+      // READ
+      // -------------------------------------------------------
+      //
       // Anyone can view events.
+      //
+
       allow read: if true;
+
 
       // -------------------------------------------------------
       // CREATE
       // -------------------------------------------------------
+      //
+      // Super Admin can create any event.
+      //
+      // Normal Admin can create events only for their
+      // own department.
+      //
 
       allow create: if
         isSuperAdmin()
         ||
         (
-          isAuthenticated() &&
-          getUserData().role == 'admin' &&
+          isAuthenticated()
+          &&
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin'
+          &&
           request.resource.data.department ==
-            getUserData().department
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.department
         );
 
 
       // -------------------------------------------------------
       // UPDATE
       // -------------------------------------------------------
+      //
+      // Super Admin can update any event.
+      //
+      // Normal Admin can update events only for their
+      // own department.
+      //
 
       allow update: if
         isSuperAdmin()
         ||
         (
-          isAuthenticated() &&
-          getUserData().role == 'admin' &&
+          isAuthenticated()
+          &&
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin'
+          &&
           request.resource.data.department ==
-            getUserData().department
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.department
         );
 
 
       // -------------------------------------------------------
       // DELETE
       // -------------------------------------------------------
+      //
+      // Super Admin can delete any event.
+      //
+      // Normal Admin can delete events only from their
+      // own department.
+      //
 
       allow delete: if
         isSuperAdmin()
         ||
         (
-          isAuthenticated() &&
-          getUserData().role == 'admin' &&
+          isAuthenticated()
+          &&
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin'
+          &&
           resource.data.department ==
-            getUserData().department
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.department
         );
     }
 
@@ -121,45 +214,84 @@ service cloud.firestore {
       // CREATE
       // -------------------------------------------------------
       //
-      // User can create only their own registration.
-      // Event must exist.
-      // Event must be open.
+      // NORMAL USER:
+      // Can register only themselves.
+      //
+      // SUPER ADMIN:
+      // Can register any existing user.
+      //
+      // Normal user registration also requires:
+      // - Event exists
+      // - Registration is open
+      // - Valid registration status
+      //
+      // Super Admin registrations do not require the event
+      // to be open because this is a manual admin registration.
       //
 
       allow create: if
-        isSuperAdmin()
-        ||
-        (
-          isAuthenticated()
-          &&
-          request.resource.data.userId ==
-            request.auth.uid
-          &&
-          exists(
-          /databases/$(database)/documents/events/$(request.resource.data.eventId)
-        )
+        isAuthenticated()
         &&
         (
-          !(
-            'registrationOpen'
-            in get(
-              /databases/$(database)/documents/events/$(request.resource.data.eventId)
-            ).data
-          )
+          // ---------------------------------------------------
+          // SUPER ADMIN REGISTRATION
+          // ---------------------------------------------------
+          isSuperAdmin()
+
           ||
-          get(
-            /databases/$(database)/documents/events/$(request.resource.data.eventId)
-          ).data.registrationOpen == true
+
+          // ---------------------------------------------------
+          // NORMAL USER REGISTRATION
+          // ---------------------------------------------------
+          (
+            request.resource.data.userId ==
+              request.auth.uid
+
+            &&
+
+            exists(
+              /databases/$(database)/documents/events/$(request.resource.data.eventId)
+            )
+
+            &&
+
+            (
+              !(
+                'registrationOpen'
+                in get(
+                  /databases/$(database)/documents/events/$(request.resource.data.eventId)
+                ).data
+              )
+
+              ||
+
+              get(
+                /databases/$(database)/documents/events/$(request.resource.data.eventId)
+              ).data.registrationOpen == true
+            )
+          )
         )
+
         &&
-          request.resource.data.status
-            in ['registered', 'paid', 'pending']
-        );
+
+        request.resource.data.status
+          in [
+            'registered',
+            'paid',
+            'pending'
+          ];
 
 
       // -------------------------------------------------------
       // READ
       // -------------------------------------------------------
+      //
+      // User can read their own registrations.
+      //
+      // Super Admin can read all registrations.
+      //
+      // Admin can read registrations.
+      //
 
       allow read: if
         isAuthenticated()
@@ -167,16 +299,29 @@ service cloud.firestore {
         (
           resource.data.userId ==
             request.auth.uid
+
           ||
+
           isSuperAdmin()
+
           ||
-          getUserData().role == 'admin'
+
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin'
         );
 
 
       // -------------------------------------------------------
       // UPDATE
       // -------------------------------------------------------
+      //
+      // User can update their own registration.
+      //
+      // Super Admin can update any registration.
+      //
+      // Admin can update registrations.
+      //
 
       allow update: if
         isAuthenticated()
@@ -184,10 +329,16 @@ service cloud.firestore {
         (
           resource.data.userId ==
             request.auth.uid
+
           ||
+
           isSuperAdmin()
+
           ||
-          getUserData().role == 'admin'
+
+          get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'admin'
         );
 
 
@@ -195,7 +346,7 @@ service cloud.firestore {
       // DELETE
       // -------------------------------------------------------
       //
-      // Super Admin can manually deregister a user.
+      // Only Super Admin can manually deregister users.
       //
 
       allow delete: if isSuperAdmin();
@@ -211,22 +362,42 @@ service cloud.firestore {
       // -------------------------------------------------------
       // CREATE
       // -------------------------------------------------------
+      //
+      // Normal user:
+      // - Can create only their own registration
+      // - Document ID must equal their UID
+      // - Duplicate registration is prevented
+      // - Abheri registration must be open
+      //
+      // Abheri Admin / Super Admin can also create.
+      //
 
       allow create: if
         isAuthenticated()
+
         &&
-        regId == request.auth.uid
+
+        regId ==
+          request.auth.uid
+
         &&
+
         request.resource.data.userId ==
           request.auth.uid
+
         &&
+
         !exists(
           /databases/$(database)/documents/abheri_registrations/$(request.auth.uid)
         )
+
         &&
+
         (
           isAbheriAdmin()
+
           ||
+
           get(
             /databases/$(database)/documents/eventSettings/abheri
           ).data.registrationOpen == true
@@ -236,13 +407,21 @@ service cloud.firestore {
       // -------------------------------------------------------
       // READ
       // -------------------------------------------------------
+      //
+      // User can read their own Abheri registration.
+      //
+      // Abheri Admin / Super Admin can read all.
+      //
 
       allow read: if
         isAuthenticated()
         &&
         (
-          regId == request.auth.uid
+          regId ==
+            request.auth.uid
+
           ||
+
           isAbheriAdmin()
         );
 
@@ -250,22 +429,37 @@ service cloud.firestore {
       // -------------------------------------------------------
       // UPDATE
       // -------------------------------------------------------
+      //
+      // Abheri Admin / Super Admin can update any registration.
+      //
+      // User can update their own registration while
+      // Abheri registration is open.
+      //
 
       allow update: if
         isAuthenticated()
         &&
         (
           isAbheriAdmin()
+
           ||
+
           (
-            regId == request.auth.uid
+            regId ==
+              request.auth.uid
+
             &&
+
             resource.data.userId ==
               request.auth.uid
+
             &&
+
             request.resource.data.userId ==
               request.auth.uid
+
             &&
+
             get(
               /databases/$(database)/documents/eventSettings/abheri
             ).data.registrationOpen == true
@@ -276,8 +470,11 @@ service cloud.firestore {
       // -------------------------------------------------------
       // DELETE
       // -------------------------------------------------------
+      //
+      // Only Super Admin can manually deregister an Abheri
+      // participant/band.
+      //
 
-      // Only Super Admin can delete Abheri registrations.
       allow delete: if isSuperAdmin();
     }
 
@@ -288,13 +485,33 @@ service cloud.firestore {
 
     match /eventSettings/{settingId} {
 
-      // Registration status can be read publicly.
+      // -------------------------------------------------------
+      // READ
+      // -------------------------------------------------------
+      //
+      // Anyone can read registration status.
+      //
+
       allow read: if true;
 
-      // Only Abheri Admin / Super Admin can change settings.
+
+      // -------------------------------------------------------
+      // CREATE / UPDATE
+      // -------------------------------------------------------
+      //
+      // Abheri Admin and Super Admin can change settings.
+      //
+
       allow create, update: if isAbheriAdmin();
 
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+      //
       // Only Super Admin can delete settings.
+      //
+
       allow delete: if isSuperAdmin();
     }
 

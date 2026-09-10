@@ -35,7 +35,7 @@ interface UserData {
 }
 
 export default function UsersManagement() {
-    const { userData } = useAuth();
+    const { user, userData } = useAuth();
 
     const [users, setUsers] = useState<UserData[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<UserData[]>([]);
@@ -52,7 +52,9 @@ export default function UsersManagement() {
     const [selectedEventId, setSelectedEventId] = useState("");
     const [registering, setRegistering] = useState(false);
 
-    const isSuperAdmin = userData?.role === "superAdmin";
+    const isSuperAdmin =
+        userData?.role === "superAdmin" ||
+        user?.email?.toLowerCase() === "joeljoy1237@gmail.com";
 
     useEffect(() => {
         if (!isSuperAdmin) return;

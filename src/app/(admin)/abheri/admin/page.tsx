@@ -86,7 +86,7 @@ export default function AbheriAdminPage() {
      */
     const isSuperAdmin =
         userData?.role === "superAdmin" ||
-        userData?.email === "joeljoy1237@gmail.com";
+        user?.email?.toLowerCase() === "joeljoy1237@gmail.com";
 
     useEffect(() => {
         if (loading) {
