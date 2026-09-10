@@ -71,22 +71,58 @@ export default function RegistrationsManagement() {
   const exportToExcel = () => {
     if (!registrations.length) return;
 
-    const eventName = events.find((e) => e.id === selectedEventId)?.title || "Event";
-    const rows = registrations.map((reg) => {
-      const row: Record<string, string | number> = {};
+    const event = events.find((e) => e.id === selectedEventId);
+    const eventName = event?.title || "Event";
+    const rows: Record<string, string | number>[] = registrations.map((reg) => {
+      const row: Record<string, string | number> = {
+        "Registration ID": reg.id,
+        "Status": String(reg.status || ""),
+        "Payment Status": String(reg.paymentStatus || ""),
+        "Event": String(reg.eventTitle || eventName),
+        "Registration Fee": Number(reg.registrationFee || 0),
+        "Name": String(reg.leaderName || reg.userName || reg.name || ""),
+        "Email": String(reg.leaderEmail || reg.userEmail || reg.email || ""),
+        "Phone": String(reg.leaderMobile || reg.phone || ""),
+        "School / College": String(reg.leaderCollege || reg.college || ""),
+        "Department / Class": String(reg.leaderDepartment || ""),
+        ...(event?.showMemberYear !== false
+          ? { "Year": String(reg.leaderYear || "") }
+          : {}),
+        "Team Size": Number(reg.teamSize || (Array.isArray(reg.teamMembers) ? reg.teamMembers.length + 1 : 1)),
+        "Razorpay Payment ID": String(reg.razorpayPaymentId || ""),
+        "Razorpay Order ID": String(reg.razorpayOrderId || ""),
+      };
 
-      Object.entries(reg).forEach(([key, value]) => {
-        if (key === "id" || key === "createdAt" || key === "updatedAt") return;
-        if (Array.isArray(value)) {
-          row[key] = value.map((item) => typeof item === "object" ? JSON.stringify(item) : String(item)).join(" | ");
-        } else if (value && typeof value === "object") {
-          row[key] = JSON.stringify(value);
-        } else if (value !== undefined && value !== null) {
-          row[key] = String(value);
-        } else {
-          row[key] = "";
-        }
-      });
+      // Every team member becomes its own set of Excel columns.
+      if (Array.isArray(reg.teamMembers)) {
+        reg.teamMembers.forEach((member, index) => {
+          const memberNo = index + 2;
+          row[`Member ${memberNo} Name`] = String(member?.name || "");
+          Object.entries(member || {}).forEach(([key, value]) => {
+            if (key === "name") return;
+            // Respect the event's current Year collection setting. This also
+            // prevents old registrations from creating Year columns when the
+            // event has been configured for school + college students.
+            if (
+              key.toLowerCase() === "year" &&
+              event?.showMemberYear === false
+            ) {
+              return;
+            }
+            const label = key
+              .replace(/([A-Z])/g, " $1")
+              .replace(/^./, (char) => char.toUpperCase());
+            row[`Member ${memberNo} ${label}`] = value == null ? "" : String(value);
+          });
+        });
+      }
+
+      // Custom event-level fields are exported as individual columns.
+      if (reg.extraData && typeof reg.extraData === "object") {
+        Object.entries(reg.extraData).forEach(([key, value]) => {
+          row[key] = value == null ? "" : String(value);
+        });
+      }
 
       return row;
     });
@@ -94,7 +130,10 @@ export default function RegistrationsManagement() {
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(rows);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Registrations");
-    XLSX.writeFile(workbook, `${eventName.replace(/[^a-z0-9_-]/gi, "_")}_Registrations.xlsx`);
+    XLSX.writeFile(
+      workbook,
+      `${eventName.replace(/[^a-z0-9_-]/gi, "_")}_Registrations.xlsx`
+    );
   };
 
   if (!userData) return null;
@@ -147,12 +186,13 @@ export default function RegistrationsManagement() {
                   <th className="p-4 font-semibold text-gray-400 text-sm">Email</th>
                   <th className="p-4 font-semibold text-gray-400 text-sm">Phone</th>
                   <th className="p-4 font-semibold text-gray-400 text-sm">College</th>
+                  <th className="p-4 font-semibold text-gray-400 text-sm">Team</th>
                   <th className="p-4 font-semibold text-gray-400 text-sm">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
                 {loading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-gray-500">Loading registrations...</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-gray-500">Loading registrations...</td></tr>
                 ) : registrations.length ? (
                   registrations.map((reg) => (
                     <tr key={reg.id} className="hover:bg-gray-800/30">
@@ -160,6 +200,7 @@ export default function RegistrationsManagement() {
                       <td className="p-4 text-gray-400">{String(reg.userEmail || reg.email || reg.leaderEmail || "N/A")}</td>
                       <td className="p-4 text-gray-400">{String(reg.leaderMobile || reg.phone || "N/A")}</td>
                       <td className="p-4 text-gray-400">{String(reg.leaderCollege || reg.college || "N/A")}</td>
+                      <td className="p-4 text-gray-400">{reg.teamSize ? `${String(reg.teamSize)} members` : Array.isArray(reg.teamMembers) ? `${reg.teamMembers.length + 1} members` : "Individual"}</td>
                       <td className="p-4">
                         <span className="text-xs px-3 py-1 rounded-full bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
                           {String(reg.status || "registered")}
@@ -168,7 +209,7 @@ export default function RegistrationsManagement() {
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={5} className="p-8 text-center text-gray-500">No registrations found for this event.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-gray-500">No registrations found for this event.</td></tr>
                 )}
               </tbody>
             </table>

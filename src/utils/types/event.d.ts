@@ -1,3 +1,11 @@
+export type RegistrationFieldType = "text" | "number" | "date" | "email" | "tel";
+
+export type RegistrationField = {
+    name: string;
+    type: RegistrationFieldType;
+    required?: boolean;
+};
+
 export type Event = {
     id: string;
     title: string;
@@ -9,22 +17,21 @@ export type Event = {
     RegCloseTime?: {
         hours: number;
         minutes: number;
-    }
+    };
     regLink?: string;
     type: 'technical' | 'nonTechnical' | 'sports';
     date?: string;
     description: string;
     venue?: string;
-    // eventType: string;
     memberMaxCount: number;
     memberMinCount: number;
     isOnline?: boolean;
-    upi?: string[]
+    upi?: string[];
     gpay?: string;
     maxParticipation?: string;
     minParticipation?: string;
     totalParticipation?: string;
-    eveType?: "ind" | "team"
+    eveType?: "ind" | "team";
     registrationFee: string;
     isFree?: boolean;
     registrationOpen?: boolean;
@@ -32,7 +39,10 @@ export type Event = {
     secondPrize?: string;
     thirdPrize?: string;
     requiresExtraData?: boolean;
-    extraFields?: { name: string; type: string }[]
+    extraFields?: RegistrationField[];
+    teamMemberFields?: RegistrationField[];
+    /** Whether team member Year/Class year should be collected. Defaults to true for legacy events. */
+    showMemberYear?: boolean;
     coordinators: { name: string; phone: string }[];
     rules?: string[];
 };

@@ -880,9 +880,50 @@ export default function Register() {
 
         await refetchUserProfile();
 
-        toastSuccess(
-          "Registration successful!"
-        );
+        if (user.email) {
+          try {
+            const emailResponse = await fetch(
+              "/api/abheri/send-confirmation-email",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  email: user.email,
+                  bandName: formData.bandName,
+                  collegeName: formData.collegeName,
+                  managerName: formData.managerName,
+                  managerMobile: formData.managerMobile,
+                  leaderName: formData.leaderName,
+                  leaderMobile: formData.leaderMobile,
+                  musiciansCount: formData.musiciansCount,
+                  vocalistCount: formData.vocalistCount,
+                  instrumentalistCount: formData.instrumentalistCount,
+                  transactionId: formData.transactionId,
+                  instruments: selectedInstruments,
+                  screenshotUrl,
+                }),
+              }
+            );
+
+            if (!emailResponse.ok) {
+              const emailResult = await emailResponse.json().catch(() => null);
+
+              console.warn(
+                "Abheri registration email was not sent:",
+                emailResult?.error || emailResponse.statusText
+              );
+            }
+          } catch (emailError) {
+            console.warn(
+              "Abheri registration email request failed:",
+              emailError
+            );
+          }
+        }
+
+        toastSuccess("Registration successful! Confirmation email sent.");
       }
 
       // ==================================================

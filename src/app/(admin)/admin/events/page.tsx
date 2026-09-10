@@ -29,6 +29,7 @@ export default function EventsManagement() {
         registrationFee: "",
         isFree: false,
         registrationOpen: true,
+        showMemberYear: true,
         firstPrize: "",
         memberMaxCount: 1,
         memberMinCount: 1,
@@ -100,10 +101,13 @@ export default function EventsManagement() {
         setFormData({ ...formData, coordinators: current });
     };
 
+    const canManageCustomFields = userData?.role === 'superAdmin';
+    const canManageMemberYear = userData?.role === 'superAdmin' || userData?.role === 'admin';
+
     // Extra Fields Helper
     const addExtraField = () => {
         const current = formData.extraFields || [];
-        setFormData({ ...formData, extraFields: [...current, { name: "", type: "text" }] });
+        setFormData({ ...formData, extraFields: [...current, { name: "", type: "text", required: true }] });
     };
 
     const removeExtraField = (index: number) => {
@@ -113,9 +117,27 @@ export default function EventsManagement() {
 
     const updateExtraField = (index: number, field: 'name' | 'type', value: string) => {
         const current = [...(formData.extraFields || [])];
-        if (!current[index]) current[index] = { name: "", type: "text" };
-        current[index][field] = value;
+        if (!current[index]) current[index] = { name: "", type: "text", required: true };
+        current[index] = { ...current[index], [field]: value };
         setFormData({ ...formData, extraFields: current });
+    };
+
+    // Team-member-specific registration fields. These are controlled by Super Admin.
+    const addTeamMemberField = () => {
+        const current = formData.teamMemberFields || [];
+        setFormData({ ...formData, teamMemberFields: [...current, { name: "", type: "text", required: true }] });
+    };
+
+    const removeTeamMemberField = (index: number) => {
+        const current = formData.teamMemberFields || [];
+        setFormData({ ...formData, teamMemberFields: current.filter((_, i) => i !== index) });
+    };
+
+    const updateTeamMemberField = (index: number, field: 'name' | 'type' | 'required', value: string | boolean) => {
+        const current = [...(formData.teamMemberFields || [])];
+        if (!current[index]) current[index] = { name: "", type: "text", required: true };
+        current[index] = { ...current[index], [field]: value };
+        setFormData({ ...formData, teamMemberFields: current });
     };
 
 
@@ -339,6 +361,8 @@ export default function EventsManagement() {
                 bgImageUrl,
                 isFree: Boolean(formData.isFree),
                 registrationOpen: formData.registrationOpen !== false,
+                // Legacy events default to collecting Year unless explicitly turned off.
+                showMemberYear: formData.showMemberYear !== false,
                 registrationFee: formData.isFree ? "0" : formData.registrationFee,
                 // Ensure numbers are numbers
                 memberMaxCount: Number(formData.memberMaxCount),
@@ -347,7 +371,8 @@ export default function EventsManagement() {
                 upi: formData.upi?.filter(u => u) || [],
                 rules: formData.rules?.filter(r => r) || [],
                 coordinators: formData.coordinators?.filter(c => c.name) || [],
-                extraFields: formData.extraFields?.filter(ef => ef.name) || [],
+                extraFields: formData.extraFields?.filter(ef => ef.name?.trim()) || [],
+                teamMemberFields: formData.teamMemberFields?.filter(ef => ef.name?.trim()) || [],
             };
 
             await setDoc(doc(db, "events", eventId), eventData);
@@ -820,34 +845,129 @@ export default function EventsManagement() {
                                 <div>
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="text-sm text-gray-400">Extra Fields (Custom)</label>
-                                        <button type="button" onClick={addExtraField} className="text-xs px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded hover:bg-indigo-500/20 transition-colors">+ Add Field</button>
+                                        {canManageCustomFields && (
+                                            <button type="button" onClick={addExtraField} className="text-xs px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded hover:bg-indigo-500/20 transition-colors">+ Add Field</button>
+                                        )}
                                     </div>
                                     <div className="space-y-3">
                                         {formData.extraFields?.map((field, idx) => (
-                                            <div key={idx} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-gray-900/50 p-3 rounded-lg border border-gray-800/50">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Field Name"
-                                                    value={field.name}
-                                                    onChange={(e) => updateExtraField(idx, 'name', e.target.value)}
-                                                    className="w-full sm:flex-1 bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none text-sm"
-                                                />
-                                                <select
-                                                    value={field.type}
-                                                    onChange={(e) => updateExtraField(idx, 'type', e.target.value)}
-                                                    className="w-full sm:w-32 bg-black/50 border border-gray-700 rounded-lg px-2 py-2 outline-none text-sm"
-                                                >
-                                                    <option value="text">Text</option>
-                                                    <option value="number">Number</option>
-                                                    <option value="date">Date</option>
-                                                </select>
-                                                <button type="button" onClick={() => removeExtraField(idx)} className="text-red-400 hover:text-red-300 p-2 ml-auto sm:ml-0"><FiTrash2 /></button>
+                                            <div key={idx} className="bg-gray-900/50 p-3 rounded-lg border border-gray-800/50 space-y-2">
+                                                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Field Name"
+                                                        value={field.name}
+                                                        onChange={(e) => updateExtraField(idx, 'name', e.target.value)}
+                                                        className="w-full sm:flex-1 bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none text-sm"
+                                                        disabled={!canManageCustomFields}
+                                                    />
+                                                    <select
+                                                        value={field.type}
+                                                        onChange={(e) => updateExtraField(idx, 'type', e.target.value)}
+                                                        className="w-full sm:w-32 bg-black/50 border border-gray-700 rounded-lg px-2 py-2 outline-none text-sm"
+                                                        disabled={!canManageCustomFields}
+                                                    >
+                                                        <option value="text">Text</option>
+                                                        <option value="number">Number</option>
+                                                        <option value="date">Date</option>
+                                                        <option value="email">Email</option>
+                                                        <option value="tel">Phone</option>
+                                                    </select>
+                                                    {canManageCustomFields && (
+                                                        <button type="button" onClick={() => removeExtraField(idx)} className="text-red-400 hover:text-red-300 p-2"><FiTrash2 /></button>
+                                                    )}
+                                                </div>
+                                                <label className="flex items-center gap-2 text-xs text-gray-400">
+                                                    <input type="checkbox" checked={field.required !== false} onChange={(e) => { const current = [...(formData.extraFields || [])]; current[idx] = { ...current[idx], required: e.target.checked }; setFormData({ ...formData, extraFields: current }); }} disabled={!canManageCustomFields} />
+                                                    Required field
+                                                </label>
                                             </div>
                                         ))}
                                         {(!formData.extraFields || formData.extraFields.length === 0) && (
                                             <p className="text-xs text-gray-600 italic">No extra fields added.</p>
                                         )}
                                     </div>
+                                </div>
+
+                                <div className="mt-6 pt-6 border-t border-gray-800">
+                                    {formData.eveType === 'team' && (
+                                        <div className="mb-5 p-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div>
+                                                    <label className="text-sm font-medium text-gray-300">Collect Year for Team Members</label>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Turn this off for events that accept both school and college students.
+                                                        The setting is saved with this event and controls registration + Excel export.
+                                                    </p>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={formData.showMemberYear !== false}
+                                                        onChange={(e) => setFormData({ ...formData, showMemberYear: e.target.checked })}
+                                                        disabled={!canManageMemberYear}
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
+                                                </label>
+                                            </div>
+                                            {!canManageMemberYear && (
+                                                <p className="text-xs text-gray-600 mt-2">Only an Admin or Super Admin can change this setting.</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div>
+                                            <label className="text-sm text-gray-400">Team Member Fields</label>
+                                            <p className="text-xs text-gray-600 mt-1">These fields appear for every member of a team event. Name is always required.</p>
+                                        </div>
+                                        {canManageCustomFields && formData.eveType === 'team' && (
+                                            <button type="button" onClick={addTeamMemberField} className="text-xs px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded hover:bg-indigo-500/20 transition-colors">+ Add Member Field</button>
+                                        )}
+                                    </div>
+                                    {formData.eveType === 'team' ? (
+                                        <div className="space-y-3">
+                                            {(formData.teamMemberFields || []).map((field, idx) => (
+                                                <div key={idx} className="bg-gray-900/50 p-3 rounded-lg border border-gray-800/50 space-y-2">
+                                                    <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. Phone Number, College, Class"
+                                                            value={field.name}
+                                                            onChange={(e) => updateTeamMemberField(idx, 'name', e.target.value)}
+                                                            className="w-full sm:flex-1 bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none text-sm"
+                                                            disabled={!canManageCustomFields}
+                                                        />
+                                                        <select
+                                                            value={field.type}
+                                                            onChange={(e) => updateTeamMemberField(idx, 'type', e.target.value)}
+                                                            className="w-full sm:w-32 bg-black/50 border border-gray-700 rounded-lg px-2 py-2 outline-none text-sm"
+                                                            disabled={!canManageCustomFields}
+                                                        >
+                                                            <option value="text">Text</option>
+                                                            <option value="number">Number</option>
+                                                            <option value="date">Date</option>
+                                                            <option value="email">Email</option>
+                                                            <option value="tel">Phone</option>
+                                                        </select>
+                                                        {canManageCustomFields && (
+                                                            <button type="button" onClick={() => removeTeamMemberField(idx)} className="text-red-400 hover:text-red-300 p-2"><FiTrash2 /></button>
+                                                        )}
+                                                    </div>
+                                                    <label className="flex items-center gap-2 text-xs text-gray-400">
+                                                        <input type="checkbox" checked={field.required !== false} onChange={(e) => updateTeamMemberField(idx, 'required', e.target.checked)} disabled={!canManageCustomFields} />
+                                                        Required field
+                                                    </label>
+                                                </div>
+                                            ))}
+                                            {(!formData.teamMemberFields || formData.teamMemberFields.length === 0) && (
+                                                <p className="text-xs text-gray-600 italic">No custom member fields. Members still receive Name, Phone Number, School / College and Department / Class. Year is controlled by the toggle above.</p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-600 italic">Select Team as the event type to configure member fields.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -9,7 +9,6 @@ import BandCompetition from "@/widgets/home/BandCompetition";
 import ITBPExhibition from "@/widgets/home/ITBPExhibition";
 import ISROExhibition from "@/widgets/home/ISROExhibition";
 import Preloader from "@/widgets/home/Preloader";
-import Partners from "@/widgets/home/Partners";
 
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +32,6 @@ export default function HomePage() {
       <ISROExhibition />
       <ITBPExhibition />
       <BandCompetition />
-      <Partners />
     </div>
   );
 }
