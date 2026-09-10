@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import ParticleImage from "@/widgets/common/ParticleImage";
 
 export default function Hero() {
 
@@ -37,26 +37,26 @@ export default function Hero() {
   }, [particleCount]);
 
   return (
-    <section className="relative isolate overflow-hidden bg-[#F9F6ED] text-[#221F1A]">
+    <section className="relative isolate overflow-hidden bg-[#0B0B0E] text-white">
       {/* Ambient + grid */}
       {mounted && (
         <>
-          <div className="pointer-events-none absolute -left-32 -top-24 h-72 w-72 animate-pulse rounded-full bg-[#DEC077]/25 blur-[120px]" />
-          <div className="pointer-events-none absolute right-0 top-10 h-80 w-80 animate-[pulse_7s_ease-in-out_infinite] rounded-full bg-[#E9D39D]/30 blur-[130px]" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(222,192,119,0.12),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(233,211,157,0.15),transparent_38%)]" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(193,155,76,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(193,155,76,0.04)_1px,transparent_1px)] bg-[size:140px_140px] opacity-30" />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(222,192,119,0.08),transparent_40%),linear-gradient(240deg,rgba(193,155,76,0.06),transparent_35%)] opacity-60" />
+          <div className="pointer-events-none absolute -left-32 -top-24 h-80 w-80 animate-pulse rounded-full bg-[#3A270D]/50 blur-[140px]" />
+          <div className="pointer-events-none absolute right-0 top-10 h-96 w-96 animate-[pulse_7s_ease-in-out_infinite] rounded-full bg-[#3A270D]/40 blur-[150px]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(212,163,89,0.06),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(58,39,13,0.35),transparent_38%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:140px_140px] opacity-25" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(58,39,13,0.2),transparent_40%),linear-gradient(240deg,rgba(212,163,89,0.05),transparent_35%)] opacity-70" />
 
-          {/* Circuit overlay */}
-          <div className="pointer-events-none absolute inset-0 opacity-15">
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(193,155,76,0.15)_1px,transparent_1px),linear-gradient(0deg,rgba(222,192,119,0.12)_1px,transparent_1px),linear-gradient(135deg,rgba(233,211,157,0.1)_1px,transparent_1px)] bg-[size:180px_180px,180px_180px,220px_220px]" />
+          {/* Geometric lines overlay */}
+          <div className="pointer-events-none absolute inset-0 opacity-20">
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(212,163,89,0.08)_1px,transparent_1px),linear-gradient(0deg,rgba(212,163,89,0.06)_1px,transparent_1px)] bg-[size:180px_180px]" />
           </div>
 
-          {/* Floating chips (static/deterministic props) */}
+          {/* Floating chips */}
           {[
             {
               className:
-                "left-[8%] top-[18%] h-7 w-7 rounded-lg border border-[#DEC077] bg-[#E9D39D]/30 blur-[1px]",
+                "left-[8%] top-[18%] h-7 w-7 rounded-lg border border-[rgba(212,163,89,0.35)] bg-[#3A270D]/30 blur-[1px]",
               y: -12,
               rot: 8,
               dur: 6,
@@ -64,7 +64,7 @@ export default function Hero() {
             },
             {
               className:
-                "right-[10%] top-[26%] h-9 w-9 rounded-xl border border-[#C19B4C]/60 bg-[#DEC077]/20 blur-[1px]",
+                "right-[10%] top-[26%] h-9 w-9 rounded-xl border border-[rgba(243,200,122,0.35)] bg-[#3A270D]/25 blur-[1px]",
               y: 14,
               rot: -10,
               dur: 7,
@@ -72,7 +72,7 @@ export default function Hero() {
             },
             {
               className:
-                "left-1/2 bottom-[18%] h-11 w-11 -translate-x-1/2 rounded-2xl border border-[#DEC077] bg-[#E9D39D]/25 blur-[1px]",
+                "left-1/2 bottom-[18%] h-11 w-11 -translate-x-1/2 rounded-2xl border border-[rgba(212,163,89,0.35)] bg-[#3A270D]/20 blur-[1px]",
               y: -10,
               rot: 12,
               dur: 8,
@@ -80,7 +80,7 @@ export default function Hero() {
             },
             {
               className:
-                "left-[18%] bottom-[26%] h-6 w-6 rounded-md border border-[#C19B4C]/50 bg-[#E9D39D]/30 blur-[1px]",
+                "left-[18%] bottom-[26%] h-6 w-6 rounded-md border border-[rgba(253,230,176,0.3)] bg-[#3A270D]/25 blur-[1px]",
               y: 10,
               rot: -6,
               dur: 6.5,
@@ -121,20 +121,20 @@ export default function Hero() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, amount: 0.6 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="inline-flex items-center text-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D]/50 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#221F1A] backdrop-blur"
+            className="inline-flex items-center text-center gap-2 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318]/80 px-3.5 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#FDE6B0] backdrop-blur"
           >
             Carmel College of Engineering and Technology presents
           </motion.div>
 
-          {/* Spark the date badge! */}
+          {/* Date badge */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mx-auto md:mx-0 inline-flex items-center gap-3 rounded-full border border-[#DEC077] bg-[#E9D39D] px-5 py-2.5 text-xs font-bold text-[#221F1A] shadow-sm backdrop-blur-sm"
+            className="mx-auto md:mx-0 inline-flex items-center gap-3 rounded-full border border-[rgba(212,163,89,0.35)] bg-[#131318]/90 px-5 py-2.5 text-xs font-bold text-[#F3C87A] backdrop-blur-sm"
           >
-            <span className="h-2 w-2 rounded-full bg-[#C19B4C] animate-ping" />
+            <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-[#F3C87A] animate-ping" />
             <span>October 8 - 9, 2026</span>
           </motion.div>
 
@@ -143,12 +143,14 @@ export default function Hero() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="text-3xl font-bold leading-tight text-[#221F1A] sm:text-4xl lg:text-4xl"
+            className="text-3xl font-bold leading-tight text-white sm:text-3xl lg:text-3xl"
           >
-            <span className="relative block mt-2 text-6xl sm:text-5xl lg:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C]">
+            <span className="relative block mt-2 text-6xl sm:text-4xl lg:text-7xl font-extrabold gold-gradient-text">
               Sparkz 2K26
             </span>
-            Innovation Unleashed
+            <span className="text-white font-bold text-2xl sm:text-3xl block mt-1 tracking-wide">
+              Innovation Unleashed
+            </span>
           </motion.h1>
 
           <motion.p
@@ -156,7 +158,7 @@ export default function Hero() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.65, ease: "easeOut" }}
-            className="max-w-lg text-[17px] text-[#221F1A]/80 sm:text-[17px]"
+            className="max-w-lg text-[17px] text-[#A1A1AA] sm:text-[17px] leading-relaxed"
           >
             The fest where students compete, create, and spark something big.
           </motion.p>
@@ -164,10 +166,10 @@ export default function Hero() {
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-start">
             <Link
               href="/events"
-              className="group text-[15px] inline-flex items-center justify-center gap-2 rounded-full bg-[#E9D39D] hover:bg-[#DEC077] border border-[#DEC077] px-7 py-3 text-base font-semibold text-[#221F1A] shadow-[0_10px_30px_rgba(222,192,119,0.35)] transition-all hover:scale-[1.02]"
+              className="btn-gold group text-[15px] inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-bold text-[#0B0B0E] transition hover:scale-[1.02]"
             >
               Join Now
-              <span className="transition group-hover:translate-x-1 text-[#C19B4C]">→</span>
+              <span className="transition group-hover:translate-x-1">→</span>
             </Link>
           </div>
         </motion.div>
@@ -180,7 +182,7 @@ export default function Hero() {
           transition={{ duration: 0.75, ease: "easeOut" }}
           className="order-1 relative flex w-full items-center justify-center md:order-2 md:w-1/2 md:-mt-6"
         >
-          <div className="relative pl-5 h-80 w-64 sm:h-[28rem] sm:w-96">
+          <div className="relative pl-5 h-46 w-46 sm:h-74 sm:w-74">
             {mounted &&
               particles.map((p) => {
                 const angleRad = (p.angle * Math.PI) / 180;
@@ -211,52 +213,33 @@ export default function Hero() {
                     }}
                   >
                     {p.i % 3 === 0 && (
-                      <div className="h-3 w-3 rounded-full bg-[#DEC077] shadow-[0_0_12px_#DEC077] blur-[1px]" />
+                      <div className="h-3 w-3 rounded-full bg-[#F3C87A] shadow-[0_0_16px_#D4A359] blur-[1px]" />
                     )}
                     {p.i % 3 === 1 && (
-                      <div className="h-2 w-2 rotate-45 border border-[#C19B4C] shadow-[0_0_12px_#C19B4C]" />
+                      <div className="h-2 w-2 rotate-45 border border-[#FDE6B0] shadow-[0_0_12px_#F3C87A]" />
                     )}
                     {p.i % 3 === 2 && (
-                      <div className="h-4 w-4 rounded-sm bg-gradient-to-br from-[#E9D39D] to-[#C19B4C] shadow-[0_0_15px_#C19B4C] blur-[1px]" />
+                      <div className="h-4 w-4 rounded-sm bg-gradient-to-br from-[#D4A359] to-[#F3C87A] shadow-[0_0_20px_#D4A359] blur-[2px]" />
                     )}
                   </motion.div>
                 );
               })}
 
-            {/* Ambient golden backlight behind logo */}
-            <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_50%,rgba(217,155,38,0.22),rgba(193,155,76,0.08)_50%,transparent_70%)] blur-2xl" />
-
-            {/* Particle Logo */}
-            <ParticleImage
-              imageConfig={{
-                image: "/extracted_sparkz.png",
-                mode: "fit",
-                scale: 11,
-              }}
-              particleColor="original"
-              particleShape="circle"
-              particleCount={150}
-              particleSize={6}
-              hoverEnabled
-              hoverConfig={{
-                hoverType: "roam",
-                transition: { duration: 0.8, ease: "easeInOut" },
-                roamOpacity: 0.85,
-                roamShape: "oval",
-              }}
-              repulsionEnabled
-              repulsionConfig={{
-                repulsionMode: "outside",
-                repulsionForce: 8,
-                repulsionRadius: 65,
-              }}
-              autoCycle
-              cycleInterval={4500}
-              holdDuration={2200}
-              width="100%"
-              height="100%"
-              className="absolute inset-0"
-            />
+            {/* Logo container */}
+            <motion.div
+              className="relative flex h-full w-full items-center justify-center bg-transparent"
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <Image
+                src="/sparkz.svg"
+                alt="Sparkz Logo"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_0_35px_rgba(212,163,89,0.45)]"
+                sizes="(max-width: 768px) 200px, 280px"
+              />
+            </motion.div>
           </div>
         </motion.div>
       </div>

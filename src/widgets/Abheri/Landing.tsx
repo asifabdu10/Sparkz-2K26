@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { toastInfo } from "@/utils/common/Toast";
 import {
   collection,
   query,
@@ -13,9 +12,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { useAuth } from "@/context/AuthContext";
-
-const accentGradient =
-  "bg-gradient-to-r from-indigo-500/30 via-fuchsia-500/25 to-amber-400/25";
 
 const rulesSections = [
   {
@@ -93,17 +89,18 @@ const rulesSections = [
   },
 ];
 
-const chiefGuestImage = "/ouseppachan.png"; // Replace with actual image path/URL
+const chiefGuestImage = "/ouseppachan.png";
 
 export default function AbheriPage() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
 
-  const [abheriRegistered, setAbheriRegistered] =
-    useState(false);
+  const [abheriRegistered, setAbheriRegistered] = useState(false);
+  const [checkingAbheriRegistration, setCheckingAbheriRegistration] = useState(true);
 
-  const [checkingAbheriRegistration, setCheckingAbheriRegistration] =
-    useState(true);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const checkAbheriRegistration = async () => {
@@ -121,14 +118,9 @@ export default function AbheriPage() {
         );
 
         const snapshot = await getDocs(q);
-
         setAbheriRegistered(!snapshot.empty);
       } catch (error) {
-        console.error(
-          "Failed to check Abheri registration:",
-          error
-        );
-
+        console.error("Failed to check Abheri registration:", error);
         setAbheriRegistered(false);
       } finally {
         setCheckingAbheriRegistration(false);
@@ -139,38 +131,14 @@ export default function AbheriPage() {
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-[#F9F6ED] text-[#221F1A] overflow-x-hidden">
+    <div className="min-h-screen bg-[#0B0B0E] text-white overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative isolate overflow-hidden pt-10 pb-20 sm:py-15">
         {mounted && (
           <>
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#F9F6ED] via-transparent to-transparent h-64" />
-            <div className="pointer-events-none absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#DEC077]/20 blur-[140px]" />
-            <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[15%] h-96 w-96 rounded-full bg-[#E9D39D]/30 blur-[150px]" />
-            <div className="hidden sm:block pointer-events-none absolute inset-x-0 top-[20%] h-full bg-linear-to-b from-[#DEC077]/10 via-[#E9D39D]/15 to-transparent blur-3xl opacity-70" />
-            <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(222,192,119,0.15),transparent_45%),radial-gradient(circle_at_70%_70%,rgba(233,211,157,0.12),transparent_40%)]" />
-            <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(193,155,76,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(193,155,76,0.04)_1px,transparent_1px)] bg-size-[140px_140px] opacity-40" />
-
-            {[
-              {
-                className: "right-[12%] top-[20%] h-10 w-10",
-              },
-              {
-                className: "left-1/2 top-[55%] -translate-x-1/2 h-12 w-12",
-              },
-              { className: "left-[10%] top-[70%] h-8 w-8" },
-            ].map((chip, i) => (
-              <motion.div
-                key={i}
-                className={`pointer-events-none absolute ${chip.className} rounded-xl border border-[#DEC077]/50 bg-[#E9D39D]/30 blur-[1px]`}
-                animate={{ y: [-10, 15, -10], rotate: [-8, 8, -8] }}
-                transition={{
-                  duration: 7 + i,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            ))}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0B0B0E] via-transparent to-transparent h-64" />
+            <div className="pointer-events-none absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
+            <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[15%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
           </>
         )}
         <div className="relative z-10 px-[5vw]">
@@ -181,32 +149,30 @@ export default function AbheriPage() {
               transition={{ duration: 0.8 }}
               className="text-center space-y-8"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#221F1A] shadow-xs mx-auto">
-                <span className="h-2 w-2 rounded-full bg-[#C19B4C] animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.3)] bg-[#3A270D]/60 px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#F3C87A] backdrop-blur mx-auto">
+                <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />
                 Inter-Collegiate Band Competition
               </div>
-              <h1 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl text-[#221F1A]">
-                <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent">
+              <h1 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl">
+                <span className="gold-gradient-text">
                   ABHERI
                 </span>
                 <br />
-                Rock the Stage on <br />
-                <span className="text-[#C19B4C]">8 Oct 2026</span>
+                <span className="text-white">Rock the Stage on</span> <br />
+                <span className="text-[#F3C87A]">8 Oct 2026</span>
               </h1>
-              <p className="text-xl text-[#221F1A]/70 max-w-2xl mx-auto font-medium">
+              <p className="text-xl text-[#A1A1AA] max-w-2xl mx-auto">
                 Unleash your band&apos;s energy at Sparkz 2K26 – Prize pool up to
                 ₹60,000 | Teams of 5-10 | Reg: ₹1,200
               </p>
               {abheriRegistered ? (
-                <div
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-green-600/40 bg-green-100 px-8 py-3 text-sm font-bold uppercase tracking-widest text-green-800 w-full md:w-auto"
-                >
+                <div className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(212,163,89,0.4)] bg-[#3A270D]/80 px-8 py-3 text-sm font-bold uppercase tracking-widest text-[#F3C87A] w-full md:w-auto">
                   ✓ Registered
                 </div>
               ) : (
                 <Link
                   href="/abheri/register"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] hover:bg-[#dec077] px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[#221F1A] shadow-md hover:scale-105 transition-all w-full md:w-auto"
+                  className="inline-flex items-center justify-center gap-2 rounded-full btn-gold px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[#0B0B0E] shadow-[0_0_20px_rgba(212,163,89,0.35)] hover:scale-105 transition-transform w-full md:w-auto"
                 >
                   Register Now
                 </Link>
@@ -218,13 +184,9 @@ export default function AbheriPage() {
 
       {/* Chief Guest Section */}
       <section className="relative isolate overflow-hidden pb-20 pt-10 sm:pt-14">
-        <div className="absolute inset-0 bg-linear-to-b from-[#F9F6ED] via-[#FAF4E8] to-[#F9F6ED]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0E] via-[#131318]/50 to-[#0B0B0E]" />
         {mounted && (
-          <>
-            {/* Dynamic background elements */}
-            <div className="hidden sm:block pointer-events-none absolute left-[-10%] top-[-10%] h-[600px] w-[600px] rounded-full bg-[#DEC077]/15 blur-[180px]" />
-            <div className="hidden sm:block pointer-events-none absolute right-[-10%] bottom-[-10%] h-[500px] w-[500px] rounded-full bg-[#E9D39D]/20 blur-[150px]" />
-          </>
+          <div className="hidden sm:block pointer-events-none absolute left-[-10%] top-[-10%] h-[600px] w-[600px] rounded-full bg-[#3A270D]/30 blur-[180px]" />
         )}
         <div className="relative z-10 px-[5vw]">
           <div className="mx-auto max-w-7xl">
@@ -237,34 +199,34 @@ export default function AbheriPage() {
               <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
                 {/* Image Side */}
                 <div className="w-full lg:w-1/2">
-                  <div className="relative mx-auto w-full max-w-sm lg:max-w-md aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5] overflow-hidden rounded-3xl border border-[#DEC077] shadow-xl group">
+                  <div className="relative mx-auto w-full max-w-sm lg:max-w-md aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5] overflow-hidden rounded-3xl border border-[rgba(212,163,89,0.3)] shadow-2xl shadow-black group">
                     <Image
                       src={chiefGuestImage}
                       alt="Ouseppachan"
                       fill
                       className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#221F1A]/70 via-transparent to-transparent opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E] via-transparent to-transparent opacity-80" />
                   </div>
                 </div>
 
                 {/* Content Side */}
                 <div className="w-full lg:w-1/2 space-y-8 text-center lg:text-left">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#221F1A] shadow-xs">
-                    <span className="h-2 w-2 rounded-full bg-[#C19B4C] animate-pulse" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.3)] bg-[#3A270D]/60 px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#F3C87A] backdrop-blur">
+                    <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />
                     Chief Guest Spotlight
                   </div>
 
-                  <h2 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl text-[#221F1A]">
-                    <span>Ouseppachan</span>
+                  <h2 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl">
+                    <span className="gold-gradient-text">Ouseppachan</span>
                   </h2>
 
                   <div className="space-y-4">
-                    <p className="text-xl text-[#C19B4C] font-bold leading-relaxed">
+                    <p className="text-xl text-[#FDE6B0] font-medium leading-relaxed">
                       Renowned Film Composer, Music Director, Producer, Violinist &amp; Singer.
                     </p>
-                    <p className="text-lg text-[#221F1A]/70 leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium">
-                      Gracing the stage of Spark at Abheri 2K26, experience the
+                    <p className="text-lg text-[#A1A1AA] leading-relaxed max-w-xl mx-auto lg:mx-0">
+                      Gracing the stage of Sparkz at Abheri 2K26, experience the
                       timeless artistry of a legendary musician whose music continues to resonate across generations.
                     </p>
                   </div>
@@ -277,13 +239,9 @@ export default function AbheriPage() {
 
       {/* Competition Judge Section - Roshan NC */}
       <section className="relative isolate overflow-hidden pb-20 pt-10 sm:pt-14">
-        <div className="absolute inset-0 bg-linear-to-b from-[#F9F6ED] via-[#FAF4E8] to-[#F9F6ED]" />
+        <div className="absolute inset-0 bg-[#0B0B0E]" />
         {mounted && (
-          <>
-            {/* Dynamic background elements */}
-            <div className="hidden sm:block pointer-events-none absolute left-[-10%] top-[-10%] h-[600px] w-[600px] rounded-full bg-[#DEC077]/15 blur-[180px]" />
-            <div className="hidden sm:block pointer-events-none absolute right-[-10%] bottom-[-10%] h-[500px] w-[500px] rounded-full bg-[#E9D39D]/20 blur-[150px]" />
-          </>
+          <div className="hidden sm:block pointer-events-none absolute right-[-10%] bottom-[-10%] h-[500px] w-[500px] rounded-full bg-[#3A270D]/25 blur-[150px]" />
         )}
         <div className="relative z-10 px-[5vw]">
           <div className="mx-auto max-w-7xl">
@@ -296,33 +254,33 @@ export default function AbheriPage() {
               <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-20">
                 {/* Image Side */}
                 <div className="w-full lg:w-1/2">
-                  <div className="relative mx-auto w-full max-w-sm lg:max-w-md aspect-[4/5] sm:aspect-3/4 lg:aspect-[4/5] overflow-hidden rounded-3xl border border-[#DEC077] shadow-xl group">
+                  <div className="relative mx-auto w-full max-w-sm lg:max-w-md aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5] overflow-hidden rounded-3xl border border-[rgba(212,163,89,0.3)] shadow-2xl shadow-black group">
                     <Image
                       src="/roshan_nc.png"
                       alt="Roshan NC"
                       fill
                       className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#221F1A]/70 via-transparent to-transparent opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E] via-transparent to-transparent opacity-80" />
                   </div>
                 </div>
 
                 {/* Content Side */}
                 <div className="w-full lg:w-1/2 space-y-8 text-center lg:text-left">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#221F1A] shadow-xs">
-                    <span className="h-2 w-2 rounded-full bg-[#C19B4C] animate-pulse" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.3)] bg-[#3A270D]/60 px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#F3C87A] backdrop-blur">
+                    <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />
                     Competition Judge
                   </div>
 
-                  <h2 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl text-[#221F1A]">
-                    <span>Roshan NC</span>
+                  <h2 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl">
+                    <span className="gold-gradient-text">Roshan NC</span>
                   </h2>
 
                   <div className="space-y-4">
-                    <p className="text-xl text-[#C19B4C] font-bold leading-relaxed">
+                    <p className="text-xl text-[#FDE6B0] font-medium leading-relaxed">
                       Acclaimed Musician &amp; Guitarist.
                     </p>
-                    <p className="text-lg text-[#221F1A]/70 leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium">
+                    <p className="text-lg text-[#A1A1AA] leading-relaxed max-w-xl mx-auto lg:mx-0">
                       Bringing his technical expertise and cinematic music experience to judge the performances at Abheri 2K26.
                       Elevate your performance under the keen eye of a true industry professional.
                     </p>
@@ -335,13 +293,7 @@ export default function AbheriPage() {
       </section>
 
       {/* Rules Section */}
-      <section id="rules" className="relative py-20">
-        {mounted && (
-          <>
-            <div className="pointer-events-none absolute left-[-10%] top-0 h-96 w-96 rounded-full bg-[#DEC077]/15 blur-[100px]" />
-            <div className="hidden sm:block pointer-events-none absolute right-[-5%] bottom-0 h-96 w-96 rounded-full bg-[#E9D39D]/20 blur-[100px]" />
-          </>
-        )}
+      <section id="rules" className="relative py-20 bg-[#0B0B0E]">
         <div className="relative z-10 px-[5vw]">
           <div className="mx-auto max-w-7xl">
             <motion.div
@@ -350,13 +302,11 @@ export default function AbheriPage() {
               viewport={{ once: true }}
               className="text-center space-y-8 mb-16"
             >
-              <h2 className="text-4xl font-black sm:text-5xl text-[#221F1A]">
-                Rules &amp;{" "}
-                <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent">
-                  Regulations
-                </span>
+              <h2 className="text-4xl font-black sm:text-5xl">
+                <span className="text-white">Rules &amp; </span>
+                <span className="gold-gradient-text">Regulations</span>
               </h2>
-              <p className="text-xl text-[#221F1A]/70 max-w-2xl mx-auto font-medium">
+              <p className="text-xl text-[#A1A1AA] max-w-2xl mx-auto">
                 Know the guidelines to rock the stage without a hitch.
               </p>
             </motion.div>
@@ -368,22 +318,20 @@ export default function AbheriPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="rounded-3xl border border-[#DEC077] bg-[#FAF4E8] backdrop-blur overflow-hidden flex flex-col hover:border-[#C19B4C] hover:shadow-lg transition-all duration-300"
+                  className="rounded-3xl border border-[rgba(212,163,89,0.25)] bg-[#131318] overflow-hidden flex flex-col hover:border-[rgba(212,163,89,0.45)] transition-all duration-300"
                 >
-                  <div
-                    className="px-8 py-5 bg-[#E9D39D] border-b border-[#DEC077]"
-                  >
-                    <h3 className="text-md font-black uppercase tracking-widest text-[#221F1A]">
+                  <div className="px-8 py-5 bg-[#3A270D]/60 border-b border-[rgba(212,163,89,0.25)]">
+                    <h3 className="text-md font-bold uppercase tracking-widest text-[#FDE6B0]">
                       {section.title}
                     </h3>
                   </div>
                   <div className="p-8 space-y-4 flex-1">
                     {section.points.map((point, pIdx) => (
                       <div key={pIdx} className="flex items-start gap-4">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E9D39D] text-[#221F1A] font-bold text-xs mt-0.5 border border-[#DEC077]">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#3A270D] text-[#F3C87A] font-bold text-xs mt-0.5 border border-[rgba(212,163,89,0.3)]">
                           {pIdx + 1}
                         </div>
-                        <p className="text-[#221F1A]/80 leading-relaxed text-base font-medium">
+                        <p className="text-[#A1A1AA] leading-relaxed text-base">
                           {point}
                         </p>
                       </div>
@@ -397,7 +345,7 @@ export default function AbheriPage() {
       </section>
 
       {/* Contacts & CTA Section */}
-      <section className="relative py-24 bg-[#FAF4E8] border-t border-[#DEC077]/40">
+      <section className="relative py-24 bg-[#0B0B0E]">
         <div className="relative z-10 px-[5vw]">
           <div className="mx-auto max-w-5xl">
             <motion.div
@@ -407,17 +355,18 @@ export default function AbheriPage() {
               className="text-center space-y-12"
             >
               <div className="space-y-6">
-                <h2 className="text-4xl font-black sm:text-5xl text-[#221F1A]">
-                  Ready to <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent">Jam?</span>
+                <h2 className="text-4xl font-black sm:text-5xl">
+                  <span className="text-white">Ready to </span>
+                  <span className="gold-gradient-text">Jam?</span>
                 </h2>
                 <div className="inline-flex flex-wrap justify-center gap-4">
-                  <span className="px-6 py-2 rounded-full bg-[#F9F6ED] border border-[#DEC077] text-[#221F1A] text-sm font-semibold shadow-xs">
+                  <span className="px-6 py-2 rounded-full bg-[#131318] border border-[rgba(212,163,89,0.25)] text-[#A1A1AA] text-sm font-medium">
                     Reg Fee:{" "}
-                    <span className="text-[#C19B4C] font-black">₹1,200</span> / team
+                    <span className="text-[#F3C87A] font-bold">₹1,200</span> / team
                   </span>
-                  <span className="px-6 py-2 rounded-full bg-[#F9F6ED] border border-[#DEC077] text-[#221F1A] text-sm font-semibold shadow-xs">
+                  <span className="px-6 py-2 rounded-full bg-[#131318] border border-[rgba(212,163,89,0.25)] text-[#A1A1AA] text-sm font-medium">
                     Date:{" "}
-                    <span className="text-[#C19B4C] font-black">8 Oct 2026</span>
+                    <span className="text-[#F3C87A] font-bold">8 Oct 2026</span>
                   </span>
                 </div>
               </div>
@@ -436,17 +385,17 @@ export default function AbheriPage() {
                 ].map((contact, i) => (
                   <div
                     key={i}
-                    className="p-6 rounded-2xl border border-[#DEC077] bg-[#F9F6ED] shadow-sm hover:border-[#C19B4C] transition-colors"
+                    className="p-6 rounded-2xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[rgba(212,163,89,0.45)] transition-colors"
                   >
-                    <h3 className="text-sm font-bold text-[#C19B4C] uppercase tracking-widest mb-2">
+                    <h3 className="text-sm font-bold text-[#F3C87A] uppercase tracking-widest mb-2">
                       {contact.title}
                     </h3>
-                    <p className="text-xl font-bold text-[#221F1A] mb-1">
+                    <p className="text-xl font-bold text-white mb-1">
                       {contact.name}
                     </p>
                     <a
                       href={`tel:${contact.phone.replace(/ /g, "")}`}
-                      className="text-[#221F1A]/70 hover:text-[#C19B4C] font-medium transition-colors"
+                      className="text-[#A1A1AA] hover:text-[#FDE6B0] transition-colors"
                     >
                       {contact.phone}
                     </a>
@@ -454,15 +403,13 @@ export default function AbheriPage() {
                 ))}
               </div>
               {abheriRegistered ? (
-                <div
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-green-600/40 bg-green-100 px-8 py-3 text-sm font-bold uppercase tracking-widest text-green-800 w-full md:w-auto"
-                >
+                <div className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(212,163,89,0.4)] bg-[#3A270D]/80 px-8 py-3 text-sm font-bold uppercase tracking-widest text-[#F3C87A] w-full md:w-auto">
                   ✓ Registered
                 </div>
               ) : (
                 <Link
                   href="/abheri/register"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] hover:bg-[#dec077] px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[#221F1A] shadow-md hover:scale-105 transition-all w-full md:w-auto"
+                  className="inline-flex items-center justify-center gap-2 rounded-full btn-gold px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[#0B0B0E] shadow-[0_0_20px_rgba(212,163,89,0.35)] hover:scale-105 transition-transform w-full md:w-auto"
                 >
                   Register Now
                 </Link>

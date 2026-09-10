@@ -94,14 +94,14 @@ export default function Register() {
   // UPI DETAILS
   // ==================================================
 
-  const UPI_ID = "steevpalliath007@oksbi";
+  const UPI_ID = "asifabdulla1234@oksbi";
 
   const transactionNote = `Abheri Registration ${formData.bandName
     ? `- ${formData.bandName}`
     : ""
     }`;
 
-  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1200&cu=INR&tn=${encodeURIComponent(
+  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1&cu=INR&tn=${encodeURIComponent(
     transactionNote
   )}`;
 
@@ -980,13 +980,13 @@ export default function Register() {
 
   if (!registrationOpen) {
     return (
-      <div className="min-h-screen bg-[#F9F6ED] text-[#221F1A] px-4 py-12 flex items-center justify-center">
-        <div className="max-w-2xl w-full text-center border border-[#DEC077] bg-[#FAF4E8] rounded-3xl p-8 md:p-12 shadow-xl">
-          <h1 className="text-4xl md:text-5xl font-black mb-4 text-[#221F1A]">
+      <div className="min-h-screen bg-black text-white px-4 py-12 flex items-center justify-center">
+        <div className="max-w-2xl w-full text-center border border-white/10 bg-white/5 rounded-3xl p-8 md:p-12">
+          <h1 className="text-4xl md:text-5xl font-black mb-4">
             Registration Closed
           </h1>
 
-          <p className="text-[#221F1A]/70 text-lg mb-8 font-medium">
+          <p className="text-gray-400 text-lg mb-8">
             The registration for Abheri is
             currently closed. Please check
             again later.
@@ -994,7 +994,7 @@ export default function Register() {
 
           <Link
             href="/abheri"
-            className="inline-flex items-center justify-center rounded-full bg-[#E9D39D] hover:bg-[#dec077] border border-[#DEC077] text-[#221F1A] px-8 py-3.5 font-bold transition shadow-md"
+            className="inline-flex items-center justify-center rounded-xl bg-white text-black px-6 py-3 font-semibold hover:bg-gray-200 transition"
           >
             Back to Event Details
           </Link>
@@ -1008,13 +1008,13 @@ export default function Register() {
   // ==================================================
 
   return (
-    <div className="min-h-screen bg-[#F9F6ED] text-[#221F1A] px-4 py-10 md:py-14 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-black text-white px-4 py-10 md:py-14 font-sans relative overflow-hidden">
 
       {/* Background glow */}
       <div className="fixed inset-0 pointer-events-none -z-10">
-        <div className="absolute top-0 left-0 w-[40%] h-[40%] bg-[#DEC077]/20 rounded-full blur-[120px]" />
+        <div className="absolute top-0 left-0 w-[40%] h-[40%] bg-purple-900/20 rounded-full blur-[120px]" />
 
-        <div className="absolute bottom-0 right-0 w-[40%] h-[40%] bg-[#E9D39D]/30 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-0 w-[40%] h-[40%] bg-orange-900/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="max-w-5xl mx-auto">
@@ -1024,23 +1024,23 @@ export default function Register() {
 
           <Link
             href="/abheri"
-            className="inline-block mb-6 text-sm text-[#221F1A]/70 hover:text-[#C19B4C] font-semibold transition"
+            className="inline-block mb-6 text-sm text-white/50 hover:text-white transition"
           >
             ← Back to Abheri
           </Link>
 
           <h1 className="text-4xl md:text-6xl font-black">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C]">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-fuchsia-500">
               ABHERI
             </span>
           </h1>
 
-          <p className="text-[#221F1A]/70 mt-3 text-lg font-medium">
+          <p className="text-white/50 mt-3 text-lg">
             Battle of Bands — Registration
           </p>
 
           {existingRegistrationId && (
-            <div className="inline-block mt-5 px-5 py-2 rounded-full border border-green-600/30 bg-green-100 text-green-800 font-semibold text-sm">
+            <div className="inline-block mt-5 px-5 py-2 rounded-full border border-green-500/20 bg-green-500/10 text-green-300 text-sm">
               You already registered. You can
               update your details below.
             </div>
@@ -1048,7 +1048,7 @@ export default function Register() {
         </div>
 
         {/* Form card */}
-        <div className="rounded-3xl border border-[#DEC077] bg-[#FAF4E8] backdrop-blur-xl p-6 md:p-10 shadow-xl">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6 md:p-10 shadow-2xl">
 
           <form
             onSubmit={handleSubmit}
@@ -1060,12 +1060,12 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Band Details
                 </h2>
 
-                <p className="text-sm text-[#221F1A]/60 mt-1">
+                <p className="text-sm text-white/40 mt-1">
                   Enter your band information.
                 </p>
               </div>
@@ -1073,7 +1073,7 @@ export default function Register() {
               <div className="grid md:grid-cols-2 gap-5">
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Band Name *
                   </label>
 
@@ -1083,12 +1083,12 @@ export default function Register() {
                     value={formData.bandName}
                     onChange={handleChange}
                     placeholder="Enter band name"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     College Name *
                   </label>
 
@@ -1098,7 +1098,7 @@ export default function Register() {
                     value={formData.collegeName}
                     onChange={handleChange}
                     placeholder="Enter college name"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
@@ -1110,8 +1110,8 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Manager Details
                 </h2>
               </div>
@@ -1119,7 +1119,7 @@ export default function Register() {
               <div className="grid md:grid-cols-2 gap-5">
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Manager Name *
                   </label>
 
@@ -1129,12 +1129,12 @@ export default function Register() {
                     value={formData.managerName}
                     onChange={handleChange}
                     placeholder="Manager name"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Manager Mobile *
                   </label>
 
@@ -1145,7 +1145,7 @@ export default function Register() {
                     value={formData.managerMobile}
                     onChange={handleChange}
                     placeholder="Manager mobile number"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
@@ -1157,8 +1157,8 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Band Leader Details
                 </h2>
               </div>
@@ -1166,7 +1166,7 @@ export default function Register() {
               <div className="grid md:grid-cols-2 gap-5">
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Leader Name *
                   </label>
 
@@ -1176,12 +1176,12 @@ export default function Register() {
                     value={formData.leaderName}
                     onChange={handleChange}
                     placeholder="Band leader name"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Leader Mobile *
                   </label>
 
@@ -1192,7 +1192,7 @@ export default function Register() {
                     value={formData.leaderMobile}
                     onChange={handleChange}
                     placeholder="Band leader mobile number"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
@@ -1204,12 +1204,12 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Band Members
                 </h2>
 
-                <p className="text-sm text-[#221F1A]/60 mt-1">
+                <p className="text-sm text-white/40 mt-1">
                   Total team size must be between
                   5 and 10 members.
                 </p>
@@ -1218,7 +1218,7 @@ export default function Register() {
               <div className="grid md:grid-cols-3 gap-5">
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Total Members *
                   </label>
 
@@ -1231,12 +1231,12 @@ export default function Register() {
                     value={formData.musiciansCount}
                     onChange={handleChange}
                     placeholder="5 - 10"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Vocalists *
                   </label>
 
@@ -1248,12 +1248,12 @@ export default function Register() {
                     value={formData.vocalistCount}
                     onChange={handleChange}
                     placeholder="Minimum 2"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                  <label className="block text-sm text-white/70 mb-2">
                     Instrumentalists *
                   </label>
 
@@ -1265,7 +1265,7 @@ export default function Register() {
                     value={formData.instrumentalistCount}
                     onChange={handleChange}
                     placeholder="Minimum 3"
-                    className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
                   />
                 </div>
 
@@ -1277,12 +1277,12 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Instruments
                 </h2>
 
-                <p className="text-sm text-[#221F1A]/60 mt-1">
+                <p className="text-sm text-white/40 mt-1">
                   Select the instruments your
                   band uses.
                 </p>
@@ -1293,12 +1293,12 @@ export default function Register() {
                 onChange={
                   handleDropdownChange
                 }
-                className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] font-medium"
+                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500 transition"
               >
                 <option
                   value=""
                   disabled
-                  className="bg-[#FAF4E8] text-[#221F1A]"
+                  className="bg-black"
                 >
                   Select an instrument
                 </option>
@@ -1308,7 +1308,7 @@ export default function Register() {
                     <option
                       key={instrument}
                       value={instrument}
-                      className="bg-[#FAF4E8] text-[#221F1A]"
+                      className="bg-black"
                     >
                       {instrument}
                     </option>
@@ -1317,7 +1317,7 @@ export default function Register() {
 
                 <option
                   value="Other"
-                  className="bg-[#FAF4E8] text-[#221F1A]"
+                  className="bg-black"
                 >
                   Other
                 </option>
@@ -1337,7 +1337,7 @@ export default function Register() {
                       )
                     }
                     placeholder="Enter instrument name"
-                    className="flex-1 rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] text-[#221F1A]"
+                    className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-3 outline-none focus:border-purple-500"
                   />
 
                   <button
@@ -1345,7 +1345,7 @@ export default function Register() {
                     onClick={
                       handleAddCustom
                     }
-                    className="px-6 py-3 rounded-xl bg-[#E9D39D] hover:bg-[#dec077] border border-[#DEC077] font-bold text-[#221F1A] transition shadow-xs"
+                    className="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold"
                   >
                     Add
                   </button>
@@ -1360,7 +1360,7 @@ export default function Register() {
                         ""
                       );
                     }}
-                    className="px-6 py-3 rounded-xl bg-[#FAF4E8] hover:bg-[#F9F6ED] border border-[#DEC077] text-[#221F1A] font-semibold"
+                    className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/15"
                   >
                     Cancel
                   </button>
@@ -1377,7 +1377,7 @@ export default function Register() {
                       (instrument) => (
                         <div
                           key={instrument}
-                          className="flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] px-4 py-2 text-sm text-[#221F1A] font-semibold shadow-xs"
+                          className="flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-4 py-2 text-sm text-purple-200"
                         >
                           <span>
                             {instrument}
@@ -1390,7 +1390,7 @@ export default function Register() {
                                 instrument
                               )
                             }
-                            className="text-[#221F1A]/60 hover:text-red-600 font-bold ml-1"
+                            className="text-white/50 hover:text-red-400"
                           >
                             ×
                           </button>
@@ -1407,47 +1407,47 @@ export default function Register() {
             {/* ============================= */}
 
             <section>
-              <div className="border-b border-[#DEC077]/50 pb-4 mb-6">
-                <h2 className="text-2xl font-bold text-[#221F1A]">
+              <div className="border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-2xl font-bold">
                   Payment
                 </h2>
 
-                <p className="text-sm text-[#221F1A]/70 mt-1 font-medium">
+                <p className="text-sm text-white/40 mt-1">
                   Registration Fee:{" "}
-                  <span className="text-[#C19B4C] font-black">
+                  <span className="text-white font-semibold">
                     ₹1,200
                   </span>
                 </p>
               </div>
 
               {/* UPI PAYMENT CARD */}
-              <div className="rounded-2xl border border-[#DEC077] bg-[#F9F6ED] p-6 shadow-xs">
+              <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-6">
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
 
                   {/* UPI DETAILS */}
                   <div className="flex-1">
 
-                    <p className="text-sm text-[#221F1A]/60 mb-2 font-medium">
+                    <p className="text-sm text-white/40 mb-2">
                       UPI ID
                     </p>
 
                     <div className="flex items-center gap-3">
 
                       <Smartphone
-                        className="text-[#C19B4C] shrink-0"
+                        className="text-purple-400 shrink-0"
                         size={22}
                       />
 
-                      <span className="font-mono break-all font-bold text-[#221F1A]">
+                      <span className="font-mono break-all">
                         {UPI_ID}
                       </span>
 
                     </div>
 
-                    <p className="text-sm text-[#221F1A]/70 mt-3 font-medium">
+                    <p className="text-sm text-white/40 mt-3">
                       Amount:{" "}
-                      <span className="text-[#C19B4C] font-black">
+                      <span className="text-white font-semibold">
                         ₹1,200
                       </span>
                     </p>
@@ -1459,7 +1459,7 @@ export default function Register() {
 
                     <a
                       href={upiLink}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#E9D39D] hover:bg-[#dec077] border border-[#DEC077] px-5 py-3 font-bold text-[#221F1A] transition shadow-xs"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 px-5 py-3 font-semibold transition"
                     >
                       <ExternalLink size={17} />
                       Pay via UPI
@@ -1470,7 +1470,7 @@ export default function Register() {
                       onClick={
                         handleCopyUPI
                       }
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FAF4E8] hover:bg-[#F9F6ED] border border-[#DEC077] text-[#221F1A] px-5 py-3 font-bold transition shadow-xs"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 px-5 py-3 font-semibold transition"
                     >
                       <Copy size={17} />
                       Copy UPI
@@ -1481,21 +1481,21 @@ export default function Register() {
                 </div>
 
                 {/* QR CODE */}
-                <div className="mt-8 pt-8 border-t border-[#DEC077]/50">
+                <div className="mt-8 pt-8 border-t border-white/10">
 
                   <div className="flex flex-col items-center text-center">
 
-                    <h3 className="text-xl font-bold text-[#221F1A]">
-                      Scan &amp; Pay
+                    <h3 className="text-xl font-bold text-white">
+                      Scan & Pay
                     </h3>
 
-                    <p className="text-sm text-[#221F1A]/60 mt-2 mb-5">
+                    <p className="text-sm text-white/40 mt-2 mb-5">
                       Scan this QR code using
                       Google Pay, PhonePe,
                       Paytm or any UPI app
                     </p>
 
-                    <div className="bg-white p-4 rounded-2xl shadow-xl border border-[#DEC077]">
+                    <div className="bg-white p-4 rounded-2xl shadow-2xl">
 
                       <QRCodeSVG
                         value={upiLink}
@@ -1508,11 +1508,11 @@ export default function Register() {
 
                     <div className="mt-5">
 
-                      <p className="text-sm text-[#221F1A]/60 font-medium">
+                      <p className="text-sm text-white/40">
                         Registration Fee
                       </p>
 
-                      <p className="text-2xl font-black text-[#C19B4C] mt-1">
+                      <p className="text-2xl font-bold text-purple-300 mt-1">
                         ₹1,200
                       </p>
 
@@ -1520,11 +1520,11 @@ export default function Register() {
 
                     <div className="mt-3 max-w-full">
 
-                      <p className="text-xs text-[#221F1A]/50 font-semibold">
+                      <p className="text-xs text-white/30">
                         UPI ID
                       </p>
 
-                      <p className="text-sm text-[#221F1A] font-mono break-all font-bold">
+                      <p className="text-sm text-purple-300 font-mono break-all">
                         {UPI_ID}
                       </p>
 
@@ -1539,7 +1539,7 @@ export default function Register() {
               {/* TRANSACTION ID */}
               <div className="mt-6">
 
-                <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                <label className="block text-sm text-white/70 mb-2">
                   Transaction ID / Reference Number *
                 </label>
 
@@ -1551,10 +1551,10 @@ export default function Register() {
                   }
                   onChange={handleChange}
                   placeholder="Enter UPI transaction ID"
-                  className="w-full rounded-xl border border-[#DEC077] bg-[#F9F6ED] px-4 py-3 font-mono outline-none focus:ring-2 focus:ring-[#C19B4C]/30 focus:border-[#C19B4C] transition text-[#221F1A] placeholder:text-[#221F1A]/30 font-medium"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 font-mono outline-none focus:border-purple-500 transition"
                 />
 
-                <p className="text-xs text-[#221F1A]/60 mt-2">
+                <p className="text-xs text-white/30 mt-2">
                   Enter the transaction/reference
                   number shown after completing
                   the payment.
@@ -1565,25 +1565,25 @@ export default function Register() {
               {/* SCREENSHOT */}
               <div className="mt-6">
 
-                <label className="block text-sm font-semibold text-[#221F1A]/80 mb-2">
+                <label className="block text-sm text-white/70 mb-2">
                   Payment Screenshot *
                 </label>
 
                 {!screenshotUrl ? (
                   <label className="block cursor-pointer">
 
-                    <div className="border border-dashed border-[#DEC077] hover:border-[#C19B4C] bg-[#F9F6ED] rounded-2xl p-8 text-center transition">
+                    <div className="border border-dashed border-white/20 hover:border-purple-500/50 rounded-2xl p-8 text-center transition">
 
                       <Upload
-                        className="mx-auto mb-3 text-[#C19B4C]"
+                        className="mx-auto mb-3 text-white/30"
                         size={40}
                       />
 
-                      <p className="font-bold text-[#221F1A]">
+                      <p className="font-semibold">
                         Upload payment screenshot
                       </p>
 
-                      <p className="text-sm text-[#221F1A]/60 mt-2">
+                      <p className="text-sm text-white/40 mt-2">
                         JPG, PNG or WEBP —
                         Maximum 5MB
                       </p>
@@ -1601,16 +1601,16 @@ export default function Register() {
 
                   </label>
                 ) : (
-                  <div className="rounded-2xl border border-green-600/30 bg-green-100 p-5">
+                  <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
 
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
 
                       <div>
-                        <p className="font-bold text-green-800">
+                        <p className="font-semibold text-green-300">
                           ✓ Screenshot uploaded
                         </p>
 
-                        <p className="text-sm text-green-700 mt-1">
+                        <p className="text-sm text-white/40 mt-1">
                           {paymentScreenshot?.name ||
                             "Payment screenshot"}
                         </p>
@@ -1621,7 +1621,7 @@ export default function Register() {
                         onClick={
                           handleDeleteFile
                         }
-                        className="flex items-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-700 px-4 py-2 font-bold"
+                        className="flex items-center gap-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 px-4 py-2"
                       >
                         <Trash2 size={16} />
                         Remove
@@ -1636,7 +1636,7 @@ export default function Register() {
                 {uploading && (
                   <div className="mt-4">
 
-                    <div className="flex justify-between text-xs text-[#221F1A]/60 mb-2 font-semibold">
+                    <div className="flex justify-between text-xs text-white/40 mb-2">
 
                       <span>
                         Uploading...
@@ -1651,10 +1651,10 @@ export default function Register() {
 
                     </div>
 
-                    <div className="h-2 rounded-full bg-[#DEC077]/30 overflow-hidden">
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
 
                       <div
-                        className="h-full bg-gradient-to-r from-[#C19B4C] to-[#DEC077] transition-all"
+                        className="h-full bg-gradient-to-r from-purple-500 to-orange-500 transition-all"
                         style={{
                           width: `${uploadProgress}%`,
                         }}
@@ -1673,7 +1673,7 @@ export default function Register() {
             {/* ACKNOWLEDGEMENT */}
             {/* ============================= */}
 
-            <div className="rounded-2xl border border-[#DEC077]/50 bg-[#E9D39D]/20 p-5">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
 
               <div className="flex items-start gap-3">
 
@@ -1686,12 +1686,12 @@ export default function Register() {
                       e.target.checked
                     )
                   }
-                  className="mt-1 w-5 h-5 accent-[#C19B4C]"
+                  className="mt-1 w-5 h-5 accent-purple-600"
                 />
 
                 <label
                   htmlFor="acknowledgement"
-                  className="text-sm text-[#221F1A]/80 leading-6 cursor-pointer font-medium"
+                  className="text-sm text-white/70 leading-6 cursor-pointer"
                 >
                   I confirm that all the
                   details provided are
@@ -1715,14 +1715,14 @@ export default function Register() {
                 uploading ||
                 !acknowledged
               }
-              className="w-full rounded-full bg-[#E9D39D] hover:bg-[#dec077] border border-[#DEC077] text-[#221F1A] font-black text-lg py-4 transition flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-2xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-orange-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed py-4 font-bold text-lg transition flex items-center justify-center gap-2"
             >
 
               {loading ? (
                 <>
                   <Loader2
                     size={22}
-                    className="animate-spin text-[#C19B4C]"
+                    className="animate-spin"
                   />
 
                   Processing...
@@ -1738,7 +1738,7 @@ export default function Register() {
           </form>
         </div>
 
-        <p className="text-center text-[#221F1A]/40 text-sm mt-8 font-medium">
+        <p className="text-center text-white/30 text-sm mt-8">
           Sparkz 2K26 • Abheri Battle of Bands
         </p>
 

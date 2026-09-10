@@ -24,13 +24,13 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 w-full border-b border-[#DEC077]/40 bg-[#F9F6ED]/90 backdrop-blur-lg">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(222,192,119,0.15),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(233,211,157,0.15),transparent_35%)] opacity-70" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(222,192,119,0.08),transparent_50%),linear-gradient(240deg,rgba(193,155,76,0.06),transparent_50%)]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[#DEC077]/50 to-transparent" />
-        <div className="relative flex flex-wrap items-center justify-between gap-3 px-[5vw] py-4 sm:flex-nowrap sm:gap-6 sm:py-5">
+      <header className="sticky top-0 z-30 w-full border-b border-[rgba(212,163,89,0.25)] bg-[#0B0B0E]/90 backdrop-blur-lg">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(58,39,13,0.4),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(212,163,89,0.08),transparent_35%)] opacity-70" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(58,39,13,0.3),transparent_50%),linear-gradient(240deg,rgba(212,163,89,0.06),transparent_50%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(212,163,89,0.4)] to-transparent" />
+        <div className="relative  flex  flex-wrap items-center justify-between gap-3 px-[5vw] py-4 sm:flex-nowrap sm:gap-6  sm:py-5">
           {/* Left nav - Desktop Only */}
-          <div className="hidden flex-1 items-center gap-4 text-sm text-[#221F1A]/80 sm:flex sm:gap-6">
+          <div className="hidden flex-1 items-center gap-4 text-sm text-[#A1A1AA] sm:flex sm:gap-6">
             {navItems?.slice(0, 3).map((item, index) => {
               const isSpecial = item.title === "ABHERI";
               const isHashLink = item.to.startsWith("/#");
@@ -61,19 +61,19 @@ export default function Header() {
                       }
                     }
                   }}
-                  className={`relative rounded-full border px-3 py-2 transition duration-300 ${isSpecial
-                      ? "group border-[#DEC077] bg-[#E9D39D]/50 hover:bg-[#E9D39D] hover:border-[#C19B4C] hover:shadow-[0_0_15px_rgba(222,192,119,0.4)] text-[#221F1A]"
-                      : "border-transparent hover:border-[#DEC077]/40 hover:bg-[#E9D39D]/30 hover:text-[#221F1A]"
+                  className={`relative rounded-full border px-3.5 py-1.5 transition duration-300 ${isSpecial
+                      ? "group border-[rgba(212,163,89,0.35)] bg-[rgba(212,163,89,0.1)] hover:bg-[rgba(212,163,89,0.2)] hover:border-[#F3C87A] hover:shadow-[0_0_20px_rgba(212,163,89,0.25)]"
+                      : "border-transparent hover:border-[rgba(212,163,89,0.25)] hover:bg-[#131318] hover:text-[#FFFFFF]"
                     }`}
                 >
                   {isSpecial ? (
                     <span className="flex items-center gap-2">
-                      <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent font-bold">
+                      <span className="gold-gradient-text font-bold">
                         {item.title}
                       </span>
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DEC077] opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C19B4C]"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F3C87A] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F3C87A]"></span>
                       </span>
                     </span>
                   ) : (
@@ -95,14 +95,14 @@ export default function Header() {
                 alt="Sparkz Logo"
                 width={120}
                 height={40}
-                className="h-8 w-auto sm:h-10 object-contain drop-shadow-[0_0_15px_rgba(193,155,76,0.3)]"
+                className="h-8 w-auto sm:h-10 object-contain drop-shadow-[0_0_16px_rgba(212,163,89,0.4)]"
                 priority
               />
             </Link>
           </div>
 
           {/* Right nav + CTA - Desktop Only */}
-          <div className="hidden flex-1 items-center justify-end gap-4 text-sm text-[#221F1A]/80 sm:flex">
+          <div className="hidden flex-1 items-center justify-end gap-4 text-sm text-[#A1A1AA] sm:flex">
             {navItems?.slice(3, 5).map((item, index) => {
               const isSpecial = ["ABHERI", "ISRO", "ITBP"].includes(item.title);
               const isHashLink = item.to.startsWith("/#");
@@ -132,19 +132,19 @@ export default function Header() {
                       }
                     }
                   }}
-                  className={`relative rounded-full border px-3 py-2 transition duration-300 ${isSpecial
-                      ? "group border-[#DEC077] bg-[#E9D39D]/50 hover:bg-[#E9D39D] hover:border-[#C19B4C] hover:shadow-[0_0_15px_rgba(222,192,119,0.4)] text-[#221F1A]"
-                      : "border-transparent hover:border-[#DEC077]/40 hover:bg-[#E9D39D]/30 hover:text-[#221F1A]"
+                  className={`relative rounded-full border px-3.5 py-1.5 transition duration-300 ${isSpecial
+                      ? "group border-[rgba(212,163,89,0.35)] bg-[rgba(212,163,89,0.1)] hover:bg-[rgba(212,163,89,0.2)] hover:border-[#F3C87A] hover:shadow-[0_0_20px_rgba(212,163,89,0.25)]"
+                      : "border-transparent hover:border-[rgba(212,163,89,0.25)] hover:bg-[#131318] hover:text-[#FFFFFF]"
                     }`}
                 >
                   {isSpecial ? (
                     <span className="flex items-center gap-2">
-                      <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent font-bold">
+                      <span className="gold-gradient-text font-bold">
                         {item.title}
                       </span>
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DEC077] opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C19B4C]"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F3C87A] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F3C87A]"></span>
                       </span>
                     </span>
                   ) : (
@@ -157,7 +157,7 @@ export default function Header() {
             {user ? (
               <Link
                 href="/profile"
-                className="inline-flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#FAF4E8] px-4 py-2 text-sm font-medium text-[#221F1A] transition hover:bg-[#E9D39D]/50"
+                className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] px-4 py-2 text-sm font-medium text-white transition hover:border-[#F3C87A] hover:bg-[#1b1b22]"
               >
                 {user.photoURL ? (
                   <img
@@ -166,14 +166,14 @@ export default function Header() {
                     className="w-5 h-5 rounded-full"
                   />
                 ) : (
-                  <UserIcon size={18} />
+                  <UserIcon size={18} className="text-[#F3C87A]" />
                 )}
                 <span>Profile</span>
               </Link>
             ) : (
               <button
                 onClick={handleLoginClick}
-                className="inline-flex overflow-hidden items-center justify-center bg-[#E9D39D] hover:bg-[#DEC077] border border-[#DEC077] text-[#221F1A] gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-sm"
+                className="btn-gold inline-flex overflow-hidden items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-bold text-[#0B0B0E] cursor-pointer"
               >
                 Login
               </button>
@@ -183,7 +183,7 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full border border-[#DEC077] bg-[#E9D39D]/30 text-[#221F1A] hover:bg-[#E9D39D]/60 transition-colors"
+            className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] hover:bg-[#1a1a22] transition-colors"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -193,7 +193,7 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed left-0 right-0 top-[73px] bottom-0 z-20 bg-[#F9F6ED]/98 border-t border-[#DEC077]/40 backdrop-blur-lg transition-all duration-300 ease-in-out sm:hidden ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+        className={`fixed left-0 right-0 top-[73px] bottom-0 z-20 bg-[#0B0B0E]/95 backdrop-blur-lg transition-all duration-300 ease-in-out sm:hidden ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
           }`}
       >
         <div className="flex h-full flex-col items-center justify-start overflow-y-auto p-6 pt-8">
@@ -231,18 +231,18 @@ export default function Header() {
                     }
                   }}
                   className={`w-full text-center py-4 text-lg font-medium rounded-2xl border transition-all hover:scale-[1.02] ${isSpecial
-                      ? "text-[#221F1A] border-[#DEC077] bg-[#E9D39D]/50 shadow-[0_0_15px_rgba(222,192,119,0.3)]"
-                      : "text-[#221F1A]/90 border-[#DEC077]/40 bg-[#FAF4E8] hover:bg-[#E9D39D]/40 hover:border-[#DEC077]"
+                      ? "text-white border-[rgba(212,163,89,0.4)] bg-[rgba(212,163,89,0.1)] shadow-[0_0_15px_rgba(212,163,89,0.2)]"
+                      : "text-[#A1A1AA] border-[rgba(212,163,89,0.2)] bg-[#131318] hover:text-white hover:border-[#F3C87A]"
                     }`}
                 >
                   {isSpecial ? (
                     <span className="flex items-center justify-center gap-2">
-                      <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent font-bold">
+                      <span className="gold-gradient-text font-bold">
                         {item.title}
                       </span>
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DEC077] opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C19B4C]"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F3C87A] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F3C87A]"></span>
                       </span>
                     </span>
                   ) : (
@@ -256,7 +256,7 @@ export default function Header() {
               <Link
                 href="/profile"
                 onClick={() => setIsMenuOpen(false)}
-                className="w-full mt-6 py-4 text-lg font-semibold text-[#221F1A] rounded-2xl border border-[#DEC077] bg-[#FAF4E8] hover:bg-[#E9D39D]/40 transition-all flex items-center justify-center gap-2"
+                className="w-full mt-6 py-4 text-lg font-semibold text-white rounded-2xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A] transition-all flex items-center justify-center gap-2"
               >
                 {user.photoURL ? (
                   <img
@@ -265,14 +265,14 @@ export default function Header() {
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <UserIcon size={20} />
+                  <UserIcon size={20} className="text-[#F3C87A]" />
                 )}
                 Profile
               </Link>
             ) : (
               <button
                 onClick={handleLoginClick}
-                className="w-full mt-6 py-4 text-lg font-semibold text-[#221F1A] rounded-2xl bg-[#E9D39D] hover:bg-[#DEC077] border border-[#DEC077] transition-all hover:scale-[1.02] active:scale-95 shadow-sm"
+                className="btn-gold w-full mt-6 py-4 text-lg font-bold text-[#0B0B0E] rounded-2xl transition-all hover:scale-[1.02] active:scale-95"
               >
                 Login
               </button>
@@ -281,11 +281,11 @@ export default function Header() {
 
           {/* Made with Love - Tech Team */}
           <div className="mt-auto pt-8 text-center">
-            <p className="text-xs text-[#221F1A]/50">
+            <p className="text-xs text-white/40">
               <Link
                 href="/credits"
                 onClick={() => setIsMenuOpen(false)}
-                className="text-[#C19B4C] hover:text-[#221F1A] transition-all duration-300 font-semibold hover:underline decoration-dotted underline-offset-2"
+                className="text-white/70 hover:text-white transition-all duration-300 font-semibold hover:underline decoration-dotted underline-offset-2 animate-pulse hover:animate-none"
               >
                 Tech Team
               </Link>

@@ -48,23 +48,26 @@ export default function BandCompetition() {
   return (
     <section
       id="band-competition"
-      className="relative isolate overflow-hidden bg-[#F9F6ED] pt-10 pb-20 text-[#221F1A] sm:py-24"
+      className="relative isolate overflow-hidden bg-[#0B0B0E] pt-10 pb-20 text-white sm:py-24"
     >
       {/* Background Effects */}
       {mounted && (
         <>
-          {/* Gradient Glows */}
-          <div className="pointer-events-none absolute left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#DEC077]/20 blur-[140px]" />
-          <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#E9D39D]/30 blur-[150px]" />
+          {/* Warm Dark Bronze Glows */}
+          <div className="pointer-events-none absolute left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
+          <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
 
           {/* Subtle Grid Pattern */}
-          <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(193,155,76,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(193,155,76,0.03)_1px,transparent_1px)] bg-size-[100px_100px] opacity-30" />
+          <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-size-[100px_100px] opacity-25" />
+
+          {/* Radial Gradients */}
+          <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_40%_40%,rgba(58,39,13,0.3),transparent_50%),radial-gradient(circle_at_60%_60%,rgba(212,163,89,0.05),transparent_45%)]" />
         </>
       )}
 
       {/* CONTENT */}
       <div className="relative z-10">
-        <div className="mx-auto max-w-336 px-[5vw]">
+        <div className="mx-auto max-w-336">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left Column: Content + Highlights */}
             <motion.div
@@ -75,43 +78,43 @@ export default function BandCompetition() {
               className="space-y-8"
             >
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] px-5 py-2 text-[13px] font-bold uppercase tracking-widest text-[#221F1A] shadow-sm">
-                  <span className="h-2 w-2 rounded-full bg-[#C19B4C] animate-pulse" />
+                <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318]/80 px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#F3C87A] backdrop-blur">
+                  <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />
                   ABHERI -{" "}
-                  <span className="text-[10px]">Music Band Competition</span>
+                  <span className="text-[9px]">Music Band Competition</span>
                 </div>
 
-                <h2 className="mt-6 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl text-[#221F1A]">
+                <h2 className="mt-6 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl text-white">
                   Rock the Stage
                   <br />
-                  <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent">
+                  <span className="gold-gradient-text">
                     with ABHERI
                   </span>
                 </h2>
 
-                <p className="mt-4 text-lg text-[#221F1A]/80 leading-relaxed max-w-xl">
+                <p className="mt-4 text-lg text-[#A1A1AA] leading-relaxed max-w-xl">
                   Unleash your rhythm, captivate the crowd, and battle for glory
                   in the ultimate inter-college band showdown.
                 </p>
               </div>
 
-              {/* Highlights Grid */}
+              {/* Highlights Grid (Now on Left) */}
               <div className="grid sm:grid-cols-2 gap-4">
                 {eventPoints.map((point, i) => (
                   <div
                     key={i}
-                    className={`p-5 rounded-2xl border border-[#DEC077] bg-[#FAF4E8] shadow-sm hover:border-[#C19B4C] transition-all duration-300 ${i === 2 ? "sm:col-span-2" : ""
+                    className={`p-4 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A] transition-colors duration-300 ${i === 2 ? "sm:col-span-2" : ""
                       }`}
                   >
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E9D39D] text-[#221F1A] text-xs font-bold border border-[#DEC077]">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)] text-xs font-bold">
                         {i + 1}
                       </div>
-                      <h3 className="font-bold text-[#221F1A]">
+                      <h3 className="font-bold text-white">
                         {point.title}
                       </h3>
                     </div>
-                    <p className="text-sm text-[#221F1A]/75 leading-relaxed pl-10">
+                    <p className="text-sm text-[#A1A1AA] leading-relaxed pl-9">
                       {point.body}
                     </p>
                   </div>
@@ -127,15 +130,17 @@ export default function BandCompetition() {
               >
                 <Link
                   href="/abheri"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#DEC077] bg-[#E9D39D] hover:bg-[#DEC077] px-8 py-3 text-sm font-bold uppercase tracking-widest text-[#221F1A] shadow-md transition-all duration-300 transform hover:-translate-y-0.5 w-full sm:w-auto"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-gold inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 text-sm font-bold uppercase tracking-widest text-[#0B0B0E] transition-all duration-300 transform hover:-translate-y-1 w-full sm:w-auto"
                 >
                   View More & Register
-                  <span className="text-xs text-[#C19B4C]">→</span>
+                  <span className="text-xs">→</span>
                 </Link>
               </motion.div>
             </motion.div>
 
-            {/* Right Column: Guest Spotlights */}
+            {/* Right Column: Guest Spotlights (Grid/Stacked) */}
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -146,29 +151,32 @@ export default function BandCompetition() {
               {guests.map((guest, index) => (
                 <div
                   key={index}
-                  className="relative rounded-3xl border border-[#DEC077] bg-[#FAF4E8] shadow-sm overflow-hidden group"
+                  className="relative rounded-3xl border border-[rgba(212,163,89,0.25)] bg-[#131318] backdrop-blur overflow-hidden group shadow-xl"
                 >
+                  {/* Decorative background */}
+                  <div className="absolute inset-0 bg-linear-to-br from-[#3A270D]/20 via-transparent to-[rgba(212,163,89,0.05)] opacity-50" />
+
                   <div className="relative p-2 sm:p-4">
-                    <div className="relative w-full aspect-4/5 overflow-hidden rounded-2xl bg-neutral-900">
+                    <div className="relative w-full aspect-4/5 overflow-hidden rounded-2xl bg-[#0B0B0E]">
                       <Image
                         src={guest.image}
                         alt={guest.name}
                         fill
                         className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                       />
-                      {/* Gradient overlay to create space for text */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#221F1A] via-[#221F1A]/70 to-transparent" />
+                      {/* Stronger gradient overlay to create space for text */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E] via-[#0B0B0E]/80 to-transparent" />
 
                       <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
-                        <div className="inline-block px-3 py-1 mb-2 rounded-lg bg-[#E9D39D] border border-[#DEC077]">
-                          <span className="text-[#221F1A] text-[10px] font-bold tracking-widest uppercase">
+                        <div className="inline-block px-3 py-1 mb-2 rounded-lg bg-[#3A270D] border border-[rgba(212,163,89,0.35)] backdrop-blur-md">
+                          <span className="text-[#F3C87A] text-[10px] font-bold tracking-widest uppercase">
                             {guest.tag}
                           </span>
                         </div>
                         <h3 className="text-xl sm:text-2xl font-black text-white mb-1 tracking-tight">
                           {guest.name}
                         </h3>
-                        <p className="text-xs sm:text-[13px] text-white/90 font-normal">
+                        <p className="text-xs sm:text-[13px] text-[#A1A1AA] font-normal">
                           {guest.role}
                         </p>
                       </div>

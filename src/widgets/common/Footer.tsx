@@ -8,20 +8,20 @@ import { FaXTwitter } from "react-icons/fa6";
 
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden bg-[#FAF4E8] border-t border-[#DEC077]/50">
-      {/* Decorative ambient glows (non-interactive) */}
+    <footer className="relative overflow-hidden bg-[#0B0B0E] border-t border-[rgba(212,163,89,0.25)]">
+      {/* Decorative ambient glows */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute left-6 top-12 h-64 w-64 rounded-full bg-[#DEC077]/20 blur-[120px]" />
-        <div className="absolute right-6 bottom-12 h-64 w-64 rounded-full bg-[#E9D39D]/30 blur-[120px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(222,192,119,0.12),transparent_50%)]" />
+        <div className="absolute left-6 top-12 h-64 w-64 rounded-full bg-[#3A270D]/40 blur-[120px]" />
+        <div className="absolute right-6 bottom-12 h-64 w-64 rounded-full bg-[#3A270D]/30 blur-[120px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(58,39,13,0.35),transparent_50%)]" />
       </div>
 
-      {/* Subtle grid overlay */}
+      {/* Subtle grid overlay for the circuit feel */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-10"
+        className="pointer-events-none absolute inset-0 opacity-20"
       >
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(193,155,76,0.1)_1px,transparent_1px),linear-gradient(rgba(193,155,76,0.08)_1px,transparent_1px)] bg-[size:120px_120px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(212,163,89,0.04)_1px,transparent_1px),linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:120px_120px]" />
       </div>
 
       <div className="relative px-[5vw] py-12 md:py-16">
@@ -39,30 +39,30 @@ export default function Footer() {
                   src="/sparkz.svg"
                   alt="Sparkz logo"
                   fill
-                  className="object-contain drop-shadow-[0_0_10px_rgba(193,155,76,0.25)]"
+                  className="object-contain drop-shadow-[0_0_15px_rgba(212,163,89,0.4)]"
                   priority
                 />
               </div>
 
               <div>
-                <h4 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C]">
+                <h4 className="text-lg font-extrabold gold-gradient-text">
                   Sparkz 2K26
                 </h4>
-                <p className="mt-1 text-xs text-[#221F1A]/70">
+                <p className="mt-1 text-xs text-[#A1A1AA]">
                   October 08–09 • Campus Arena
                 </p>
               </div>
             </motion.div>
 
-            <p className="max-w-sm text-sm text-[#221F1A]/70">
+            <p className="max-w-sm text-sm text-[#A1A1AA]">
               A vibrant tech fest for students — challenges, workshops, and
               prizes for tomorrow&apos;s makers.
             </p>
           </div>
 
-          {/* Quick links: grouped and accessible */}
+          {/* Quick links */}
           <nav aria-label="Quick links">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[#C19B4C]">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
               Quick Links
             </h3>
 
@@ -76,7 +76,7 @@ export default function Footer() {
                 <li key={label}>
                   <Link
                     href={href as string}
-                    className="text-[#221F1A]/75 hover:text-[#C19B4C] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DEC077] rounded-sm px-1 py-0.5"
+                    className="text-[#A1A1AA] hover:text-[#F3C87A] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F3C87A]/40 rounded-sm px-1 py-0.5"
                   >
                     {label}
                   </Link>
@@ -85,9 +85,9 @@ export default function Footer() {
             </ul>
           </nav>
 
-          {/* Socials with clear icons and labels */}
+          {/* Socials */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[#C19B4C]">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
               Join the Circuit
             </h3>
 
@@ -95,7 +95,7 @@ export default function Footer() {
               {/* Instagram */}
               <Link
                 href="#"
-                className="group inline-flex items-center gap-2 rounded-full p-2.5 border border-[#DEC077]/40 bg-[#FAF4E8] text-[#221F1A]/80 transition-all hover:text-[#C19B4C] hover:border-[#DEC077] hover:scale-110 focus:outline-none"
+                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
                 aria-label="Instagram"
               >
                 <FaInstagram
@@ -108,7 +108,7 @@ export default function Footer() {
               {/* LinkedIn */}
               <Link
                 href="#"
-                className="group inline-flex items-center gap-2 rounded-full p-2.5 border border-[#DEC077]/40 bg-[#FAF4E8] text-[#221F1A]/80 transition-all hover:text-[#C19B4C] hover:border-[#DEC077] hover:scale-110 focus:outline-none"
+                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
                 aria-label="LinkedIn"
               >
                 <FaLinkedin className="h-5 w-5 transition-colors" aria-hidden />
@@ -118,7 +118,7 @@ export default function Footer() {
               {/* X / Twitter */}
               <Link
                 href="#"
-                className="group inline-flex items-center gap-2 rounded-full p-2.5 border border-[#DEC077]/40 bg-[#FAF4E8] text-[#221F1A]/80 transition-all hover:text-[#C19B4C] hover:border-[#DEC077] hover:scale-110 focus:outline-none"
+                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
                 aria-label="Twitter"
               >
                 <FaXTwitter className="h-5 w-5 transition-colors" aria-hidden />
@@ -126,7 +126,7 @@ export default function Footer() {
               </Link>
             </div>
 
-            <p className="mt-4 text-sm text-[#221F1A]/60 max-w-xs">
+            <p className="mt-4 text-sm text-[#A1A1AA] max-w-xs">
               Follow us for event updates, behind-the-scenes, and shoutouts.
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function Footer() {
           {/* Call to action */}
           <div className="md:flex md:flex-col md:items-end">
             <div>
-              <p className="mb-4 text-sm text-[#221F1A]/70">
+              <p className="mb-4 text-sm text-[#A1A1AA]">
                 Ready to do something that sparks?
               </p>
               <motion.div
@@ -143,7 +143,7 @@ export default function Footer() {
               >
                 <Link
                   href="/events"
-                  className="inline-flex items-center gap-2 rounded-full bg-[#E9D39D] hover:bg-[#DEC077] border border-[#DEC077] px-6 py-2.5 text-sm font-bold text-[#221F1A] shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C19B4C]"
+                  className="btn-gold inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold text-[#0B0B0E]"
                 >
                   Join Now →
                 </Link>
@@ -152,16 +152,16 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom legal bar */}
-        <div className="mt-10 border-t border-[#DEC077]/40 pt-6">
+        {/* Bottom tiny legal bar */}
+        <div className="mt-10 border-t border-[rgba(212,163,89,0.2)] pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-[#221F1A]/60">
+            <p className="text-xs text-[#A1A1AA]">
               Terms • Privacy • Code of Conduct
             </p>
-            <div className="text-xs text-[#221F1A]/60 text-center md:text-right">
+            <div className="text-xs text-[#A1A1AA] text-center md:text-right">
               <p>© 2026 Sparkz.</p>
               <p className="mt-1">
-                Crafted with ♥ by the <Link href="/credits" className="text-[#C19B4C] hover:text-[#221F1A] transition-all duration-300 font-semibold decoration-dotted underline-offset-2">Tech Team</Link>
+                Crafted with ♥ by the <Link href="/credits" className="text-[#F3C87A] hover:underline font-semibold">Tech Team</Link>
               </p>
             </div>
           </div>

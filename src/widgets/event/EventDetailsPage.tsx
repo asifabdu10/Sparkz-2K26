@@ -15,10 +15,9 @@ import RegisterButtonSection from "@/widgets/event/RegisterButtonSection";
 import {
   FaWhatsapp,
   FaCalendarDay,
-  FaClock,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
-import { shimmer, toBase64, convertDriveUrl } from "@/utils/imageUtils";
+import { shimmer, toBase64 } from "@/utils/imageUtils";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { db } from "@/utils/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -27,17 +26,17 @@ import { Event } from "@/utils/types/event";
 // Loading component for suspense
 function EventDetailsSkeleton() {
   return (
-    <div className="relative min-h-screen bg-[#F9F6ED] text-[#221F1A] overflow-hidden">
+    <div className="relative min-h-screen bg-[#0B0B0E] text-white overflow-hidden">
       <div className="flex flex-col lg:flex-row max-w-7xl mx-auto">
         <div className="w-full lg:w-5/12 p-6 lg:h-screen lg:sticky lg:top-0">
-          <div className="h-full w-full bg-[#E9D39D]/20 rounded-3xl animate-pulse" />
+          <div className="h-full w-full bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-3xl animate-pulse" />
         </div>
         <div className="w-full lg:w-7/12 p-6 space-y-8">
-           <div className="h-20 w-3/4 bg-[#E9D39D]/20 rounded-2xl animate-pulse" />
-           <div className="h-40 w-full bg-[#E9D39D]/20 rounded-2xl animate-pulse" />
+           <div className="h-20 w-3/4 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
+           <div className="h-40 w-full bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
            <div className="grid grid-cols-2 gap-4">
-             <div className="h-32 bg-[#E9D39D]/20 rounded-2xl animate-pulse" />
-             <div className="h-32 bg-[#E9D39D]/20 rounded-2xl animate-pulse" />
+             <div className="h-32 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
+             <div className="h-32 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
            </div>
         </div>
       </div>
@@ -59,27 +58,34 @@ function InfoCard({
   title,
   value,
   variant = "default",
-  delay = 0
+  delay = 0,
 }: InfoCardProps) {
-    return (
+  return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className={`relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 group shadow-sm
-        ${variant === "highlight" 
-            ? "bg-[#E9D39D]/40 border-[#DEC077] hover:bg-[#E9D39D]/60" 
-            : "bg-[#FAF4E8] border-[#DEC077]/70 hover:border-[#DEC077] hover:bg-[#FAF4E8]"
+      className={`relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 group
+        ${
+          variant === "highlight"
+            ? "bg-[#131318] border-[rgba(212,163,89,0.4)] shadow-[0_0_20px_rgba(212,163,89,0.12)] hover:border-[#F3C87A]"
+            : "bg-[#131318] border-[rgba(212,163,89,0.25)] hover:border-[rgba(212,163,89,0.45)] hover:shadow-[0_4px_20px_rgba(212,163,89,0.08)]"
         }
       `}
     >
       <div className="flex items-start gap-4">
-        <div className={`p-3 rounded-xl shrink-0 border border-[#DEC077]/50 ${variant === 'highlight' ? 'bg-[#E9D39D] text-[#221F1A]' : 'bg-[#E9D39D]/40 text-[#221F1A]'}`}>
-            {icon}
+        <div
+          className={`p-3 rounded-xl shrink-0 ${
+            variant === "highlight"
+              ? "bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.35)]"
+              : "bg-[#3A270D]/60 text-[#D4A359] border border-[rgba(212,163,89,0.2)]"
+          }`}
+        >
+          {icon}
         </div>
         <div>
-            <p className="text-xs font-semibold text-[#221F1A]/60 uppercase tracking-wider mb-1">{title}</p>
-            <div className="text-lg font-bold text-[#221F1A] tracking-wide">{value}</div>
+          <p className="text-sm font-medium text-[#A1A1AA] mb-1">{title}</p>
+          <div className="text-lg font-semibold text-white tracking-wide">{value}</div>
         </div>
       </div>
     </motion.div>
@@ -103,18 +109,18 @@ function CoordinatorCard({
       href={`https://wa.me/${coordinator.phone}?text=${whatsappMessage}`}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="flex items-center gap-3 p-3 rounded-xl border border-[#DEC077] bg-[#FAF4E8] hover:bg-[#E9D39D]/30 transition-colors group shadow-sm"
+      className="flex items-center gap-3 p-3 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A] hover:bg-[#1a1a22] transition-colors group"
     >
-      <div className="h-10 w-10 rounded-full bg-[#E9D39D] flex items-center justify-center text-[#221F1A] border border-[#DEC077] text-sm font-bold">
+      <div className="h-10 w-10 rounded-full bg-[#3A270D] flex items-center justify-center text-[#F3C87A] border border-[rgba(212,163,89,0.35)] text-sm font-bold">
         {coordinator.name.charAt(0)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-[#221F1A] truncate group-hover:text-[#C19B4C] transition-colors">
+        <p className="text-sm font-medium text-white truncate group-hover:text-[#F3C87A] transition-colors">
           {coordinator.name}
         </p>
-        <p className="text-xs text-[#221F1A]/60">Coordinator</p>
+        <p className="text-xs text-[#A1A1AA]">Coordinator</p>
       </div>
-      <FaWhatsapp className="text-[#221F1A]/40 group-hover:text-green-600 transition-colors" />
+      <FaWhatsapp className="text-[#A1A1AA] group-hover:text-[#25D366] transition-colors" />
     </Link>
   );
 }
@@ -132,24 +138,30 @@ function PrizeCard({
   icon: React.ReactNode;
 }) {
   const styles = {
-    gold: "border-[#C19B4C] text-[#C19B4C] bg-[#FAF4E8]",
-    silver: "border-[#DEC077] text-[#C19B4C] bg-[#FAF4E8]",
-    bronze: "border-[#DEC077] text-[#C19B4C] bg-[#FAF4E8]",
+    gold: "from-[#3A270D]/80 to-[#131318] border-[rgba(212,163,89,0.45)] text-[#F3C87A] shadow-[0_0_15px_rgba(212,163,89,0.1)]",
+    silver: "from-white/10 to-[#131318] border-white/20 text-[#A1A1AA]",
+    bronze:
+      "from-[#3A270D]/40 to-[#131318] border-[rgba(212,163,89,0.25)] text-[#D4A359]",
   };
 
   return (
     <div
-      className={`relative rounded-xl border p-4 shadow-sm ${styles[color]}`}
+      className={`relative rounded-xl border bg-gradient-to-b p-4 ${styles[color]}`}
     >
       <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-lg bg-[#E9D39D] text-[#221F1A] border border-[#DEC077]">
+        <div
+          className={`p-2 rounded-lg bg-[#0B0B0E]/60 border border-[rgba(212,163,89,0.2)] ${styles[color]
+            .split(" ")
+            .filter((c) => c.startsWith("text-"))
+            .pop()}`}
+        >
           {icon}
         </div>
         <div>
-          <p className="text-xs font-semibold text-[#221F1A]/60 uppercase tracking-wider">
+          <p className="text-xs font-semibold text-[#A1A1AA] uppercase tracking-wider">
             {title}
           </p>
-          <p className="text-lg font-black text-[#221F1A]">{prize}</p>
+          <p className="text-lg font-bold text-white">{prize}</p>
         </div>
       </div>
     </div>
@@ -163,21 +175,21 @@ export default function EventPage({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     const fetchEvent = async () => {
-        try {
-            const docRef = doc(db, "events", eventId);
-            const docSnap = await getDoc(docRef);
+      try {
+        const docRef = doc(db, "events", eventId);
+        const docSnap = await getDoc(docRef);
 
-            if (docSnap.exists()) {
-                setEvent({ id: docSnap.id, ...docSnap.data() } as Event);
-            } else {
-                setEvent(null);
-            }
-        } catch (error) {
-            console.error("Error fetching event:", error);
-            setEvent(null);
-        } finally {
-            setLoading(false);
+        if (docSnap.exists()) {
+          setEvent({ id: docSnap.id, ...docSnap.data() } as Event);
+        } else {
+          setEvent(null);
         }
+      } catch (error) {
+        console.error("Error fetching event:", error);
+        setEvent(null);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchEvent();
   }, [eventId]);
@@ -185,12 +197,12 @@ export default function EventPage({ eventId }: { eventId: string }) {
   if (loading) return <EventDetailsSkeleton />;
 
   if (!event) {
-    notFound(); 
+    notFound();
   }
 
   return (
     <Suspense fallback={<EventDetailsSkeleton />}>
-      <div className="min-h-screen text-[#221F1A] selection:bg-[#E9D39D]">
+      <div className="min-h-screen bg-[#0B0B0E] text-white selection:bg-[#3A270D] selection:text-[#F3C87A]">
         <GradientBackground />
 
         {/* 
@@ -205,10 +217,10 @@ export default function EventPage({ eventId }: { eventId: string }) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="relative aspect-4/5 w-full mt-12 max-w-lg mx-auto lg:max-w-none rounded-2xl overflow-hidden border border-[#DEC077] shadow-xl shadow-[#DEC077]/20 group bg-[#FAF4E8]"
+              className="relative aspect-4/5 w-full mt-12 max-w-lg mx-auto lg:max-w-none rounded-2xl overflow-hidden border border-[rgba(212,163,89,0.3)] shadow-2xl shadow-black group"
             >
               <Image
-                src={convertDriveUrl(event.imageUrl)}
+                src={event.imageUrl}
                 alt={`${event.title} poster`}
                 fill
                 quality={50}
@@ -220,37 +232,37 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 priority
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 45vw, 600px"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-[#221F1A]/60 via-transparent to-transparent opacity-60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E]/90 via-transparent to-transparent opacity-70" />
 
               {/* Category Tag on Image */}
               <div className="absolute top-4 right-4 flex gap-2">
-                  {/* Department Tag */}
-                  {event.department && (
-                     <div className="px-3.5 py-1.5 rounded-full bg-[#E9D39D] border border-[#DEC077] text-xs font-bold text-[#221F1A] uppercase shadow-sm">
-                        {event.department}
-                    </div>
-                  )}
-                  {/* Category Tag */}
-                  <div className="px-3.5 py-1.5 rounded-full bg-[#E9D39D] border border-[#DEC077] text-xs font-bold text-[#221F1A] uppercase shadow-sm">
-                    {event.type}
+                {/* Department Tag */}
+                {event.department && (
+                  <div className="px-3 py-1 rounded-full bg-[#0B0B0E]/80 backdrop-blur-md border border-[rgba(212,163,89,0.3)] text-xs font-medium text-[#FDE6B0] uppercase">
+                    {event.department}
                   </div>
+                )}
+                {/* Category Tag */}
+                <div className="px-3 py-1 rounded-full bg-[#0B0B0E]/80 backdrop-blur-md border border-[rgba(212,163,89,0.3)] text-xs font-medium text-[#F3C87A] uppercase">
+                  {event.type}
+                </div>
               </div>
 
-               {/* Online Banner if applicable */}
-               {event.isOnline && (
+              {/* Online Banner if applicable */}
+              {event.isOnline && (
                 <div className="absolute bottom-4 left-4 right-4">
-                  <div className="w-full py-2 bg-[#E9D39D] text-[#221F1A] border border-[#DEC077] text-center text-sm font-bold tracking-wide uppercase rounded-xl shadow-sm">
+                  <div className="w-full py-2 btn-gold text-center text-sm font-bold tracking-wide uppercase rounded-xl shadow-[0_0_15px_rgba(212,163,89,0.35)]">
                     Online Event
                   </div>
                 </div>
-               )}
+              )}
             </motion.div>
 
             {/* Desktop: Coordinators Below Image (Mobile: moved to bottom) */}
             <div className="hidden lg:grid gap-4 mt-auto">
               {event.coordinators && event.coordinators.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs text-[#221F1A]/60 font-semibold uppercase tracking-wider">
+                  <p className="text-xs text-[#A1A1AA] font-medium uppercase tracking-wider">
                     Event Coordinators
                   </p>
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
@@ -276,8 +288,8 @@ export default function EventPage({ eventId }: { eventId: string }) {
               transition={{ delay: 0.2 }}
               className="space-y-4"
             >
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight">
-                <span className="bg-gradient-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight">
+                <span className="gold-gradient-text">
                   {event.title}
                 </span>
               </h1>
@@ -285,14 +297,14 @@ export default function EventPage({ eventId }: { eventId: string }) {
               <div className="flex flex-wrap gap-3">
                 {/* Event Type / Subtype Tags */}
                 {event.eveType && (
-                    <span className="px-3 py-1 rounded-full text-xs border border-[#DEC077] bg-[#E9D39D] text-[#221F1A] font-bold uppercase shadow-sm">
-                        {event.eveType === 'ind' ? 'Individual' : 'Team Event'}
-                    </span>
+                  <span className="px-2.5 py-1 rounded-md text-xs font-medium border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] uppercase">
+                    {event.eveType === "ind" ? "Individual" : "Team Event"}
+                  </span>
                 )}
               </div>
 
-              <div className="max-w-3xl border-l-2 border-[#DEC077] pl-4">
-                <p className="text-base md:text-lg text-[#221F1A]/80 leading-relaxed inline">
+              <div className="max-w-3xl border-l-2 border-[#D4A359] pl-4">
+                <p className="text-base md:text-lg text-[#A1A1AA] leading-relaxed inline">
                   {isExpanded || !event.description || event.description.length <= 150
                     ? event.description
                     : `${event.description.slice(0, 150)}...`}
@@ -300,7 +312,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 {event.description && event.description.length > 150 && (
                   <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="ml-2 text-[#C19B4C] hover:text-[#221F1A] font-semibold text-sm transition-colors cursor-pointer focus:outline-hidden"
+                    className="ml-2 text-[#F3C87A] hover:text-[#FDE6B0] font-medium text-sm transition-colors cursor-pointer focus:outline-hidden"
                   >
                     {isExpanded ? "Read Less" : "Read More"}
                   </button>
@@ -334,9 +346,11 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   icon={<LuUsers size={18} />}
                   title="Participation"
                   value={
-                      event.maxParticipation 
-                      ? event.maxParticipation 
-                      : (event.memberMaxCount > 1 ? `${event.memberMinCount}-${event.memberMaxCount} Members` : "Individual")
+                    event.maxParticipation
+                      ? event.maxParticipation
+                      : event.memberMaxCount > 1
+                      ? `${event.memberMinCount}-${event.memberMaxCount} Members`
+                      : "Individual"
                   }
                   delay={0.45}
                 />
@@ -352,8 +366,8 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 className="space-y-4"
               >
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold text-[#221F1A]">Prize Pool</h2>
-                  <div className="h-px flex-1 bg-[#DEC077]/40" />
+                  <h2 className="text-xl font-bold text-white">Prize Pool</h2>
+                  <div className="h-px flex-1 bg-[rgba(212,163,89,0.2)]" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {event.firstPrize && (
@@ -392,10 +406,13 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  className="relative overflow-hidden rounded-2xl p-6 border border-[#DEC077] bg-[#FAF4E8] shadow-sm"
+                  className="relative overflow-hidden rounded-2xl p-6 border border-[rgba(212,163,89,0.25)] bg-[#131318]"
                 >
-                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#221F1A]">
-                    <LuBookOpen className="text-[#C19B4C]" />
+                  {/* Decorative Flash */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#3A270D]/40 blur-3xl rounded-full pointer-events-none" />
+
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#FDE6B0]">
+                    <LuBookOpen className="text-[#F3C87A]" />
                     Rules & Requirements
                   </h3>
                   <ul className="space-y-3">
@@ -403,17 +420,17 @@ export default function EventPage({ eventId }: { eventId: string }) {
                       (event.rules as string[]).map((rule, i: number) => (
                         <li
                           key={i}
-                          className="flex gap-3 text-[#221F1A]/85 text-sm leading-relaxed"
+                          className="flex gap-3 text-[#A1A1AA] text-sm leading-relaxed"
                         >
-                          <span className="text-[#C19B4C] font-bold mt-1">
+                          <span className="text-[#D4A359] font-bold mt-1">
                             •
                           </span>
                           <span>{rule}</span>
                         </li>
                       ))
                     ) : (
-                      <li className="flex gap-3 text-[#221F1A]/85 text-sm leading-relaxed">
-                        <span className="text-[#C19B4C] font-bold mt-1">
+                      <li className="flex gap-3 text-[#A1A1AA] text-sm leading-relaxed">
+                        <span className="text-[#D4A359] font-bold mt-1">
                           •
                         </span>
                         <span>{event.rules}</span>
@@ -422,22 +439,27 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   </ul>
                 </motion.div>
               )}
-              
-               {/* Extra Fields Notice */}
-               {event.extraFields && event.extraFields.length > 0 && (
-                 <div className="p-4 rounded-xl border border-[#DEC077] bg-[#FAF4E8] shadow-sm">
-                     <p className="text-[#221F1A] text-sm font-semibold mb-2">Registration Information Required:</p>
-                     <div className="flex flex-wrap gap-2">
-                         {event.extraFields.map((f, i) => (
-                             <span key={i} className="px-3 py-1 text-xs rounded-full bg-[#E9D39D] text-[#221F1A] border border-[#DEC077] font-medium">
-                                 {f.name}
-                             </span>
-                         ))}
-                     </div>
-                 </div>
-               )}
 
-              {/* Primary CTA Section */}
+              {/* Extra Fields Notice */}
+              {event.extraFields && event.extraFields.length > 0 && (
+                <div className="p-4 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318]">
+                  <p className="text-[#FDE6B0] text-sm font-medium mb-2">
+                    Registration Information Required:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {event.extraFields.map((f, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-1 text-xs rounded bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)]"
+                      >
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Primary CTA Section - Centered or Prominent */}
               {event.regLink && (
                 <div className="pt-2">
                   <RegisterButtonSection event={event} />
@@ -446,10 +468,10 @@ export default function EventPage({ eventId }: { eventId: string }) {
             </div>
 
             {/* Mobile Only: Coordinators at bottom */}
-            <div className="lg:hidden space-y-4 pt-8 border-t border-[#DEC077]/40">
+            <div className="lg:hidden space-y-4 pt-8 border-t border-[rgba(212,163,89,0.2)]">
               {event.coordinators && event.coordinators.length > 0 && (
                 <>
-                  <p className="text-sm text-[#221F1A]/60 font-semibold uppercase tracking-wider">
+                  <p className="text-sm text-[#A1A1AA] font-medium uppercase tracking-wider">
                     Event Coordinators
                   </p>
                   <div className="grid grid-cols-1 gap-3">

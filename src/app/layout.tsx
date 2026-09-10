@@ -193,7 +193,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${unBounded.variable} ${outfit.variable} antialiased font-light`}
+        className={`${unBounded.variable} ${outfit.variable} antialiased font-light bg-[#0B0B0E] text-white`}
       >
         <AuthProvider>
           {children}
