@@ -51,7 +51,7 @@ export default function Preloader() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.4 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 translate-x-5 sm:translate-x-8 md:translate-x-10"
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
             >
               <OrbBurst
                 dotColor="#F3C87A"
@@ -70,7 +70,7 @@ export default function Preloader() {
         </AnimatePresence>
 
         {/* Large Logo rendered directly as interactive Particles */}
-        <div className="relative z-10 w-full h-full flex items-center justify-center translate-x-5 sm:translate-x-8 md:translate-x-10">
+        <div className="relative z-10 w-full h-full flex items-center justify-center">
           <ParticleImage
             imageConfig={{
               image: "/extracted_sparkz.png",

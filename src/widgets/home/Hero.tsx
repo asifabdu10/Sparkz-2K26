@@ -227,7 +227,7 @@ export default function Hero() {
           transition={{ duration: 0.75, ease: "easeOut" }}
           className="order-1 relative flex w-full items-center justify-center md:order-2 md:w-1/2 md:-mt-6 overflow-visible"
         >
-          <div className="relative flex items-center justify-center h-80 w-72 sm:h-[30rem] sm:w-[32rem] md:w-[36rem] max-w-full translate-x-4 sm:translate-x-8 md:translate-x-10">
+          <div className="relative flex items-center justify-center h-80 w-72 sm:h-[30rem] sm:w-[32rem] md:w-[36rem] max-w-full">
             {mounted &&
               particles.map((p) => {
                 const angleRad = (p.angle * Math.PI) / 180;
