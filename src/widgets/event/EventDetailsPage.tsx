@@ -437,11 +437,9 @@ export default function EventPage({ eventId }: { eventId: string }) {
                )}
 
               {/* Primary CTA Section */}
-              {event.regLink && (
-                <div className="pt-2">
-                  <RegisterButtonSection event={event} />
-                </div>
-              )}
+              <div className="pt-2">
+                <RegisterButtonSection event={event} />
+              </div>
             </div>
 
             {/* Mobile Only: Coordinators at bottom */}
