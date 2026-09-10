@@ -52,6 +52,51 @@ export default function Hero() {
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(212,163,89,0.08)_1px,transparent_1px),linear-gradient(0deg,rgba(212,163,89,0.06)_1px,transparent_1px)] bg-[size:180px_180px]" />
           </div>
 
+          {/* Animated Rising Gold Lines */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+            {[
+              { left: "4%", height: "220px", width: "1.5px", duration: 8, delay: 0, opacity: 0.65 },
+              { left: "10%", height: "180px", width: "1px", duration: 10.5, delay: 3.5, opacity: 0.4 },
+              { left: "16%", height: "280px", width: "2px", duration: 7.5, delay: 1.8, opacity: 0.55 },
+              { left: "22%", height: "150px", width: "1px", duration: 9, delay: 5.2, opacity: 0.45 },
+              { left: "28%", height: "240px", width: "1.5px", duration: 11, delay: 0.8, opacity: 0.6 },
+              { left: "35%", height: "200px", width: "2px", duration: 6.8, delay: 2.2, opacity: 0.5 },
+              { left: "41%", height: "300px", width: "1px", duration: 12, delay: 4.1, opacity: 0.4 },
+              { left: "47%", height: "170px", width: "1.5px", duration: 8.5, delay: 1.5, opacity: 0.55 },
+              { left: "53%", height: "250px", width: "2px", duration: 9.8, delay: 6.0, opacity: 0.45 },
+              { left: "59%", height: "190px", width: "1px", duration: 7.2, delay: 0.3, opacity: 0.6 },
+              { left: "65%", height: "270px", width: "1.5px", duration: 10.2, delay: 3.8, opacity: 0.5 },
+              { left: "71%", height: "210px", width: "2px", duration: 8.2, delay: 2.7, opacity: 0.65 },
+              { left: "77%", height: "160px", width: "1px", duration: 11.5, delay: 5.5, opacity: 0.4 },
+              { left: "83%", height: "290px", width: "1.5px", duration: 7.8, delay: 1.1, opacity: 0.55 },
+              { left: "89%", height: "230px", width: "2px", duration: 9.2, delay: 4.4, opacity: 0.5 },
+              { left: "95%", height: "180px", width: "1px", duration: 10.8, delay: 2.0, opacity: 0.45 },
+            ].map((line, idx) => (
+              <motion.div
+                key={`rising-line-${idx}`}
+                className="absolute rounded-full bg-gradient-to-t from-transparent via-[#F3C87A] to-transparent"
+                style={{
+                  left: line.left,
+                  width: line.width,
+                  height: line.height,
+                  boxShadow:
+                    "0 0 14px rgba(243, 200, 122, 0.7), 0 0 28px rgba(212, 163, 89, 0.4)",
+                }}
+                initial={{ y: "100vh", opacity: 0 }}
+                animate={{
+                  y: ["100vh", "-30vh"],
+                  opacity: [0, line.opacity, line.opacity, 0],
+                }}
+                transition={{
+                  duration: line.duration,
+                  repeat: Infinity,
+                  ease: "linear",
+                  delay: line.delay,
+                }}
+              />
+            ))}
+          </div>
+
           {/* Floating chips */}
           {[
             {

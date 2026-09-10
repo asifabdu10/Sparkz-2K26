@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import { useAuth } from "@/context/AuthContext";
+import RisingLines from "@/components/ui/RisingLines";
 
 const rulesSections = [
   {
@@ -136,6 +137,18 @@ export default function AbheriPage() {
       <section className="relative isolate overflow-hidden pt-10 pb-20 sm:py-15">
         {mounted && (
           <>
+            <div className="pointer-events-none absolute inset-0 z-0">
+              <RisingLines
+                color="#D4A359"
+                horizonColor="#3A270D"
+                particles={500}
+                riseSpeed={30}
+                opacity={90}
+                scale={8}
+                showHorizon={true}
+                horizonOpacity={40}
+              />
+            </div>
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0B0B0E] via-transparent to-transparent h-64" />
             <div className="pointer-events-none absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
             <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[15%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
@@ -161,10 +174,13 @@ export default function AbheriPage() {
                 <span className="text-white">Rock the Stage on</span> <br />
                 <span className="text-[#F3C87A]">8 Oct 2026</span>
               </h1>
-              <p className="text-xl text-[#A1A1AA] max-w-2xl mx-auto">
-                Unleash your band&apos;s energy at Sparkz 2K26 – Prize pool up to
-                ₹60,000 | Teams of 5-10 | Reg: ₹1,200
-              </p>
+              <div className="max-w-2xl mx-auto rounded-2xl border border-[rgba(212,163,89,0.3)] bg-[#131318]/90 p-5 sm:p-6 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.7)]">
+                <p className="text-lg sm:text-xl text-[#FDE6B0] font-medium leading-relaxed">
+                  Unleash your band&apos;s energy at Sparkz 2K26 – Prize pool up to{" "}
+                  <span className="text-[#F3C87A] font-bold">₹60,000</span> | Teams of 5-10 | Reg:{" "}
+                  <span className="text-[#F3C87A] font-bold">₹1,200</span>
+                </p>
+              </div>
               {abheriRegistered ? (
                 <div className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(212,163,89,0.4)] bg-[#3A270D]/80 px-8 py-3 text-sm font-bold uppercase tracking-widest text-[#F3C87A] w-full md:w-auto">
                   ✓ Registered
