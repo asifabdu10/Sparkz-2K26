@@ -225,9 +225,9 @@ export default function Hero() {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true, amount: 0.35 }}
           transition={{ duration: 0.75, ease: "easeOut" }}
-          className="order-1 relative flex w-full items-center justify-center md:order-2 md:w-1/2 md:-mt-6"
+          className="order-1 relative flex w-full items-center justify-center md:order-2 md:w-1/2 md:-mt-6 overflow-visible"
         >
-          <div className="relative pl-5 h-80 w-64 sm:h-[28rem] sm:w-96">
+          <div className="relative flex items-center justify-center h-80 w-72 sm:h-[30rem] sm:w-[32rem] md:w-[36rem] max-w-full translate-x-4 sm:translate-x-8 md:translate-x-10">
             {mounted &&
               particles.map((p) => {
                 const angleRad = (p.angle * Math.PI) / 180;
@@ -302,7 +302,7 @@ export default function Hero() {
               holdDuration={2200}
               width="100%"
               height="100%"
-              className="absolute inset-0"
+              className="w-full h-full"
             />
           </div>
         </motion.div>

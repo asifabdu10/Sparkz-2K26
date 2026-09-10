@@ -40,7 +40,7 @@ export default function Preloader() {
         initial={{ opacity: 0, scale: 0.85 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="relative flex items-center justify-center w-[94vw] max-w-2xl h-[24rem] sm:h-[28rem] px-2 py-2"
+        className="relative flex items-center justify-center w-full max-w-3xl sm:max-w-4xl h-[26rem] sm:h-[32rem] px-4 py-2"
       >
         {/* 3D OrbBurst Particle Surge — appears after logo, then vanishes early */}
         <AnimatePresence>
@@ -51,7 +51,7 @@ export default function Preloader() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.4 }}
               transition={{ duration: 0.45, ease: "easeOut" }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none z-0"
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 translate-x-5 sm:translate-x-8 md:translate-x-10"
             >
               <OrbBurst
                 dotColor="#F3C87A"
@@ -62,15 +62,15 @@ export default function Preloader() {
                 spinTurns={1}
                 ball={{ spread: 100, turn: 0, tilt: 0 }}
                 pointer={{ drag: 100, damping: 20 }}
-                width={480}
-                height={480}
+                width={500}
+                height={500}
               />
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Large Logo rendered directly as interactive Particles */}
-        <div className="relative z-10 w-full h-full flex items-center justify-center">
+        <div className="relative z-10 w-full h-full flex items-center justify-center translate-x-5 sm:translate-x-8 md:translate-x-10">
           <ParticleImage
             imageConfig={{
               image: "/extracted_sparkz.png",
