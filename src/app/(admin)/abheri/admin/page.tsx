@@ -53,6 +53,7 @@ interface AbheriRegistration {
 
 export default function AbheriAdminPage() {
     const {
+        user,
         userData,
         loading,
         logout,
@@ -60,44 +61,45 @@ export default function AbheriAdminPage() {
 
     const router = useRouter();
 
-    const [
-        registrations,
-        setRegistrations,
-    ] = useState<AbheriRegistration[]>([]);
+    const [registrations, setRegistrations] =
+        useState<AbheriRegistration[]>([]);
 
-    const [
-        fetchLoading,
-        setFetchLoading,
-    ] = useState(true);
+    const [fetchLoading, setFetchLoading] =
+        useState(true);
 
-    const [
-        deletingId,
-        setDeletingId,
-    ] = useState<string | null>(null);
+    const [deletingId, setDeletingId] =
+        useState<string | null>(null);
 
     /*
-     * IMPORTANT:
+     * =========================================================
+     * SUPER ADMIN CHECK
+     * =========================================================
      *
-     * Your Firestore rules recognize this email
-     * as a Super Admin.
+     * Super Admin is recognized in two ways:
      *
-     * Therefore the UI must also recognize it
-     * as a Super Admin.
+     * 1. users/{uid}.role === "superAdmin"
+     *
+     * 2. Super Admin email configured in Firestore rules.
+     *
      */
+
     const isSuperAdmin =
         userData?.role === "superAdmin" ||
-        user?.email?.toLowerCase() === "joeljoy1237@gmail.com";
+        user?.email?.toLowerCase() ===
+        "joeljoy1237@gmail.com";
+
+
+    /*
+     * =========================================================
+     * AUTHORIZATION
+     * =========================================================
+     */
 
     useEffect(() => {
         if (loading) {
             return;
         }
 
-        /*
-         * Allow:
-         * - Abheri Admin
-         * - Super Admin
-         */
         if (
             !userData ||
             (
@@ -117,9 +119,13 @@ export default function AbheriAdminPage() {
         isSuperAdmin,
     ]);
 
+
     /*
-     * Fetch all Abheri registrations
+     * =========================================================
+     * FETCH ABHERI REGISTRATIONS
+     * =========================================================
      */
+
     const fetchRegistrations = async () => {
         try {
             setFetchLoading(true);
@@ -155,51 +161,66 @@ export default function AbheriAdminPage() {
         }
     };
 
+
     /*
-     * Super Admin only:
+     * =========================================================
+     * DEREGISTER USER
+     * =========================================================
      *
-     * Deregister a user/band from Abheri.
+     * SUPER ADMIN ONLY
      *
-     * This does TWO things:
+     * This performs two database operations:
      *
-     * 1. Deletes:
+     * 1. Delete:
+     *
      *    abheri_registrations/{registrationId}
      *
-     * 2. Removes:
+     * 2. Remove:
+     *
      *    "Abheri Battle of Bands"
      *
      *    from:
+     *
      *    users/{userId}.registeredEvents
+     *
      */
+
     const deregisterUser = async (
         registration: AbheriRegistration
     ) => {
+
         /*
-         * Extra security check on the UI
+         * Security check
          */
         if (!isSuperAdmin) {
             toastError(
                 "Only Super Admin can deregister users."
             );
+
             return;
         }
 
+
         /*
-         * Get Firebase UID
+         * Get the registered user's UID
          */
-        const userId = String(
-            registration.userId || ""
-        ).trim();
+        const userId =
+            String(
+                registration.userId || ""
+            ).trim();
+
 
         if (!userId) {
             toastError(
                 "User ID not found for this registration."
             );
+
             return;
         }
 
+
         /*
-         * Confirmation
+         * Confirmation dialog
          */
         const confirmed =
             window.confirm(
@@ -208,24 +229,31 @@ export default function AbheriAdminPage() {
                 `This action cannot be undone.`
             );
 
+
         if (!confirmed) {
             return;
         }
 
+
         try {
-            setDeletingId(registration.id);
+            setDeletingId(
+                registration.id
+            );
+
 
             /*
-             * Use one Firestore batch so both
-             * database changes are committed together.
+             * Create Firestore batch
              */
-            const batch = writeBatch(db);
+            const batch =
+                writeBatch(db);
+
 
             /*
-             * ------------------------------------------------
-             * 1. DELETE ABHERI REGISTRATION
-             * ------------------------------------------------
+             * -------------------------------------------------
+             * DELETE ABHERI REGISTRATION
+             * -------------------------------------------------
              */
+
             batch.delete(
                 doc(
                     db,
@@ -234,11 +262,13 @@ export default function AbheriAdminPage() {
                 )
             );
 
+
             /*
-             * ------------------------------------------------
-             * 2. REMOVE ABHERI FROM USER PROFILE
-             * ------------------------------------------------
+             * -------------------------------------------------
+             * REMOVE ABHERI FROM USER PROFILE
+             * -------------------------------------------------
              */
+
             batch.update(
                 doc(
                     db,
@@ -253,15 +283,18 @@ export default function AbheriAdminPage() {
                 }
             );
 
-            /*
-             * Commit both changes
-             */
-            await batch.commit();
 
             /*
-             * Remove the row immediately
-             * from the admin page.
+             * Commit both operations
              */
+
+            await batch.commit();
+
+
+            /*
+             * Remove row from UI
+             */
+
             setRegistrations(
                 (current) =>
                     current.filter(
@@ -271,27 +304,37 @@ export default function AbheriAdminPage() {
                     )
             );
 
+
             toastSuccess(
                 `${registration.bandName} has been deregistered successfully.`
             );
+
         } catch (error) {
+
             console.error(
                 "Error deregistering Abheri user:",
                 error
             );
 
             toastError(
-                "Failed to deregister user. Please check the console."
+                "Failed to deregister user. Please check Firestore permissions."
             );
+
         } finally {
+
             setDeletingId(null);
         }
     };
 
+
     /*
-     * Export registrations to Excel
+     * =========================================================
+     * EXPORT TO EXCEL
+     * =========================================================
      */
+
     const exportToExcel = () => {
+
         const data =
             registrations.map((r) => ({
                 "Band Name":
@@ -329,38 +372,46 @@ export default function AbheriAdminPage() {
                 "Instruments":
                     r.instruments?.join(
                         ", "
-                    ),
+                    ) || "",
 
                 "Screenshot Link":
-                    r.screenshotUrl,
+                    r.screenshotUrl || "",
 
                 "User Email":
-                    r.userEmail ?? "",
+                    r.userEmail || "",
             }));
 
-        const wb =
+
+        const workbook =
             XLSX.utils.book_new();
 
-        const ws =
+
+        const worksheet =
             XLSX.utils.json_to_sheet(
                 data
             );
 
+
         XLSX.utils.book_append_sheet(
-            wb,
-            ws,
+            workbook,
+            worksheet,
             "Abheri Registrations"
         );
 
+
         XLSX.writeFile(
-            wb,
+            workbook,
             "Abheri_Registrations.xlsx"
         );
     };
 
+
     /*
-     * Loading screen
+     * =========================================================
+     * LOADING SCREEN
+     * =========================================================
      */
+
     if (
         loading ||
         fetchLoading
@@ -372,18 +423,27 @@ export default function AbheriAdminPage() {
         );
     }
 
+
     if (!userData) {
         return null;
     }
+
+
+    /*
+     * =========================================================
+     * PAGE
+     * =========================================================
+     */
 
     return (
         <div className="min-h-screen bg-[#04050b] text-white p-4 md:p-8">
 
             <div className="max-w-7xl mx-auto">
 
-                {/* =========================================
+
+                {/* =================================================
                     HEADER
-                ========================================= */}
+                ================================================= */}
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
 
@@ -397,6 +457,7 @@ export default function AbheriAdminPage() {
                             Manage Battle of Bands Registrations
                         </p>
 
+
                         {isSuperAdmin && (
                             <p className="text-xs text-purple-400 mt-2">
                                 Super Admin — Deregistration enabled
@@ -405,45 +466,64 @@ export default function AbheriAdminPage() {
 
                     </div>
 
+
                     <div className="flex flex-wrap gap-4">
 
-                        {/* Export */}
+
+                        {/* =========================================
+                            EXPORT BUTTON
+                        ========================================= */}
+
                         <button
                             onClick={
                                 exportToExcel
                             }
                             className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg transition-colors font-medium shadow-lg shadow-emerald-500/20"
                         >
+
                             <FiDownload />
 
                             Export Excel
+
                         </button>
 
-                        {/* Logout */}
+
+                        {/* =========================================
+                            LOGOUT BUTTON
+                        ========================================= */}
+
                         <button
                             onClick={() =>
                                 logout()
                             }
                             className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg transition-colors font-medium"
                         >
+
                             <FiLogOut />
 
                             Logout
+
                         </button>
 
                     </div>
 
                 </div>
 
-                {/* =========================================
+
+                {/* =================================================
                     REGISTRATION TABLE
-                ========================================= */}
+                ================================================= */}
 
                 <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden backdrop-blur-sm">
 
                     <div className="overflow-x-auto">
 
                         <table className="w-full text-left border-collapse min-w-[1200px]">
+
+
+                            {/* =====================================
+                                TABLE HEADER
+                            ===================================== */}
 
                             <thead>
 
@@ -465,7 +545,9 @@ export default function AbheriAdminPage() {
                                         Payment
                                     </th>
 
-                                    {/* ONLY SUPER ADMIN */}
+
+                                    {/* SUPER ADMIN ONLY */}
+
                                     {isSuperAdmin && (
                                         <th className="p-4 font-semibold text-center">
                                             Action
@@ -476,7 +558,13 @@ export default function AbheriAdminPage() {
 
                             </thead>
 
+
+                            {/* =====================================
+                                TABLE BODY
+                            ===================================== */}
+
                             <tbody className="divide-y divide-gray-800">
+
 
                                 {registrations.map(
                                     (reg) => (
@@ -487,6 +575,7 @@ export default function AbheriAdminPage() {
                                             }
                                             className="hover:bg-gray-800/20 transition-colors group"
                                         >
+
 
                                             {/* =================================
                                                 BAND INFO
@@ -506,6 +595,7 @@ export default function AbheriAdminPage() {
                                                     }
                                                 </div>
 
+
                                                 {reg.userEmail && (
                                                     <div className="text-xs text-gray-500 mt-2">
                                                         {
@@ -515,6 +605,7 @@ export default function AbheriAdminPage() {
                                                 )}
 
                                             </td>
+
 
                                             {/* =================================
                                                 CONTACT
@@ -544,6 +635,7 @@ export default function AbheriAdminPage() {
 
                                                 </div>
 
+
                                                 <div className="text-sm mt-2">
 
                                                     <span className="text-gray-500">
@@ -568,6 +660,7 @@ export default function AbheriAdminPage() {
 
                                             </td>
 
+
                                             {/* =================================
                                                 DETAILS
                                             ================================= */}
@@ -584,6 +677,7 @@ export default function AbheriAdminPage() {
                                                     </span>
 
                                                 </div>
+
 
                                                 {(
                                                     reg.vocalistCount !==
@@ -604,6 +698,7 @@ export default function AbheriAdminPage() {
                                                                     </span>
                                                                 )}
 
+
                                                             {reg.vocalistCount !==
                                                                 undefined &&
                                                                 reg.instrumentalistCount !==
@@ -612,6 +707,7 @@ export default function AbheriAdminPage() {
                                                                         •
                                                                     </span>
                                                                 )}
+
 
                                                             {reg.instrumentalistCount !==
                                                                 undefined && (
@@ -626,6 +722,7 @@ export default function AbheriAdminPage() {
                                                         </div>
 
                                                     )}
+
 
                                                 <div className="mt-2 flex flex-wrap gap-1">
 
@@ -654,21 +751,27 @@ export default function AbheriAdminPage() {
                                                             )
                                                         )}
 
+
                                                     {reg.instruments
                                                         ?.length >
                                                         3 && (
+
                                                             <span className="text-xs text-gray-500">
+
                                                                 +
                                                                 {reg
                                                                     .instruments
                                                                     .length -
                                                                     3}
+
                                                             </span>
+
                                                         )}
 
                                                 </div>
 
                                             </td>
+
 
                                             {/* =================================
                                                 PAYMENT
@@ -677,12 +780,16 @@ export default function AbheriAdminPage() {
                                             <td className="p-4 align-top">
 
                                                 <div className="text-sm font-mono text-gray-300 mb-2">
+
                                                     {
                                                         reg.transactionId
                                                     }
+
                                                 </div>
 
+
                                                 {reg.screenshotUrl && (
+
                                                     <a
                                                         href={
                                                             reg.screenshotUrl
@@ -691,20 +798,24 @@ export default function AbheriAdminPage() {
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 underline"
                                                     >
+
                                                         <FiExternalLink />
 
                                                         View Screenshot
+
                                                     </a>
+
                                                 )}
 
                                             </td>
 
+
                                             {/* =================================
-                                                DEREGISTER
-                                                SUPER ADMIN ONLY
+                                                SUPER ADMIN DEREGISTER
                                             ================================= */}
 
                                             {isSuperAdmin && (
+
                                                 <td className="p-4 align-top text-center">
 
                                                     <button
@@ -730,6 +841,7 @@ export default function AbheriAdminPage() {
                                                     </button>
 
                                                 </td>
+
                                             )}
 
                                         </tr>
@@ -737,12 +849,14 @@ export default function AbheriAdminPage() {
                                     )
                                 )}
 
+
                                 {/* =================================
                                     EMPTY STATE
                                 ================================= */}
 
                                 {registrations.length ===
                                     0 && (
+
                                         <tr>
 
                                             <td
@@ -753,10 +867,13 @@ export default function AbheriAdminPage() {
                                                 }
                                                 className="p-12 text-center text-gray-500"
                                             >
+
                                                 No registrations found.
+
                                             </td>
 
                                         </tr>
+
                                     )}
 
                             </tbody>
@@ -767,11 +884,13 @@ export default function AbheriAdminPage() {
 
                 </div>
 
-                {/* =========================================
+
+                {/* =================================================
                     SUPER ADMIN INFORMATION
-                ========================================= */}
+                ================================================= */}
 
                 {isSuperAdmin && (
+
                     <div className="mt-6 bg-purple-500/5 border border-purple-500/10 rounded-xl p-4 text-sm text-gray-400">
 
                         <div className="font-medium text-purple-300 mb-1">
@@ -779,22 +898,29 @@ export default function AbheriAdminPage() {
                         </div>
 
                         <p>
+
                             You can deregister a band using
                             the{" "}
+
                             <span className="text-red-400">
                                 Deregister
                             </span>{" "}
+
                             button. This deletes the
                             Abheri registration from
                             Firestore and removes{" "}
+
                             <span className="text-white">
                                 Abheri Battle of Bands
                             </span>{" "}
+
                             from the user's registered
                             events.
+
                         </p>
 
                     </div>
+
                 )}
 
             </div>
