@@ -94,14 +94,14 @@ export default function Register() {
   // UPI DETAILS
   // ==================================================
 
-  const UPI_ID = "steevpalliath007@oksbi";
-
+  // const UPI_ID = "steevpalliath007@oksbi";
+  const UPI_ID = "asifabdulla1234@oksbi";
   const transactionNote = `Abheri Registration ${formData.bandName
     ? `- ${formData.bandName}`
     : ""
     }`;
 
-  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1200&cu=INR&tn=${encodeURIComponent(
+  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1&cu=INR&tn=${encodeURIComponent(
     transactionNote
   )}`;
 
