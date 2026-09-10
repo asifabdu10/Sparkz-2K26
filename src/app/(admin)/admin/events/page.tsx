@@ -2,7 +2,18 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
+import {
+    collection,
+    getDocs,
+    doc,
+    setDoc,
+    deleteDoc,
+    query,
+    where,
+    updateDoc,
+    writeBatch,
+    arrayRemove,
+} from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
@@ -217,14 +228,135 @@ export default function EventsManagement() {
 
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this event? This action cannot be undone.")) return;
+        const event = events.find((e) => e.id === id);
+
+        if (!event) {
+            toastError("Event not found");
+            return;
+        }
+
+        if (
+            !confirm(
+                `Are you sure you want to delete "${event.title}"?\n\n` +
+                `This will also deregister all users from this event and remove ` +
+                `the event from their registered events list.\n\n` +
+                `This action cannot be undone.`
+            )
+        ) {
+            return;
+        }
+
         try {
+            setLoading(true);
+
+            // -----------------------------------------------------
+            // 1. Find all registrations for this event
+            // -----------------------------------------------------
+
+            const registrationsQuery = query(
+                collection(db, "registrations"),
+                where("eventId", "==", id)
+            );
+
+            const registrationsSnapshot = await getDocs(registrationsQuery);
+
+            // -----------------------------------------------------
+            // 2. Collect unique users
+            // -----------------------------------------------------
+
+            const userIds = new Set<string>();
+
+            registrationsSnapshot.docs.forEach((registrationDoc) => {
+                const data = registrationDoc.data();
+
+                if (data.userId) {
+                    userIds.add(String(data.userId));
+                }
+            });
+
+            // -----------------------------------------------------
+            // 3. Delete registrations + remove event from users
+            // -----------------------------------------------------
+            //
+            // Firestore batches have a maximum of 500 writes.
+            // We therefore process the cleanup in chunks.
+            //
+
+            const operations: Array<{
+                type: "deleteRegistration" | "updateUser";
+                id: string;
+            }> = [];
+
+            registrationsSnapshot.docs.forEach((registrationDoc) => {
+                operations.push({
+                    type: "deleteRegistration",
+                    id: registrationDoc.id,
+                });
+            });
+
+            userIds.forEach((userId) => {
+                operations.push({
+                    type: "updateUser",
+                    id: userId,
+                });
+            });
+
+            const CHUNK_SIZE = 450;
+
+            for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+                const chunk = operations.slice(i, i + CHUNK_SIZE);
+
+                const batch = writeBatch(db);
+
+                chunk.forEach((operation) => {
+                    if (operation.type === "deleteRegistration") {
+                        batch.delete(
+                            doc(db, "registrations", operation.id)
+                        );
+                    } else {
+                        batch.update(
+                            doc(db, "users", operation.id),
+                            {
+                                registeredEvents: arrayRemove(event.title),
+                            }
+                        );
+                    }
+                });
+
+                await batch.commit();
+            }
+
+            // -----------------------------------------------------
+            // 4. Finally delete the event itself
+            // -----------------------------------------------------
+
             await deleteDoc(doc(db, "events", id));
-            toastSuccess("Event deleted");
-            setEvents(events.filter(e => e.id !== id));
+
+            // -----------------------------------------------------
+            // 5. Update UI
+            // -----------------------------------------------------
+
+            setEvents((current) =>
+                current.filter((e) => e.id !== id)
+            );
+
+            toastSuccess(
+                registrationsSnapshot.size > 0
+                    ? `Event deleted and ${registrationsSnapshot.size} registration(s) removed`
+                    : "Event deleted"
+            );
+
         } catch (error) {
-            console.error(error);
-            toastError("Failed to delete event");
+            console.error(
+                "Error deleting event and cleaning registrations:",
+                error
+            );
+
+            toastError(
+                "Failed to delete event. Some registration data may not have been cleaned."
+            );
+        } finally {
+            setLoading(false);
         }
     };
 

@@ -37,7 +37,7 @@ service cloud.firestore {
 
 
     // =========================================================
-    // Users Collection
+    // USERS
     // =========================================================
 
     match /users/{userId} {
@@ -45,181 +45,252 @@ service cloud.firestore {
       // Authenticated users can read profiles
       allow read: if isAuthenticated();
 
-      // User can create/update their own profile
-      // Super Admin can also create/update profiles
-      allow create, update: if isOwner(userId) || isSuperAdmin();
+      // User can create/update their own profile.
+      // Super Admin can create/update any profile.
+      allow create, update: if
+        isOwner(userId) ||
+        isSuperAdmin();
 
-      // Only Super Admin can delete users
+      // Only Super Admin can delete users.
       allow delete: if isSuperAdmin();
     }
 
 
     // =========================================================
-    // Events Collection
+    // EVENTS
     // =========================================================
 
     match /events/{eventId} {
 
-      // Public read access
+      // Anyone can view events.
       allow read: if true;
 
-      // Only event admins can create/update/delete events.
-      // Department admins may only modify events belonging to their department.
-      allow create: if isSuperAdmin() || (
-        isAuthenticated() &&
-        getUserData().role == 'admin' &&
-        request.resource.data.department == getUserData().department
-      );
+      // -------------------------------------------------------
+      // CREATE
+      // -------------------------------------------------------
 
-      allow update: if isSuperAdmin() || (
-        isAuthenticated() &&
-        getUserData().role == 'admin' &&
-        request.resource.data.department == getUserData().department
-      );
+      allow create: if
+        isSuperAdmin()
+        ||
+        (
+          isAuthenticated() &&
+          getUserData().role == 'admin' &&
+          request.resource.data.department ==
+            getUserData().department
+        );
 
-      allow delete: if isSuperAdmin() || (
-        isAuthenticated() &&
-        getUserData().role == 'admin' &&
-        resource.data.department == getUserData().department
-      );
+
+      // -------------------------------------------------------
+      // UPDATE
+      // -------------------------------------------------------
+
+      allow update: if
+        isSuperAdmin()
+        ||
+        (
+          isAuthenticated() &&
+          getUserData().role == 'admin' &&
+          request.resource.data.department ==
+            getUserData().department
+        );
+
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+
+      allow delete: if
+        isSuperAdmin()
+        ||
+        (
+          isAuthenticated() &&
+          getUserData().role == 'admin' &&
+          resource.data.department ==
+            getUserData().department
+        );
     }
 
 
     // =========================================================
-    // General Event Registrations
+    // GENERAL EVENT REGISTRATIONS
     // =========================================================
 
     match /registrations/{regId} {
 
-      // A logged-in user can register only themselves, and only while
-      // the selected event is open. Free and paid registrations are both supported.
-      allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid
-        && exists(/databases/$(database)/documents/events/$(request.resource.data.eventId))
-        && (
-          !('registrationOpen' in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data)
-          || get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationOpen == true
+      // -------------------------------------------------------
+      // CREATE
+      // -------------------------------------------------------
+      //
+      // User can create only their own registration.
+      // Event must exist.
+      // Event must be open.
+      //
+
+      allow create: if
+        isAuthenticated()
+        &&
+        request.resource.data.userId ==
+          request.auth.uid
+        &&
+        exists(
+          /databases/$(database)/documents/events/$(request.resource.data.eventId)
         )
-        && request.resource.data.status in ['registered', 'paid', 'pending'];
+        &&
+        (
+          !(
+            'registrationOpen'
+            in get(
+              /databases/$(database)/documents/events/$(request.resource.data.eventId)
+            ).data
+          )
+          ||
+          get(
+            /databases/$(database)/documents/events/$(request.resource.data.eventId)
+          ).data.registrationOpen == true
+        )
+        &&
+        request.resource.data.status
+          in ['registered', 'paid', 'pending'];
 
-      // Users can read their own registration; admins can read their events.
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isSuperAdmin() ||
-        getUserData().role == 'admin'
-      );
 
-      // Users can update their own registration; admins can update registrations.
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isSuperAdmin() ||
-        getUserData().role == 'admin'
-      );
+      // -------------------------------------------------------
+      // READ
+      // -------------------------------------------------------
+
+      allow read: if
+        isAuthenticated()
+        &&
+        (
+          resource.data.userId ==
+            request.auth.uid
+          ||
+          isSuperAdmin()
+          ||
+          getUserData().role == 'admin'
+        );
+
+
+      // -------------------------------------------------------
+      // UPDATE
+      // -------------------------------------------------------
+
+      allow update: if
+        isAuthenticated()
+        &&
+        (
+          resource.data.userId ==
+            request.auth.uid
+          ||
+          isSuperAdmin()
+          ||
+          getUserData().role == 'admin'
+        );
+
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+      //
+      // Super Admin can manually deregister a user.
+      //
 
       allow delete: if isSuperAdmin();
     }
 
 
-// =========================================================
-// Abheri - Battle of Bands Registrations
-// =========================================================
+    // =========================================================
+    // ABHERI - BATTLE OF BANDS
+    // =========================================================
 
-match /abheri_registrations/{regId} {
+    match /abheri_registrations/{regId} {
 
-  // -------------------------------------------------------
-  // CREATE
-  // -------------------------------------------------------
-  // A normal user can create ONLY their own document.
-  // The document ID must be their Firebase UID.
-  // A second document cannot be created for the same user.
-  //
-  // Registration must also be OPEN.
+      // -------------------------------------------------------
+      // CREATE
+      // -------------------------------------------------------
 
-  allow create: if isAuthenticated()
-    && regId == request.auth.uid
-    && request.resource.data.userId == request.auth.uid
-    && !exists(
-      /databases/$(database)/documents/abheri_registrations/$(request.auth.uid)
-    )
-    && (
-      isAbheriAdmin()
-      ||
-      get(
-        /databases/$(database)/documents/eventSettings/abheri
-      ).data.registrationOpen == true
-    );
-
-
-  // -------------------------------------------------------
-  // READ
-  // -------------------------------------------------------
-  // Users can read ONLY their own registration.
-  // Abheri Admin / Super Admin can read all.
-
-  allow read: if isAuthenticated() && (
-    regId == request.auth.uid ||
-    isAbheriAdmin()
-  );
+      allow create: if
+        isAuthenticated()
+        &&
+        regId == request.auth.uid
+        &&
+        request.resource.data.userId ==
+          request.auth.uid
+        &&
+        !exists(
+          /databases/$(database)/documents/abheri_registrations/$(request.auth.uid)
+        )
+        &&
+        (
+          isAbheriAdmin()
+          ||
+          get(
+            /databases/$(database)/documents/eventSettings/abheri
+          ).data.registrationOpen == true
+        );
 
 
-  // -------------------------------------------------------
-  // UPDATE
-  // -------------------------------------------------------
-  // Normal users can update ONLY their own registration.
-  // Admins can update any Abheri registration.
+      // -------------------------------------------------------
+      // READ
+      // -------------------------------------------------------
 
-  allow update: if isAuthenticated() && (
-    isAbheriAdmin()
-    ||
-    (
-      regId == request.auth.uid
-      &&
-      resource.data.userId == request.auth.uid
-      &&
-      request.resource.data.userId == request.auth.uid
-      &&
-      get(
-        /databases/$(database)/documents/eventSettings/abheri
-      ).data.registrationOpen == true
-    )
-  );
+      allow read: if
+        isAuthenticated()
+        &&
+        (
+          regId == request.auth.uid
+          ||
+          isAbheriAdmin()
+        );
 
 
-  // -------------------------------------------------------
-  // DELETE
-  // -------------------------------------------------------
-  // Only Super Admin can delete registrations.
+      // -------------------------------------------------------
+      // UPDATE
+      // -------------------------------------------------------
 
-  allow delete: if isSuperAdmin();
-}
+      allow update: if
+        isAuthenticated()
+        &&
+        (
+          isAbheriAdmin()
+          ||
+          (
+            regId == request.auth.uid
+            &&
+            resource.data.userId ==
+              request.auth.uid
+            &&
+            request.resource.data.userId ==
+              request.auth.uid
+            &&
+            get(
+              /databases/$(database)/documents/eventSettings/abheri
+            ).data.registrationOpen == true
+          )
+        );
+
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+
+      // Only Super Admin can delete Abheri registrations.
+      allow delete: if isSuperAdmin();
+    }
 
 
     // =========================================================
-    // Abheri Registration Settings
-    // =========================================================
-    //
-    // This document controls whether Abheri registration
-    // is currently OPEN or CLOSED.
-    //
-    // Firestore document:
-    //
-    // eventSettings
-    //      └── abheri
-    //           └── registrationOpen: true / false
-    //
+    // ABHERI REGISTRATION SETTINGS
     // =========================================================
 
     match /eventSettings/{settingId} {
 
-      // Registration page can read the status
-      // to show OPEN or CLOSED.
+      // Registration status can be read publicly.
       allow read: if true;
 
-      // Only Abheri Admin and Super Admin can
-      // create or change the registration status.
+      // Only Abheri Admin / Super Admin can change settings.
       allow create, update: if isAbheriAdmin();
 
-      // Only Super Admin can delete the settings.
+      // Only Super Admin can delete settings.
       allow delete: if isSuperAdmin();
     }
 
