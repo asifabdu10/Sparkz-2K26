@@ -34,10 +34,11 @@
   --color-text-muted: #A1A1AA;
 }
 
-/* 5. Base style */
+/* 6. Body style */
 html {
   scroll-behavior: smooth;
   background-color: #0B0B0E;
+  color: #FFFFFF;
 }
 
 body {
@@ -47,7 +48,8 @@ body {
   scroll-behavior: smooth;
 }
 
-/* Custom theme utility classes */
+/* Utility classes for Obsidian & Metallic Gold Theme */
+.text-gold-accent,
 .gold-gradient-text {
   background: linear-gradient(135deg, #F3C87A 0%, #FDE6B0 40%, #D4A359 100%);
   -webkit-background-clip: text;
@@ -78,9 +80,24 @@ body {
   transform: translateY(0);
 }
 
+.pill-btn-gold {
+  background: linear-gradient(135deg, #D4A359 0%, #F3C87A 100%);
+  color: #0B0B0E;
+  border: 1px solid rgba(212, 163, 89, 0.35);
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.pill-btn-gold:hover {
+  background: linear-gradient(135deg, #E0B36E 0%, #F8D595 100%);
+  box-shadow: 0 4px 18px rgba(212, 163, 89, 0.35);
+}
+
 .card-gold {
   background-color: #131318;
   border: 1px solid rgba(212, 163, 89, 0.25);
+  border-radius: 1rem;
 }
 
 .badge-gold {
@@ -92,13 +109,27 @@ body {
 
 
 @keyframes fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -111,8 +142,13 @@ body {
 
 /* Add to your global.css or Tailwind config */
 @keyframes shimmer {
-  0% { transform: translateX(-100%) rotate(45deg); }
-  100% { transform: translateX(100%) rotate(45deg); }
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+  }
+
+  100% {
+    transform: translateX(100%) rotate(45deg);
+  }
 }
 
 .animate-shimmer {
@@ -126,8 +162,10 @@ body {
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 /* Remove arrow/spinners from input type=number */

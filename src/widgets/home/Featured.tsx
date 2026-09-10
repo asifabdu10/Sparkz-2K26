@@ -15,17 +15,12 @@ export default function FeaturedEvents() {
   const [events, setEvents] = useState<Event[]>([]);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const fetchFeaturedEvents = async () => {
       try {
-        let fetchedEvents: Event[] = [];
+        const fetchedEvents: Event[] = [];
 
         // 1. First, fetch the rc-car-racing event specifically
         const rcCarQuery = query(
@@ -135,19 +130,12 @@ export default function FeaturedEvents() {
       ref={sectionRef}
     >
       {/* Background Effects */}
-      {mounted && (
-        <>
-          {/* Warm Dark Bronze Glows */}
-          <div className="pointer-events-none absolute left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
-          <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
+      {/* Warm Dark Bronze Glows */}
+      <div className="pointer-events-none absolute left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
+      <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
 
-          {/* Subtle Grid Pattern */}
-          <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-size-[100px_100px] opacity-25" />
-
-          {/* Radial Gradients */}
-          <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_40%_40%,rgba(58,39,13,0.3),transparent_50%),radial-gradient(circle_at_60%_60%,rgba(212,163,89,0.05),transparent_45%)]" />
-        </>
-      )}
+      {/* Subtle Grid Pattern */}
+      <div className="hidden sm:block pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-size-[100px_100px] opacity-25" />
 
       <div className="relative px-[5vw]">
         <motion.h2
@@ -212,8 +200,6 @@ export default function FeaturedEvents() {
                         }
                          transition-all duration-500`}
                     >
-                      {/* Inner glow */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#131318]/80 via-transparent to-transparent pointer-events-none" />
                       <Image
                         src={event.imageUrl || "/event.png"}
                         alt={event.title}
@@ -232,13 +218,15 @@ export default function FeaturedEvents() {
           {/* Glowing nav buttons */}
           <button
             onClick={() => setActive((i) => getIndex(i - 1))}
-            className="absolute left-2 sm:left-4 z-40 rounded-full bg-[#131318]/80 border border-[rgba(212,163,89,0.25)] p-2 sm:p-4 backdrop-blur hover:bg-[#1a1a22] hover:border-[#F3C87A] hover:scale-110 transition"
+            className="absolute left-2 sm:left-4 z-40 rounded-full bg-[#131318]/80 border border-[rgba(212,163,89,0.3)] p-2 sm:p-4 hover:bg-[#3A270D] hover:border-[#F3C87A] hover:scale-110 transition shadow-lg"
+            aria-label="Previous event"
           >
             <span className="text-2xl sm:text-4xl text-[#F3C87A]">‹</span>
           </button>
           <button
             onClick={() => setActive((i) => getIndex(i + 1))}
-            className="absolute right-2 sm:right-4 z-40 rounded-full bg-[#131318]/80 border border-[rgba(212,163,89,0.25)] p-2 sm:p-4 backdrop-blur hover:bg-[#1a1a22] hover:border-[#F3C87A] hover:scale-110 transition"
+            className="absolute right-2 sm:right-4 z-40 rounded-full bg-[#131318]/80 border border-[rgba(212,163,89,0.3)] p-2 sm:p-4 hover:bg-[#3A270D] hover:border-[#F3C87A] hover:scale-110 transition shadow-lg"
+            aria-label="Next event"
           >
             <span className="text-2xl sm:text-4xl text-[#F3C87A]">›</span>
           </button>

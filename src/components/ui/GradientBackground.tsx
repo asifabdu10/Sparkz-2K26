@@ -31,7 +31,7 @@ export default function GradientBackground() {
           </linearGradient>
         </defs>
 
-        {/* Upper Right Geometric Accents (behind Hero logo) */}
+        {/* Upper Right Geometric Accents */}
         <g stroke="url(#goldStrokeGrad)" fill="none" strokeWidth="1">
           <circle cx="85%" cy="22%" r="180" strokeDasharray="6 8" opacity="0.4" />
           <circle cx="85%" cy="22%" r="260" opacity="0.3" />

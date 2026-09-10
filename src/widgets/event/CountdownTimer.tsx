@@ -67,13 +67,13 @@ export default function CountdownTimer({
         animate={{ opacity: 1, scale: 1 }}
         className="relative"
       >
-        <div className="absolute -inset-4 bg-linear-to-r from-[#DEC077]/20 to-[#E9D39D]/20 rounded-2xl blur-xl opacity-60" />
-        <div className="relative rounded-xl border border-[#DEC077] bg-[#FAF4E8] p-6 backdrop-blur-sm shadow-sm">
+        <div className="absolute -inset-4 bg-linear-to-r from-[rgba(212,163,89,0.2)] to-[#3A270D]/40 rounded-2xl blur-xl opacity-60" />
+        <div className="relative rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] p-6 backdrop-blur-sm shadow-sm">
           <div className="flex items-center justify-center gap-3">
-            <div className="rounded-full bg-[#E9D39D] p-3">
-              <FaClock className="text-[#C19B4C] text-xl" />
+            <div className="rounded-full bg-[#3A270D] p-3 border border-[rgba(212,163,89,0.3)]">
+              <FaClock className="text-[#F3C87A] text-xl" />
             </div>
-            <h3 className="text-lg font-semibold text-[#221F1A]">
+            <h3 className="text-lg font-semibold text-white">
               Registration Closed
             </h3>
           </div>
@@ -104,8 +104,8 @@ export default function CountdownTimer({
             isCritical
               ? "from-red-500/20 via-orange-500/20 to-amber-500/20"
               : isUrgent
-              ? "from-amber-500/20 to-[#DEC077]/30"
-              : "from-[#DEC077]/20 via-[#E9D39D]/30 to-[#DEC077]/20"
+              ? "from-amber-500/20 to-[rgba(212,163,89,0.3)]"
+              : "from-[rgba(212,163,89,0.2)] via-[#3A270D]/40 to-[rgba(212,163,89,0.2)]"
           } blur-xl transition-all duration-500 ${
             isHovered ? "opacity-80 scale-110" : "opacity-50"
           }`}
@@ -120,7 +120,7 @@ export default function CountdownTimer({
                 ? "bg-red-400/60"
                 : isUrgent
                 ? "bg-orange-400/60"
-                : "bg-[#C19B4C]/50"
+                : "bg-[#D4A359]/50"
             }`}
             initial={{
               x: Math.sin(i * 45) * 50 + "%",
@@ -143,7 +143,7 @@ export default function CountdownTimer({
       </div>
 
       {/* Main content */}
-      <div className="relative rounded-2xl border border-[#DEC077] bg-[#FAF4E8]/90 p-6 backdrop-blur-sm shadow-sm">
+      <div className="relative rounded-2xl border border-[rgba(212,163,89,0.25)] bg-[#131318]/90 p-6 backdrop-blur-sm shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-center gap-3 mb-6">
           <div
@@ -152,13 +152,13 @@ export default function CountdownTimer({
                 ? "bg-red-100 text-red-600"
                 : isUrgent
                 ? "bg-amber-100 text-amber-700"
-                : "bg-[#E9D39D] text-[#C19B4C]"
+                : "bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)]"
             }`}
           >
             {isCritical ? (
               <FaFire className="text-red-500 text-lg animate-pulse" />
             ) : (
-              <FaRocket className="text-[#C19B4C] text-lg" />
+              <FaRocket className="text-[#F3C87A] text-lg" />
             )}
           </div>
           <h3
@@ -167,7 +167,7 @@ export default function CountdownTimer({
                 ? "text-red-600"
                 : isUrgent
                 ? "text-amber-700"
-                : "text-[#221F1A]"
+                : "text-white"
             } uppercase tracking-wider`}
           >
             {isCritical
@@ -199,12 +199,12 @@ export default function CountdownTimer({
                     ? "bg-linear-to-r from-red-500/30 to-orange-500/30"
                     : isUrgent
                     ? "bg-linear-to-r from-orange-500/30 to-amber-500/30"
-                    : "bg-[#DEC077]/30"
+                    : "bg-[rgba(212,163,89,0.25)]"
                 }`}
               />
 
               {/* Time unit card */}
-              <div className="relative rounded-xl border border-[#DEC077]/60 bg-[#F9F6ED] p-4 backdrop-blur-sm shadow-xs">
+              <div className="relative rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] p-4 backdrop-blur-sm shadow-xs">
                 <motion.p
                   key={unit.value}
                   initial={{ scale: 1.2 }}
@@ -214,7 +214,7 @@ export default function CountdownTimer({
                       ? "text-red-600"
                       : isUrgent
                       ? "text-amber-600"
-                      : "bg-linear-to-r from-[#C19B4C] via-[#DEC077] to-[#C19B4C] bg-clip-text text-transparent"
+                      : "gold-gradient-text"
                   }`}
                 >
                   {unit.value.toString().padStart(2, "0")}
@@ -225,7 +225,7 @@ export default function CountdownTimer({
                       ? "text-red-600/80"
                       : isUrgent
                       ? "text-amber-600/80"
-                      : "text-[#221F1A]/70"
+                      : "text-[#A1A1AA]"
                   }`}
                 >
                   {unit.label}
@@ -241,7 +241,7 @@ export default function CountdownTimer({
                         ? "bg-linear-to-r from-red-500/50 to-orange-500/50"
                         : isUrgent
                         ? "bg-linear-to-r from-orange-500/50 to-amber-500/50"
-                        : "bg-linear-to-r from-[#DEC077]/60 to-[#C19B4C]/60"
+                        : "bg-linear-to-r from-[rgba(212,163,89,0.3)] to-[#D4A359]/60"
                     }`}
                   />
                 </div>
@@ -257,7 +257,7 @@ export default function CountdownTimer({
                 ? "bg-red-500"
                 : isUrgent
                 ? "bg-amber-500"
-                : "bg-[#C19B4C]"
+                : "bg-[#D4A359]"
             }`}
           />
           <p
@@ -266,7 +266,7 @@ export default function CountdownTimer({
                 ? "text-red-600"
                 : isUrgent
                 ? "text-amber-700"
-                : "text-[#221F1A]/80"
+                : "text-[#A1A1AA]"
             }`}
           >
             {isCritical

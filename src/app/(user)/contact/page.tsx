@@ -1,37 +1,31 @@
 "use client";
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, User } from "lucide-react";
 import Head from "next/head";
+import Link from "next/link";
 
 const coordinators = [
   {
     role: "Staff Coordinator",
-    name: "Mr. Vipin G. Namboothiri",
-    phone: "+91 97447 64927",
-    email: "vipin@example.com",
+    name: "Dr. Kannan C. Bhanu",
+    phone: "+91 94963 31267",
+    email: "sparkz@carmelcet.in",
   },
   {
     role: "Student Coordinator",
-    name: "Abhilash Chandran J",
-    phone: "+91 87148 38918",
-    email: "abhilash@example.com",
+    name: "Mr. Steev Palliath",
+    phone: "+91 62358 34190",
+    email: "sparkz@carmelcet.in",
   },
 ];
 
 const contactInfo = {
   address: "Carmel College of Engineering & Technology, Kerala, India",
-  generalEmail: "info@sparkz.carmelcet.in",
+  generalEmail: "sparkz@carmelcet.in",
   website: "sparkz.carmelcet.in",
 };
 
 export default function ContactPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <>
       <Head>
@@ -41,11 +35,11 @@ export default function ContactPage() {
         </title>
         <meta
           name="description"
-          content="Get in touch with Sparkz 2K26 coordinators. Contact Mr. Vipin G. Namboothiri (Staff Coordinator) at +91 97447 64927 or Abhilash Chandran J (Student Coordinator) at +91 87148 38918 for event information, registrations, and inquiries."
+          content="Get in touch with Sparkz 2K26 coordinators. Contact Dr. Kannan C. Bhanu (Staff Coordinator) at +91 94963 31267 or Mr. Steev Palliath (Student Coordinator) at +91 62358 34190 for event information, registrations, and inquiries."
         />
         <meta
           name="keywords"
-          content="Sparkz contact, Sparkz 2K26 contact, Carmel College tech fest contact, event coordinators, Sparkz registration help, tech fest Kerala contact, Vipin G Namboothiri, Abhilash Chandran J, Carmel College events, college fest contact, event inquiry, Sparkz support, tech fest coordinators, ABHERI contact, band competition contact"
+          content="Sparkz contact, Sparkz 2K26 contact, Carmel College tech fest contact, event coordinators, Sparkz registration help, tech fest Kerala contact, Dr Kannan C Bhanu, Steev Palliath, Carmel College events, college fest contact, event inquiry, Sparkz support, tech fest coordinators, ABHERI contact, band competition contact"
         />
         <meta name="author" content="Sparkz 2K26 Team" />
         <link rel="canonical" href="https://sparkz.carmelcet.in/contact" />
@@ -59,7 +53,7 @@ export default function ContactPage() {
         />
         <meta
           property="og:description"
-          content="Reach out to our coordinators for Sparkz 2K26 event details, registrations, and support. Staff Coordinator: Mr. Vipin G. Namboothiri | Student Coordinator: Abhilash Chandran J"
+          content="Reach out to our coordinators for Sparkz 2K26 event details, registrations, and support. Staff Coordinator: Dr. Kannan C. Bhanu | Student Coordinator: Mr. Steev Palliath"
         />
         <meta
           property="og:image"
@@ -95,9 +89,9 @@ export default function ContactPage() {
         />
 
         {/* Contact Information for Search Engines */}
-        <meta name="contact:phone:staff" content="+91 97447 64927" />
-        <meta name="contact:phone:student" content="+91 87148 38918" />
-        <meta name="contact:email" content="info@sparkz.com" />
+        <meta name="contact:phone:staff" content="+91 94963 31267" />
+        <meta name="contact:phone:student" content="+91 62358 34190" />
+        <meta name="contact:email" content="sparkz@carmelcet.in" />
 
         {/* Structured Data */}
         <script
@@ -117,17 +111,17 @@ export default function ContactPage() {
                 contactPoint: [
                   {
                     "@type": "ContactPoint",
-                    telephone: "+91-97447-64927",
+                    telephone: "+91-94963-31267",
                     contactType: "Staff Coordinator",
-                    name: "Mr. Vipin G. Namboothiri",
+                    name: "Dr. Kannan C. Bhanu",
                     areaServed: "IN",
                     availableLanguage: ["English", "Malayalam"],
                   },
                   {
                     "@type": "ContactPoint",
-                    telephone: "+91-87148-38918",
+                    telephone: "+91-62358-34190",
                     contactType: "Student Coordinator",
-                    name: "Abhilash Chandran J",
+                    name: "Mr. Steev Palliath",
                     areaServed: "IN",
                     availableLanguage: ["English", "Malayalam"],
                   },
@@ -140,18 +134,14 @@ export default function ContactPage() {
 
       <div className="min-h-screen bg-[#0B0B0E] text-white">
         {/* Background Effects */}
-        {mounted && (
-          <>
-            <div className="pointer-events-none fixed inset-0">
-              <div className="absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
-              <div className="absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
-              <div className="absolute left-[20%] bottom-[10%] h-96 w-96 rounded-full bg-[#3A270D]/20 blur-[140px]" />
-            </div>
+        <div className="pointer-events-none fixed inset-0">
+          <div className="absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
+          <div className="absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
+          <div className="absolute left-[20%] bottom-[10%] h-96 w-96 rounded-full bg-[#3A270D]/20 blur-[140px]" />
+        </div>
 
-            {/* Grid Pattern */}
-            <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:100px_100px] opacity-30" />
-          </>
-        )}
+        {/* Grid Pattern */}
+        <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:100px_100px] opacity-30" />
 
         {/* Content */}
         <div className="relative z-10 px-6 py-20 sm:py-32">
@@ -168,7 +158,7 @@ export default function ContactPage() {
                 Get in Touch
               </div>
 
-              <h1 className="text-5xl font-black leading-tight sm:text-6xl lg:text-7xl">
+              <h1 className="text-5xl font-black leading-tight sm:text-6xl lg:text-7xl text-white">
                 For more{" "}
                 <span className="gold-gradient-text">
                   info
@@ -326,13 +316,13 @@ export default function ContactPage() {
               <p className="text-[#A1A1AA] mb-6">
                 Ready to be part of Sparkz &apos;26?
               </p>
-              <a
+              <Link
                 href="/events"
                 className="inline-flex items-center justify-center gap-2 rounded-full btn-gold px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[#0B0B0E] shadow-[0_0_20px_rgba(212,163,89,0.35)] hover:scale-105 transition-all duration-300 transform"
               >
                 Explore Events
                 <span className="text-xs">→</span>
-              </a>
+              </Link>
             </motion.div>
           </div>
         </div>

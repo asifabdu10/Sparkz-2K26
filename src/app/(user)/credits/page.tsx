@@ -19,12 +19,6 @@ const techTeam = [
 ];
 
 export default function CreditsPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <>
       <Head>
@@ -38,39 +32,35 @@ export default function CreditsPage() {
 
       <div className="min-h-screen bg-[#0B0B0E] text-white">
         {/* Background Effects */}
-        {mounted && (
-          <>
-            <div className="pointer-events-none fixed inset-0">
-              <div className="absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
-              <div className="absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
-              <div className="absolute left-[20%] bottom-[10%] h-96 w-96 rounded-full bg-[#3A270D]/20 blur-[140px]" />
-            </div>
+        <div className="pointer-events-none fixed inset-0">
+          <div className="absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
+          <div className="absolute right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
+          <div className="absolute left-[20%] bottom-[10%] h-96 w-96 rounded-full bg-[#3A270D]/20 blur-[140px]" />
+        </div>
 
-            {/* Grid Pattern */}
-            <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:100px_100px] opacity-30" />
+        {/* Grid Pattern */}
+        <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(212,163,89,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,163,89,0.03)_1px,transparent_1px)] bg-[size:100px_100px] opacity-30" />
 
-            {/* Floating Code Symbols */}
-            {[
-              { className: "right-[15%] top-[15%] h-8 w-8", delay: 0 },
-              { className: "left-[10%] top-[60%] h-10 w-10", delay: 0.5 },
-              { className: "right-[20%] bottom-[20%] h-6 w-6", delay: 1 },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                className={`pointer-events-none absolute ${item.className} rounded-lg border border-[rgba(212,163,89,0.3)] bg-[#3A270D]/40 blur-[1px]`}
-                animate={{ y: [-10, 15, -10], rotate: [-5, 5, -5] }}
-                transition={{
-                  duration: 8 + i,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: item.delay,
-                }}
-              >
-                <Code className="w-full h-full p-1 text-[#F3C87A]/50" />
-              </motion.div>
-            ))}
-          </>
-        )}
+        {/* Floating Code Symbols */}
+        {[
+          { className: "right-[15%] top-[15%] h-8 w-8", delay: 0 },
+          { className: "left-[10%] top-[60%] h-10 w-10", delay: 0.5 },
+          { className: "right-[20%] bottom-[20%] h-6 w-6", delay: 1 },
+        ].map((item, i) => (
+          <motion.div
+            key={i}
+            className={`pointer-events-none absolute ${item.className} rounded-lg border border-[rgba(212,163,89,0.3)] bg-[#3A270D]/40 blur-[1px]`}
+            animate={{ y: [-10, 15, -10], rotate: [-5, 5, -5] }}
+            transition={{
+              duration: 8 + i,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: item.delay,
+            }}
+          >
+            <Code className="w-full h-full p-1 text-[#F3C87A]/50" />
+          </motion.div>
+        ))}
 
         {/* Content */}
         <div className="relative z-10 px-[5vw] py-20 sm:py-32">

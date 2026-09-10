@@ -17,7 +17,7 @@ import {
   FaCalendarDay,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
-import { shimmer, toBase64 } from "@/utils/imageUtils";
+import { shimmer, toBase64, convertDriveUrl } from "@/utils/imageUtils";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { db } from "@/utils/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -29,14 +29,14 @@ function EventDetailsSkeleton() {
     <div className="relative min-h-screen bg-[#0B0B0E] text-white overflow-hidden">
       <div className="flex flex-col lg:flex-row max-w-7xl mx-auto">
         <div className="w-full lg:w-5/12 p-6 lg:h-screen lg:sticky lg:top-0">
-          <div className="h-full w-full bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-3xl animate-pulse" />
+          <div className="h-full w-full bg-[#131318] rounded-3xl animate-pulse" />
         </div>
         <div className="w-full lg:w-7/12 p-6 space-y-8">
-           <div className="h-20 w-3/4 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
-           <div className="h-40 w-full bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
+           <div className="h-20 w-3/4 bg-[#131318] rounded-2xl animate-pulse" />
+           <div className="h-40 w-full bg-[#131318] rounded-2xl animate-pulse" />
            <div className="grid grid-cols-2 gap-4">
-             <div className="h-32 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
-             <div className="h-32 bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl animate-pulse" />
+             <div className="h-32 bg-[#131318] rounded-2xl animate-pulse" />
+             <div className="h-32 bg-[#131318] rounded-2xl animate-pulse" />
            </div>
         </div>
       </div>
@@ -58,34 +58,27 @@ function InfoCard({
   title,
   value,
   variant = "default",
-  delay = 0,
+  delay = 0
 }: InfoCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className={`relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 group
-        ${
-          variant === "highlight"
-            ? "bg-[#131318] border-[rgba(212,163,89,0.4)] shadow-[0_0_20px_rgba(212,163,89,0.12)] hover:border-[#F3C87A]"
-            : "bg-[#131318] border-[rgba(212,163,89,0.25)] hover:border-[rgba(212,163,89,0.45)] hover:shadow-[0_4px_20px_rgba(212,163,89,0.08)]"
+      className={`relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 group shadow-sm
+        ${variant === "highlight" 
+            ? "bg-[#3A270D]/40 border-[rgba(212,163,89,0.35)] hover:border-[#F3C87A]" 
+            : "bg-[#131318] border-[rgba(212,163,89,0.25)] hover:border-[#F3C87A]"
         }
       `}
     >
       <div className="flex items-start gap-4">
-        <div
-          className={`p-3 rounded-xl shrink-0 ${
-            variant === "highlight"
-              ? "bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.35)]"
-              : "bg-[#3A270D]/60 text-[#D4A359] border border-[rgba(212,163,89,0.2)]"
-          }`}
-        >
-          {icon}
+        <div className={`p-3 rounded-xl shrink-0 border border-[rgba(212,163,89,0.3)] ${variant === 'highlight' ? 'bg-[#3A270D] text-[#F3C87A]' : 'bg-[#131318] text-[#F3C87A]'}`}>
+            {icon}
         </div>
         <div>
-          <p className="text-sm font-medium text-[#A1A1AA] mb-1">{title}</p>
-          <div className="text-lg font-semibold text-white tracking-wide">{value}</div>
+            <p className="text-xs font-semibold text-[#A1A1AA] uppercase tracking-wider mb-1">{title}</p>
+            <div className="text-lg font-bold text-white tracking-wide">{value}</div>
         </div>
       </div>
     </motion.div>
@@ -109,18 +102,18 @@ function CoordinatorCard({
       href={`https://wa.me/${coordinator.phone}?text=${whatsappMessage}`}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="flex items-center gap-3 p-3 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A] hover:bg-[#1a1a22] transition-colors group"
+      className="flex items-center gap-3 p-3 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A] hover:bg-[#1b1b22] transition-colors group shadow-sm"
     >
-      <div className="h-10 w-10 rounded-full bg-[#3A270D] flex items-center justify-center text-[#F3C87A] border border-[rgba(212,163,89,0.35)] text-sm font-bold">
+      <div className="h-10 w-10 rounded-full bg-[#3A270D] flex items-center justify-center text-[#F3C87A] border border-[rgba(212,163,89,0.3)] text-sm font-bold">
         {coordinator.name.charAt(0)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate group-hover:text-[#F3C87A] transition-colors">
+        <p className="text-sm font-bold text-white truncate group-hover:text-[#F3C87A] transition-colors">
           {coordinator.name}
         </p>
         <p className="text-xs text-[#A1A1AA]">Coordinator</p>
       </div>
-      <FaWhatsapp className="text-[#A1A1AA] group-hover:text-[#25D366] transition-colors" />
+      <FaWhatsapp className="text-[#A1A1AA] group-hover:text-green-500 transition-colors" />
     </Link>
   );
 }
@@ -138,30 +131,24 @@ function PrizeCard({
   icon: React.ReactNode;
 }) {
   const styles = {
-    gold: "from-[#3A270D]/80 to-[#131318] border-[rgba(212,163,89,0.45)] text-[#F3C87A] shadow-[0_0_15px_rgba(212,163,89,0.1)]",
-    silver: "from-white/10 to-[#131318] border-white/20 text-[#A1A1AA]",
-    bronze:
-      "from-[#3A270D]/40 to-[#131318] border-[rgba(212,163,89,0.25)] text-[#D4A359]",
+    gold: "border-[#F3C87A] text-[#F3C87A] bg-[#131318]",
+    silver: "border-[rgba(212,163,89,0.5)] text-[#FDE6B0] bg-[#131318]",
+    bronze: "border-[rgba(212,163,89,0.3)] text-[#D4A359] bg-[#131318]",
   };
 
   return (
     <div
-      className={`relative rounded-xl border bg-gradient-to-b p-4 ${styles[color]}`}
+      className={`relative rounded-xl border p-4 shadow-sm ${styles[color]}`}
     >
       <div className="flex items-center gap-3">
-        <div
-          className={`p-2 rounded-lg bg-[#0B0B0E]/60 border border-[rgba(212,163,89,0.2)] ${styles[color]
-            .split(" ")
-            .filter((c) => c.startsWith("text-"))
-            .pop()}`}
-        >
+        <div className="p-2.5 rounded-lg bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)]">
           {icon}
         </div>
         <div>
           <p className="text-xs font-semibold text-[#A1A1AA] uppercase tracking-wider">
             {title}
           </p>
-          <p className="text-lg font-bold text-white">{prize}</p>
+          <p className="text-lg font-black text-white">{prize}</p>
         </div>
       </div>
     </div>
@@ -175,21 +162,21 @@ export default function EventPage({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     const fetchEvent = async () => {
-      try {
-        const docRef = doc(db, "events", eventId);
-        const docSnap = await getDoc(docRef);
+        try {
+            const docRef = doc(db, "events", eventId);
+            const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          setEvent({ id: docSnap.id, ...docSnap.data() } as Event);
-        } else {
-          setEvent(null);
+            if (docSnap.exists()) {
+                setEvent({ id: docSnap.id, ...docSnap.data() } as Event);
+            } else {
+                setEvent(null);
+            }
+        } catch (error) {
+            console.error("Error fetching event:", error);
+            setEvent(null);
+        } finally {
+            setLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching event:", error);
-        setEvent(null);
-      } finally {
-        setLoading(false);
-      }
     };
     fetchEvent();
   }, [eventId]);
@@ -197,12 +184,12 @@ export default function EventPage({ eventId }: { eventId: string }) {
   if (loading) return <EventDetailsSkeleton />;
 
   if (!event) {
-    notFound();
+    notFound(); 
   }
 
   return (
     <Suspense fallback={<EventDetailsSkeleton />}>
-      <div className="min-h-screen bg-[#0B0B0E] text-white selection:bg-[#3A270D] selection:text-[#F3C87A]">
+      <div className="min-h-screen text-white selection:bg-[#3A270D] selection:text-[#F3C87A]">
         <GradientBackground />
 
         {/* 
@@ -217,10 +204,10 @@ export default function EventPage({ eventId }: { eventId: string }) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="relative aspect-4/5 w-full mt-12 max-w-lg mx-auto lg:max-w-none rounded-2xl overflow-hidden border border-[rgba(212,163,89,0.3)] shadow-2xl shadow-black group"
+              className="relative aspect-4/5 w-full mt-12 max-w-lg mx-auto lg:max-w-none rounded-2xl overflow-hidden border border-[rgba(212,163,89,0.25)] shadow-xl shadow-[rgba(212,163,89,0.15)] group bg-[#0B0B0E]"
             >
               <Image
-                src={event.imageUrl}
+                src={convertDriveUrl(event.imageUrl)}
                 alt={`${event.title} poster`}
                 fill
                 quality={50}
@@ -232,37 +219,37 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 priority
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 45vw, 600px"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E]/90 via-transparent to-transparent opacity-70" />
+              <div className="absolute inset-0 bg-linear-to-t from-[#0B0B0E]/80 via-transparent to-transparent opacity-60" />
 
               {/* Category Tag on Image */}
               <div className="absolute top-4 right-4 flex gap-2">
-                {/* Department Tag */}
-                {event.department && (
-                  <div className="px-3 py-1 rounded-full bg-[#0B0B0E]/80 backdrop-blur-md border border-[rgba(212,163,89,0.3)] text-xs font-medium text-[#FDE6B0] uppercase">
-                    {event.department}
+                  {/* Department Tag */}
+                  {event.department && (
+                     <div className="px-3.5 py-1.5 rounded-full bg-[#3A270D] border border-[rgba(212,163,89,0.3)] text-xs font-bold text-[#F3C87A] uppercase shadow-sm">
+                        {event.department}
+                    </div>
+                  )}
+                  {/* Category Tag */}
+                  <div className="px-3.5 py-1.5 rounded-full bg-[#3A270D] border border-[rgba(212,163,89,0.3)] text-xs font-bold text-[#F3C87A] uppercase shadow-sm">
+                    {event.type}
                   </div>
-                )}
-                {/* Category Tag */}
-                <div className="px-3 py-1 rounded-full bg-[#0B0B0E]/80 backdrop-blur-md border border-[rgba(212,163,89,0.3)] text-xs font-medium text-[#F3C87A] uppercase">
-                  {event.type}
-                </div>
               </div>
 
-              {/* Online Banner if applicable */}
-              {event.isOnline && (
+               {/* Online Banner if applicable */}
+               {event.isOnline && (
                 <div className="absolute bottom-4 left-4 right-4">
-                  <div className="w-full py-2 btn-gold text-center text-sm font-bold tracking-wide uppercase rounded-xl shadow-[0_0_15px_rgba(212,163,89,0.35)]">
+                  <div className="w-full py-2 bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)] text-center text-sm font-bold tracking-wide uppercase rounded-xl shadow-sm">
                     Online Event
                   </div>
                 </div>
-              )}
+               )}
             </motion.div>
 
             {/* Desktop: Coordinators Below Image (Mobile: moved to bottom) */}
             <div className="hidden lg:grid gap-4 mt-auto">
               {event.coordinators && event.coordinators.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs text-[#A1A1AA] font-medium uppercase tracking-wider">
+                  <p className="text-xs text-[#A1A1AA] font-semibold uppercase tracking-wider">
                     Event Coordinators
                   </p>
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
@@ -288,7 +275,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
               transition={{ delay: 0.2 }}
               className="space-y-4"
             >
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight">
                 <span className="gold-gradient-text">
                   {event.title}
                 </span>
@@ -297,9 +284,9 @@ export default function EventPage({ eventId }: { eventId: string }) {
               <div className="flex flex-wrap gap-3">
                 {/* Event Type / Subtype Tags */}
                 {event.eveType && (
-                  <span className="px-2.5 py-1 rounded-md text-xs font-medium border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] uppercase">
-                    {event.eveType === "ind" ? "Individual" : "Team Event"}
-                  </span>
+                    <span className="px-3 py-1 rounded-full text-xs border border-[rgba(212,163,89,0.3)] bg-[#3A270D] text-[#F3C87A] font-bold uppercase shadow-sm">
+                        {event.eveType === 'ind' ? 'Individual' : 'Team Event'}
+                    </span>
                 )}
               </div>
 
@@ -312,7 +299,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 {event.description && event.description.length > 150 && (
                   <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="ml-2 text-[#F3C87A] hover:text-[#FDE6B0] font-medium text-sm transition-colors cursor-pointer focus:outline-hidden"
+                    className="ml-2 text-[#F3C87A] hover:text-white font-semibold text-sm transition-colors cursor-pointer focus:outline-hidden"
                   >
                     {isExpanded ? "Read Less" : "Read More"}
                   </button>
@@ -346,11 +333,9 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   icon={<LuUsers size={18} />}
                   title="Participation"
                   value={
-                    event.maxParticipation
-                      ? event.maxParticipation
-                      : event.memberMaxCount > 1
-                      ? `${event.memberMinCount}-${event.memberMaxCount} Members`
-                      : "Individual"
+                      event.maxParticipation 
+                      ? event.maxParticipation 
+                      : (event.memberMaxCount > 1 ? `${event.memberMinCount}-${event.memberMaxCount} Members` : "Individual")
                   }
                   delay={0.45}
                 />
@@ -367,7 +352,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
               >
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-bold text-white">Prize Pool</h2>
-                  <div className="h-px flex-1 bg-[rgba(212,163,89,0.2)]" />
+                  <div className="h-px flex-1 bg-[rgba(212,163,89,0.25)]" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {event.firstPrize && (
@@ -406,12 +391,9 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  className="relative overflow-hidden rounded-2xl p-6 border border-[rgba(212,163,89,0.25)] bg-[#131318]"
+                  className="relative overflow-hidden rounded-2xl p-6 border border-[rgba(212,163,89,0.25)] bg-[#131318] shadow-sm"
                 >
-                  {/* Decorative Flash */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#3A270D]/40 blur-3xl rounded-full pointer-events-none" />
-
-                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-[#FDE6B0]">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-white">
                     <LuBookOpen className="text-[#F3C87A]" />
                     Rules & Requirements
                   </h3>
@@ -422,7 +404,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                           key={i}
                           className="flex gap-3 text-[#A1A1AA] text-sm leading-relaxed"
                         >
-                          <span className="text-[#D4A359] font-bold mt-1">
+                          <span className="text-[#F3C87A] font-bold mt-1">
                             •
                           </span>
                           <span>{rule}</span>
@@ -430,7 +412,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                       ))
                     ) : (
                       <li className="flex gap-3 text-[#A1A1AA] text-sm leading-relaxed">
-                        <span className="text-[#D4A359] font-bold mt-1">
+                        <span className="text-[#F3C87A] font-bold mt-1">
                           •
                         </span>
                         <span>{event.rules}</span>
@@ -439,27 +421,22 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   </ul>
                 </motion.div>
               )}
+              
+               {/* Extra Fields Notice */}
+               {event.extraFields && event.extraFields.length > 0 && (
+                 <div className="p-4 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] shadow-sm">
+                     <p className="text-white text-sm font-semibold mb-2">Registration Information Required:</p>
+                     <div className="flex flex-wrap gap-2">
+                         {event.extraFields.map((f, i) => (
+                             <span key={i} className="px-3 py-1 text-xs rounded-full bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)] font-medium">
+                                 {f.name}
+                             </span>
+                         ))}
+                     </div>
+                 </div>
+               )}
 
-              {/* Extra Fields Notice */}
-              {event.extraFields && event.extraFields.length > 0 && (
-                <div className="p-4 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318]">
-                  <p className="text-[#FDE6B0] text-sm font-medium mb-2">
-                    Registration Information Required:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {event.extraFields.map((f, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-1 text-xs rounded bg-[#3A270D] text-[#F3C87A] border border-[rgba(212,163,89,0.3)]"
-                      >
-                        {f.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Primary CTA Section - Centered or Prominent */}
+              {/* Primary CTA Section */}
               {event.regLink && (
                 <div className="pt-2">
                   <RegisterButtonSection event={event} />
@@ -468,10 +445,10 @@ export default function EventPage({ eventId }: { eventId: string }) {
             </div>
 
             {/* Mobile Only: Coordinators at bottom */}
-            <div className="lg:hidden space-y-4 pt-8 border-t border-[rgba(212,163,89,0.2)]">
+            <div className="lg:hidden space-y-4 pt-8 border-t border-[rgba(212,163,89,0.25)]">
               {event.coordinators && event.coordinators.length > 0 && (
                 <>
-                  <p className="text-sm text-[#A1A1AA] font-medium uppercase tracking-wider">
+                  <p className="text-sm text-[#A1A1AA] font-semibold uppercase tracking-wider">
                     Event Coordinators
                   </p>
                   <div className="grid grid-cols-1 gap-3">

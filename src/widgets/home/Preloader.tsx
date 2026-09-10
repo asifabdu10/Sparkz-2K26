@@ -15,12 +15,12 @@ export default function Preloader() {
         {/* Background Glow */}
         <motion.div
           initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.6, scale: 1.2 }}
+          animate={{ opacity: 0.5, scale: 1.2 }}
           transition={{
             duration: 1.5,
             ease: "easeOut",
           }}
-          className="absolute h-72 w-72 rounded-full bg-[#3A270D]/60 blur-[100px]"
+          className="absolute h-64 w-64 rounded-full bg-[#3A270D]/60 blur-[100px]"
         />
 
         {/* Logo Container */}
@@ -47,7 +47,7 @@ export default function Preloader() {
             alt="Sparkz Loader"
             width={280}
             height={100}
-            className="object-contain drop-shadow-[0_0_35px_rgba(212,163,89,0.45)]"
+            className="object-contain"
             priority
           />
         </motion.div>
