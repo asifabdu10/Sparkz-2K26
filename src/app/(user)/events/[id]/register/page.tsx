@@ -365,13 +365,13 @@ export default function Register() {
       teamMembers:
         event.eveType === "team"
           ? formData.teamMembers.map((member) => {
-              if (event.showMemberYear === false) {
-                const { Year, ...memberWithoutYear } = member;
-                void Year;
-                return memberWithoutYear;
-              }
-              return member;
-            })
+            if (event.showMemberYear === false) {
+              const { Year, ...memberWithoutYear } = member;
+              void Year;
+              return memberWithoutYear;
+            }
+            return member;
+          })
           : [],
       teamSize: event.eveType === "team" ? 1 + formData.teamMembers.length : 1,
       registrationFee: feeNumber,
@@ -602,7 +602,7 @@ export default function Register() {
                       amountRupees={feeNumber}
                       eventTitle={event.title}
                       eventId={event.id}
-                      userId={user.uid}
+                      userId={user?.uid || ""}
                       userName={formData.leaderName}
                       userEmail={formData.leaderEmail}
                       userPhone={formData.leaderMobile}
