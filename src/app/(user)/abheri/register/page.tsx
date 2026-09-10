@@ -907,12 +907,35 @@ export default function Register() {
               }
             );
 
-            if (!emailResponse.ok) {
+            if (emailResponse.ok) {
+              const emailResult = await emailResponse.json().catch(() => null);
+
+              console.log(
+                "Abheri confirmation email sent:",
+                emailResult?.id || "success"
+              );
+
+              window.alert(
+                "Registration completed successfully!\n\nA confirmation email has been sent to your registered email address."
+              );
+
+              toastSuccess(
+                "Registration successful! Confirmation email sent."
+              );
+            } else {
               const emailResult = await emailResponse.json().catch(() => null);
 
               console.warn(
                 "Abheri registration email was not sent:",
                 emailResult?.error || emailResponse.statusText
+              );
+
+              window.alert(
+                "Registration completed successfully, but the confirmation email could not be sent.\n\nPlease check your email configuration or contact the organizers."
+              );
+
+              toastSuccess(
+                "Registration successful, but email could not be sent."
               );
             }
           } catch (emailError) {
@@ -920,10 +943,22 @@ export default function Register() {
               "Abheri registration email request failed:",
               emailError
             );
-          }
-        }
 
-        toastSuccess("Registration successful! Confirmation email sent.");
+            window.alert(
+              "Registration completed successfully, but the confirmation email could not be sent.\n\nPlease contact the organizers if you need the confirmation email."
+            );
+
+            toastSuccess(
+              "Registration successful, but email could not be sent."
+            );
+          }
+        } else {
+          window.alert(
+            "Registration completed successfully!\n\nNo email address is available for this account, so a confirmation email could not be sent."
+          );
+
+          toastSuccess("Registration successful.");
+        }
       }
 
       // ==================================================

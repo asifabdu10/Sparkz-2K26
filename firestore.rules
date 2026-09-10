@@ -127,12 +127,15 @@ service cloud.firestore {
       //
 
       allow create: if
-        isAuthenticated()
-        &&
-        request.resource.data.userId ==
-          request.auth.uid
-        &&
-        exists(
+        isSuperAdmin()
+        ||
+        (
+          isAuthenticated()
+          &&
+          request.resource.data.userId ==
+            request.auth.uid
+          &&
+          exists(
           /databases/$(database)/documents/events/$(request.resource.data.eventId)
         )
         &&
@@ -149,8 +152,9 @@ service cloud.firestore {
           ).data.registrationOpen == true
         )
         &&
-        request.resource.data.status
-          in ['registered', 'paid', 'pending'];
+          request.resource.data.status
+            in ['registered', 'paid', 'pending']
+        );
 
 
       // -------------------------------------------------------
