@@ -50,7 +50,6 @@ export default function Register() {
   const [screenshotUrl, setScreenshotUrl] =
     useState<string | null>(null);
 
-  // Google Drive file ID
   const [screenshotFileId, setScreenshotFileId] =
     useState<string | null>(null);
 
@@ -75,7 +74,6 @@ export default function Register() {
   const [checkingExistingRegistration, setCheckingExistingRegistration] =
     useState(true);
 
-  // Registration ON/OFF
   const [registrationOpen, setRegistrationOpen] =
     useState(true);
 
@@ -94,14 +92,12 @@ export default function Register() {
   // UPI DETAILS
   // ==================================================
 
-  // const UPI_ID = "steevpalliath007@oksbi";
-  const UPI_ID = "asifabdulla1234@oksbi";
-  const transactionNote = `Abheri Registration ${formData.bandName
-    ? `- ${formData.bandName}`
-    : ""
+  const UPI_ID = "steevpalliath007@oksbi";
+
+  const transactionNote = `Abheri Registration ${formData.bandName ? `- ${formData.bandName}` : ""
     }`;
 
-  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1&cu=INR&tn=${encodeURIComponent(
+  const upiLink = `upi://pay?pa=${UPI_ID}&pn=Sparkz2K26&am=1200&cu=INR&tn=${encodeURIComponent(
     transactionNote
   )}`;
 
@@ -153,10 +149,7 @@ export default function Register() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      toastError(
-        "Please login to register for Abheri"
-      );
-
+      toastError("Please login to register for Abheri");
       router.push("/login");
     }
   }, [user, authLoading, router]);
@@ -228,18 +221,25 @@ export default function Register() {
             leaderMobile: data.leaderMobile || "",
             musiciansCount: data.musiciansCount || "",
             vocalistCount: data.vocalistCount || "",
-            instrumentalistCount: data.instrumentalistCount || "",
+            instrumentalistCount:
+              data.instrumentalistCount || "",
             transactionId: data.transactionId || "",
           });
 
-          setSelectedInstruments(data.instruments || []);
+          setSelectedInstruments(
+            data.instruments || []
+          );
 
-          setScreenshotUrl(data.screenshotUrl || null);
-          setScreenshotFileId(data.screenshotFileId || null);
+          setScreenshotUrl(
+            data.screenshotUrl || null
+          );
+
+          setScreenshotFileId(
+            data.screenshotFileId || null
+          );
 
           setAcknowledged(true);
         } else {
-          // No Abheri registration exists for this account
           setExistingRegistrationId(null);
         }
       } catch (error) {
@@ -276,24 +276,17 @@ export default function Register() {
       );
     }, 1000);
 
-    return () =>
-      clearTimeout(timeoutId);
-  }, [
-    formData,
-    selectedInstruments,
-  ]);
+    return () => clearTimeout(timeoutId);
+  }, [formData, selectedInstruments]);
 
   // ==================================================
   // HANDLE INPUT
   // ==================================================
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement
-    >
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const { name, value } =
-      e.target;
+    const { name, value } = e.target;
 
     setFormData((prev) => ({
       ...prev,
@@ -306,9 +299,7 @@ export default function Register() {
   // ==================================================
 
   const handleDropdownChange = (
-    e: React.ChangeEvent<
-      HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLSelectElement>
   ) => {
     const value = e.target.value;
 
@@ -316,15 +307,15 @@ export default function Register() {
 
     if (value === "Other") {
       setIsAddingCustom(true);
+      e.target.value = "";
       return;
     }
 
-    if (
-      !selectedInstruments.includes(value)
-    ) {
-      setSelectedInstruments(
-        (prev) => [...prev, value]
-      );
+    if (!selectedInstruments.includes(value)) {
+      setSelectedInstruments((prev) => [
+        ...prev,
+        value,
+      ]);
     }
 
     e.target.value = "";
@@ -347,9 +338,7 @@ export default function Register() {
     }
 
     if (
-      selectedInstruments.includes(
-        instrument
-      )
+      selectedInstruments.includes(instrument)
     ) {
       toastError(
         "This instrument is already selected."
@@ -358,12 +347,10 @@ export default function Register() {
       return;
     }
 
-    setSelectedInstruments(
-      (prev) => [
-        ...prev,
-        instrument,
-      ]
-    );
+    setSelectedInstruments((prev) => [
+      ...prev,
+      instrument,
+    ]);
 
     setCustomInstrument("");
     setIsAddingCustom(false);
@@ -376,20 +363,19 @@ export default function Register() {
   const removeInstrument = (
     instrument: string
   ) => {
-    setSelectedInstruments(
-      (prev) =>
-        prev.filter(
-          (item) =>
-            item !== instrument
-        )
+    setSelectedInstruments((prev) =>
+      prev.filter(
+        (item) => item !== instrument
+      )
     );
   };
 
   // ==================================================
   // UPLOAD SCREENSHOT TO GOOGLE DRIVE
+  // REAL UPLOAD PROGRESS USING XHR
   // ==================================================
 
-  const handleFileChange = async (
+  const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (
@@ -399,96 +385,155 @@ export default function Register() {
       return;
     }
 
-    const file =
-      e.target.files[0];
+    const file = e.target.files[0];
 
     // File size
-    if (
-      file.size >
-      5 * 1024 * 1024
-    ) {
+    if (file.size > 5 * 1024 * 1024) {
       toastError(
         "File size should be less than 5MB"
       );
 
+      e.target.value = "";
       return;
     }
 
     // File type
-    if (
-      !file.type.startsWith("image/")
-    ) {
+    if (!file.type.startsWith("image/")) {
       toastError(
         "Please upload an image file."
       );
 
+      e.target.value = "";
       return;
     }
 
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-      setPaymentScreenshot(file);
+    const uploadData = new FormData();
 
-      const uploadData =
-        new FormData();
+    uploadData.append("file", file);
 
-      uploadData.append(
-        "file",
-        file
-      );
+    setUploading(true);
+    setUploadProgress(0);
+    setPaymentScreenshot(file);
 
-      const response =
-        await fetch(
-          "/api/abheri/upload-payment",
-          {
-            method: "POST",
-            body: uploadData,
-          }
-        );
+    const xhr = new XMLHttpRequest();
 
-      const result =
-        await response.json();
+    // ==================================================
+    // REAL UPLOAD PROGRESS
+    // ==================================================
 
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-          "Upload failed"
-        );
+    xhr.upload.addEventListener(
+      "progress",
+      (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round(
+            (event.loaded / event.total) * 100
+          );
+
+          setUploadProgress(percent);
+        }
       }
+    );
 
-      // Google Drive URL
-      setScreenshotUrl(
-        result.url
-      );
+    // ==================================================
+    // UPLOAD SUCCESS
+    // ==================================================
 
-      // Google Drive file ID
-      setScreenshotFileId(
-        result.fileId
-      );
+    xhr.addEventListener("load", () => {
+      try {
+        let result: any = {};
 
-      setUploadProgress(100);
+        try {
+          result = JSON.parse(
+            xhr.responseText
+          );
+        } catch {
+          result = {};
+        }
 
-      toastSuccess(
-        "Screenshot uploaded successfully!"
-      );
-    } catch (error: any) {
+        if (
+          xhr.status < 200 ||
+          xhr.status >= 300
+        ) {
+          throw new Error(
+            result.error ||
+            `Upload failed (${xhr.status})`
+          );
+        }
+
+        setScreenshotUrl(result.url);
+        setScreenshotFileId(result.fileId);
+
+        setUploadProgress(100);
+
+        toastSuccess(
+          "Screenshot uploaded successfully!"
+        );
+      } catch (error: any) {
+        console.error(
+          "Upload error:",
+          error
+        );
+
+        toastError(
+          error?.message ||
+          "Upload failed. Please try again."
+        );
+
+        setPaymentScreenshot(null);
+        setScreenshotUrl(null);
+        setScreenshotFileId(null);
+        setUploadProgress(0);
+      } finally {
+        setUploading(false);
+      }
+    });
+
+    // ==================================================
+    // NETWORK ERROR
+    // ==================================================
+
+    xhr.addEventListener("error", () => {
       console.error(
-        "Upload error:",
-        error
+        "Screenshot upload network error"
       );
 
       toastError(
-        error?.message ||
-        "Upload failed. Please try again."
+        "Upload failed. Please check your internet connection and try again."
       );
 
       setPaymentScreenshot(null);
       setScreenshotUrl(null);
       setScreenshotFileId(null);
-    } finally {
+      setUploadProgress(0);
       setUploading(false);
-    }
+    });
+
+    // ==================================================
+    // UPLOAD ABORTED
+    // ==================================================
+
+    xhr.addEventListener("abort", () => {
+      toastError(
+        "Upload cancelled."
+      );
+
+      setPaymentScreenshot(null);
+      setScreenshotUrl(null);
+      setScreenshotFileId(null);
+      setUploadProgress(0);
+      setUploading(false);
+    });
+
+    // ==================================================
+    // START UPLOAD
+    // ==================================================
+
+    xhr.open(
+      "POST",
+      "/api/abheri/upload-payment"
+    );
+
+    xhr.send(uploadData);
   };
 
   // ==================================================
@@ -594,6 +639,7 @@ export default function Register() {
       toastError(
         "You have already registered for Abheri."
       );
+
       return;
     }
 
@@ -610,7 +656,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -649,9 +694,7 @@ export default function Register() {
         },
       ];
 
-      for (
-        const field of requiredFields
-      ) {
+      for (const field of requiredFields) {
         if (
           !formData[
           field.key as keyof typeof formData
@@ -662,7 +705,6 @@ export default function Register() {
           );
 
           setLoading(false);
-
           return;
         }
       }
@@ -692,7 +734,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -702,7 +743,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -712,7 +752,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -722,7 +761,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -736,7 +774,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -750,7 +787,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -760,7 +796,6 @@ export default function Register() {
         );
 
         setLoading(false);
-
         return;
       }
 
@@ -768,25 +803,39 @@ export default function Register() {
       // TRANSACTION ID DUPLICATE CHECK
       // ==================================================
 
-      // Check only this user's registrations.
-      // Firestore rules allow users to read their own registrations.
       const transactionQuery = query(
-        collection(db, "abheri_registrations"),
-        where("userId", "==", user.uid),
-        where("transactionId", "==", formData.transactionId),
+        collection(
+          db,
+          "abheri_registrations"
+        ),
+        where(
+          "userId",
+          "==",
+          user.uid
+        ),
+        where(
+          "transactionId",
+          "==",
+          formData.transactionId
+        ),
         limit(1)
       );
 
-      const transactionSnapshot = await getDocs(
-        transactionQuery
-      );
+      const transactionSnapshot =
+        await getDocs(
+          transactionQuery
+        );
 
-      if (!transactionSnapshot.empty) {
-        const existingDoc = transactionSnapshot.docs[0];
+      if (
+        !transactionSnapshot.empty
+      ) {
+        const existingDoc =
+          transactionSnapshot.docs[0];
 
         if (
           !existingRegistrationId ||
-          existingDoc.id !== existingRegistrationId
+          existingDoc.id !==
+          existingRegistrationId
         ) {
           toastError(
             "This Transaction ID has already been used."
@@ -796,6 +845,7 @@ export default function Register() {
           return;
         }
       }
+
       // ==================================================
       // REGISTRATION DATA
       // ==================================================
@@ -806,11 +856,9 @@ export default function Register() {
         instruments:
           selectedInstruments,
 
-        // Google Drive link
         screenshotUrl:
           screenshotUrl,
 
-        // Google Drive file ID
         screenshotFileId:
           screenshotFileId,
 
@@ -880,39 +928,61 @@ export default function Register() {
 
         await refetchUserProfile();
 
+        // ==================================================
+        // SEND CONFIRMATION EMAIL
+        // ==================================================
+
         if (user.email) {
           try {
-            const emailResponse = await fetch(
-              "/api/abheri/send-confirmation-email",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  email: user.email,
-                  bandName: formData.bandName,
-                  collegeName: formData.collegeName,
-                  managerName: formData.managerName,
-                  managerMobile: formData.managerMobile,
-                  leaderName: formData.leaderName,
-                  leaderMobile: formData.leaderMobile,
-                  musiciansCount: formData.musiciansCount,
-                  vocalistCount: formData.vocalistCount,
-                  instrumentalistCount: formData.instrumentalistCount,
-                  transactionId: formData.transactionId,
-                  instruments: selectedInstruments,
-                  screenshotUrl,
-                }),
-              }
-            );
+            const emailResponse =
+              await fetch(
+                "/api/abheri/send-confirmation-email",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    email: user.email,
+                    bandName:
+                      formData.bandName,
+                    collegeName:
+                      formData.collegeName,
+                    managerName:
+                      formData.managerName,
+                    managerMobile:
+                      formData.managerMobile,
+                    leaderName:
+                      formData.leaderName,
+                    leaderMobile:
+                      formData.leaderMobile,
+                    musiciansCount:
+                      formData.musiciansCount,
+                    vocalistCount:
+                      formData.vocalistCount,
+                    instrumentalistCount:
+                      formData.instrumentalistCount,
+                    transactionId:
+                      formData.transactionId,
+                    instruments:
+                      selectedInstruments,
+                    screenshotUrl:
+                      screenshotUrl,
+                  }),
+                }
+              );
 
             if (emailResponse.ok) {
-              const emailResult = await emailResponse.json().catch(() => null);
+              const emailResult =
+                await emailResponse
+                  .json()
+                  .catch(() => null);
 
               console.log(
                 "Abheri confirmation email sent:",
-                emailResult?.id || "success"
+                emailResult?.id ||
+                "success"
               );
 
               window.alert(
@@ -923,11 +993,15 @@ export default function Register() {
                 "Registration successful! Confirmation email sent."
               );
             } else {
-              const emailResult = await emailResponse.json().catch(() => null);
+              const emailResult =
+                await emailResponse
+                  .json()
+                  .catch(() => null);
 
               console.warn(
                 "Abheri registration email was not sent:",
-                emailResult?.error || emailResponse.statusText
+                emailResult?.error ||
+                emailResponse.statusText
               );
 
               window.alert(
@@ -957,7 +1031,9 @@ export default function Register() {
             "Registration completed successfully!\n\nNo email address is available for this account, so a confirmation email could not be sent."
           );
 
-          toastSuccess("Registration successful.");
+          toastSuccess(
+            "Registration successful."
+          );
         }
       }
 
@@ -987,39 +1063,23 @@ export default function Register() {
           transactionId: "",
         });
 
-        setSelectedInstruments(
-          []
-        );
+        setSelectedInstruments([]);
 
-        setPaymentScreenshot(
-          null
-        );
+        setPaymentScreenshot(null);
 
-        setScreenshotUrl(
-          null
-        );
+        setScreenshotUrl(null);
 
-        setScreenshotFileId(
-          null
-        );
+        setScreenshotFileId(null);
 
         setUploadProgress(0);
 
-        setIsAddingCustom(
-          false
-        );
+        setIsAddingCustom(false);
 
-        setCustomInstrument(
-          ""
-        );
+        setCustomInstrument("");
 
-        setAcknowledged(
-          false
-        );
+        setAcknowledged(false);
 
-        router.push(
-          "/abheri"
-        );
+        router.push("/abheri");
       }
     } catch (error: any) {
       console.error(
@@ -1040,12 +1100,10 @@ export default function Register() {
   // LOADING
   // ==================================================
 
-  if (
-    registrationStatusLoading
-  ) {
+  if (registrationStatusLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#F3C87A]" />
       </div>
     );
   }
@@ -1159,7 +1217,7 @@ export default function Register() {
                     value={formData.bandName}
                     onChange={handleChange}
                     placeholder="Enter band name"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1174,7 +1232,7 @@ export default function Register() {
                     value={formData.collegeName}
                     onChange={handleChange}
                     placeholder="Enter college name"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1205,7 +1263,7 @@ export default function Register() {
                     value={formData.managerName}
                     onChange={handleChange}
                     placeholder="Manager name"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1221,7 +1279,7 @@ export default function Register() {
                     value={formData.managerMobile}
                     onChange={handleChange}
                     placeholder="Manager mobile number"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1252,7 +1310,7 @@ export default function Register() {
                     value={formData.leaderName}
                     onChange={handleChange}
                     placeholder="Band leader name"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1268,7 +1326,7 @@ export default function Register() {
                     value={formData.leaderMobile}
                     onChange={handleChange}
                     placeholder="Band leader mobile number"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1307,7 +1365,7 @@ export default function Register() {
                     value={formData.musiciansCount}
                     onChange={handleChange}
                     placeholder="5 - 10"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1324,7 +1382,7 @@ export default function Register() {
                     value={formData.vocalistCount}
                     onChange={handleChange}
                     placeholder="Minimum 2"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1341,7 +1399,7 @@ export default function Register() {
                     value={formData.instrumentalistCount}
                     onChange={handleChange}
                     placeholder="Minimum 3"
-                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                    className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                   />
                 </div>
 
@@ -1404,9 +1462,7 @@ export default function Register() {
                 <div className="flex flex-col sm:flex-row gap-3 mt-4">
 
                   <input
-                    value={
-                      customInstrument
-                    }
+                    value={customInstrument}
                     onChange={(e) =>
                       setCustomInstrument(
                         e.target.value
@@ -1432,6 +1488,7 @@ export default function Register() {
                       setIsAddingCustom(
                         false
                       );
+
                       setCustomInstrument(
                         ""
                       );
@@ -1627,7 +1684,7 @@ export default function Register() {
                   }
                   onChange={handleChange}
                   placeholder="Enter UPI transaction ID"
-                  className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 font-mono outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 text-white font-medium"
+                  className="w-full rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] px-4 py-3 font-mono outline-none focus:ring-2 focus:ring-[#D4A359]/30 focus:border-[#F3C87A] transition text-white placeholder:text-[#A1A1AA]/40 font-medium"
                 />
 
                 <p className="text-xs text-[#A1A1AA] mt-2">
@@ -1646,17 +1703,31 @@ export default function Register() {
                 </label>
 
                 {!screenshotUrl ? (
-                  <label className="block cursor-pointer">
+                  <label
+                    className={`block ${uploading
+                      ? "cursor-wait"
+                      : "cursor-pointer"
+                      }`}
+                  >
 
                     <div className="border border-dashed border-[rgba(212,163,89,0.3)] hover:border-[#F3C87A] bg-[#0B0B0E] rounded-2xl p-8 text-center transition">
 
-                      <Upload
-                        className="mx-auto mb-3 text-[#F3C87A]"
-                        size={40}
-                      />
+                      {uploading ? (
+                        <Loader2
+                          className="mx-auto mb-3 text-[#F3C87A] animate-spin"
+                          size={40}
+                        />
+                      ) : (
+                        <Upload
+                          className="mx-auto mb-3 text-[#F3C87A]"
+                          size={40}
+                        />
+                      )}
 
                       <p className="font-bold text-white">
-                        Upload payment screenshot
+                        {uploading
+                          ? "Uploading screenshot..."
+                          : "Upload payment screenshot"}
                       </p>
 
                       <p className="text-sm text-[#A1A1AA] mt-2">
@@ -1670,6 +1741,7 @@ export default function Register() {
                         onChange={
                           handleFileChange
                         }
+                        disabled={uploading}
                         className="hidden"
                       />
 
@@ -1708,17 +1780,29 @@ export default function Register() {
                   </div>
                 )}
 
-                {/* Progress */}
+                {/* ================================================== */}
+                {/* REAL-TIME UPLOAD PROGRESS */}
+                {/* ================================================== */}
+
                 {uploading && (
-                  <div className="mt-4">
+                  <div className="mt-4 rounded-2xl border border-[rgba(212,163,89,0.25)] bg-[#0B0B0E] p-5">
 
-                    <div className="flex justify-between text-xs text-[#A1A1AA] mb-2 font-semibold">
+                    <div className="flex items-center justify-between mb-3">
 
-                      <span>
-                        Uploading...
-                      </span>
+                      <div className="flex items-center gap-3">
 
-                      <span>
+                        <Loader2
+                          size={20}
+                          className="animate-spin text-[#F3C87A]"
+                        />
+
+                        <span className="text-sm font-bold text-white">
+                          Uploading payment screenshot...
+                        </span>
+
+                      </div>
+
+                      <span className="text-sm font-black text-[#F3C87A]">
                         {Math.round(
                           uploadProgress
                         )}
@@ -1727,16 +1811,21 @@ export default function Register() {
 
                     </div>
 
-                    <div className="h-2 rounded-full bg-[#3A270D] overflow-hidden">
+                    <div className="h-3 w-full rounded-full bg-[#3A270D] overflow-hidden">
 
                       <div
-                        className="h-full bg-gradient-to-r from-[#D4A359] to-[#F3C87A] transition-all"
+                        className="h-full rounded-full bg-gradient-to-r from-[#D4A359] to-[#F3C87A] transition-[width] duration-200 ease-out"
                         style={{
                           width: `${uploadProgress}%`,
                         }}
                       />
 
                     </div>
+
+                    <p className="text-xs text-[#A1A1AA] mt-2">
+                      Please wait while your
+                      screenshot is being uploaded...
+                    </p>
 
                   </div>
                 )}
