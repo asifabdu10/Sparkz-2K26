@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import nodemailer from "nodemailer";
 
 function escapeHtml(value: unknown) {
     return String(value ?? "")
@@ -36,22 +37,38 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const apiKey = process.env.RESEND_API_KEY;
-        const fromEmail = process.env.ABHERI_EMAIL_FROM;
+        const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpPort = Number(process.env.SMTP_PORT || 465);
+        const smtpUser = process.env.SMTP_USER || "sparkz@carmelcet.in";
+        const smtpPass = process.env.SMTP_PASS;
+        const fromEmail =
+            process.env.ABHERI_EMAIL_FROM ||
+            process.env.SMTP_FROM ||
+            `"Sparkz 2K26" <sparkz@carmelcet.in>`;
 
-        if (!apiKey || !fromEmail) {
+        if (!smtpPass) {
             console.error(
-                "Missing RESEND_API_KEY or ABHERI_EMAIL_FROM environment variable."
+                "Missing SMTP_PASS environment variable for email delivery."
             );
 
             return NextResponse.json(
                 {
                     success: false,
-                    error: "Email service is not configured.",
+                    error: "Email service is not configured (missing SMTP_PASS).",
                 },
                 { status: 500 }
             );
         }
+
+        const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+                user: smtpUser,
+                pass: smtpPass,
+            },
+        });
 
         const instrumentList = Array.isArray(instruments)
             ? instruments.join(", ")
@@ -226,8 +243,9 @@ export async function POST(request: NextRequest) {
 
           </table>
 
-          ${screenshotUrl
-                ? `
+          ${
+              screenshotUrl
+                  ? `
                 <div style="margin-top: 25px;">
                   <a
                     href="${escapeHtml(screenshotUrl)}"
@@ -245,8 +263,8 @@ export async function POST(request: NextRequest) {
                   </a>
                 </div>
               `
-                : ""
-            }
+                  : ""
+          }
 
           <p style="
             margin-top: 30px;
@@ -270,46 +288,28 @@ export async function POST(request: NextRequest) {
       </div>
     `;
 
-        const response = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                from: fromEmail,
-                to: [email],
-                subject: "Abheri 2K26 – Registration Successful",
-                html,
-            }),
+        const info = await transporter.sendMail({
+            from: fromEmail,
+            to: email,
+            subject: "Abheri 2K26 – Registration Successful",
+            html,
         });
 
-        const result = await response.json();
-
-        if (!response.ok) {
-            console.error("Resend error:", result);
-
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: result?.message || "Failed to send email.",
-                },
-                { status: response.status }
-            );
-        }
+        console.log("Nodemailer email sent:", info.messageId);
 
         return NextResponse.json({
             success: true,
             message: "Confirmation email sent successfully.",
-            id: result?.id,
+            id: info.messageId,
         });
-    } catch (error) {
-        console.error("Abheri email error:", error);
+    } catch (error: unknown) {
+        const err = error as { message?: string };
+        console.error("Abheri Nodemailer error:", error);
 
         return NextResponse.json(
             {
                 success: false,
-                error: "Failed to send confirmation email.",
+                error: err?.message || "Failed to send confirmation email.",
             },
             { status: 500 }
         );
