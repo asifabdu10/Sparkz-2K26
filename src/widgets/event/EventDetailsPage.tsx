@@ -335,7 +335,11 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   value={
                       event.maxParticipation 
                       ? event.maxParticipation 
-                      : (event.memberMaxCount > 1 ? `${event.memberMinCount}-${event.memberMaxCount} Members` : "Individual")
+                      : (event.memberMaxCount > 1 
+                          ? (event.memberMinCount && event.memberMinCount === event.memberMaxCount 
+                              ? `${event.memberMaxCount} Members` 
+                              : `${event.memberMinCount || 1}-${event.memberMaxCount} Members`)
+                          : "Individual")
                   }
                   delay={0.45}
                 />

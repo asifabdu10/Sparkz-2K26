@@ -313,7 +313,11 @@ export default function Register() {
     if (event?.eveType === "team") {
       const count = 1 + formData.teamMembers.length;
       if (count < minMembers || count > maxMembers) {
-        toastError(`Team size must be between ${minMembers} and ${maxMembers} members.`);
+        toastError(
+          minMembers === maxMembers
+            ? `Team size must be ${minMembers} ${minMembers === 1 ? "member" : "members"}.`
+            : `Team size must be between ${minMembers} and ${maxMembers} members.`
+        );
         return false;
       }
 
@@ -526,7 +530,7 @@ export default function Register() {
                       <p className="text-xs text-[#71717A] mt-1">Add or remove members within the configured team limit.</p>
                     </div>
                     <div className="text-xs font-semibold text-[#F3C87A] bg-[#3A270D] px-3 py-1 rounded-full border border-[rgba(212,163,89,0.3)]">
-                      Team size: {1 + formData.teamMembers.length} / {minMembers}-{maxMembers}
+                      Team size: {1 + formData.teamMembers.length} / {minMembers === maxMembers ? minMembers : `${minMembers}-${maxMembers}`}
                     </div>
                   </div>
 
