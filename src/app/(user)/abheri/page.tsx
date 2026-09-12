@@ -4,7 +4,7 @@ import { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Abheri 2K26 - Inter-Collegiate Band Competition | Sparkz",
   description:
-    "Join Abheri 2K26, the premier inter-collegiate band competition at Carmel Engineering College, Alappuzha on 8 Oct 2026. Chief Guest: Manjari (Playback Singer), Judge: Sudarshan. Prize pool ₹60,000. Register your band now!",
+    "Join Abheri 2K26, the premier inter-collegiate band competition at Carmel Engineering College, Alappuzha on 8 Oct 2026. Chief Guest: Ouseppachan (Film Composer & Violinist), Judge: Roshan NC (Musician & Guitarist). Prize pool ₹60,000. Register your band now!",
 
   keywords: [
     // Event name
@@ -24,21 +24,22 @@ export const metadata: Metadata = {
     "music fest",
     "battle of bands",
 
-    // Chief Guest - Manjari
-    "Manjari",
-    "Manjari singer",
-    "Manjari playback singer",
-    "Manjari concert",
-    "Manjari live performance",
-    "Manjari Hindustani classical",
-    "Manjari ghazal",
-    "Manjari composer",
+    // Chief Guest - Ouseppachan
+    "Ouseppachan",
+    "Ouseppachan Film Composer",
+    "Ouseppachan Music Director",
+    "Ouseppachan Producer",
+    "Ouseppachan live performance",
+    "Ouseppachan Violinist",
+    "Ouseppachan Singer",
 
-    // Judge - Sudarshan
-    "Sudarshan",
-    "Sudarshan singer",
-    "Sudarshan playback singer",
-    "Sudarshan judge",
+    // Judge - Roshan NC
+    "Roshan NC",
+    "Roshan NC singer",
+    "Roshan NC playback singer",
+    "Roshan NC judge",
+    "Roshan NC Guitarist",
+    "Roshan NC Musician",
 
     // Location
     "Carmel College band competition",
@@ -78,39 +79,39 @@ export const metadata: Metadata = {
 
   openGraph: {
     title:
-      "Abheri 2K26 - Inter-Collegiate Band Competition ft. Manjari | Sparkz",
+      "Abheri 2K26 - Inter-Collegiate Band Competition ft. Ouseppachan | Sparkz",
     description:
-      "Join Abheri 2K26 at Carmel Engineering College, Alappuzha on 8 Oct 2026. Chief Guest: Manjari (Playback Singer), Judge: Sudarshan. Prize pool ₹60,000. Teams of 6-10 members. Register now!",
+      "Join Abheri 2K26 at Carmel Engineering College, Alappuzha on 8 Oct 2026. Chief Guest: Ouseppachan (Film Composer & Violinist), Judge: Roshan NC (Musician & Guitarist). Prize pool ₹60,000. Teams of 5-10 members. Register now!",
     type: "website",
     locale: "en_IN",
-    url: "https://sparkz.carmelcet.in/abheri",
+    url: "https://sparkz2k26.carmelcet.in/abheri",
     siteName: "Sparkz 2K26",
     images: [
       {
-        url: "/manjari.png",
+        url: "/ouseppachan.png",
         width: 1200,
         height: 630,
-        alt: "Abheri 2K26 - Chief Guest Manjari (Playback Singer)",
+        alt: "Abheri 2K26 - Chief Guest Ouseppachan (Film Composer & Violinist)",
       },
       {
-        url: "/sudarshan.jpg",
+        url: "/roshan_nc.png",
         width: 1200,
         height: 630,
-        alt: "Abheri 2K26 - Judge Sudarshan (Playback Singer)",
+        alt: "Abheri 2K26 - Judge Roshan NC (Musician & Guitarist)",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "Abheri 2K26 - Band Competition ft. Manjari & Sudarshan",
+    title: "Abheri 2K26 - Band Competition ft. Ouseppachan & Roshan NC",
     description:
       "Inter-collegiate band competition at Carmel College, Alappuzha. 8 Oct 2026. Prize pool ₹60,000. Register your band now!",
-    images: ["/manjari.png", "/sudarshan.jpg"],
+    images: ["/ouseppachan.png", "/roshan_nc.png"],
   },
 
   alternates: {
-    canonical: "https://sparkz.carmelcet.in/abheri",
+    canonical: "https://sparkz2k26.carmelcet.in/abheri",
   },
 };
 
