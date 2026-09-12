@@ -21,7 +21,7 @@ const rulesSections = [
       "The competition is open to bonafide students of recognized colleges.",
       "Each band must consist of 5 to 10 members (minimum 2 vocals and 3 instruments).",
       "All participants must carry a valid college ID card.",
-      "(2 or 3 passed-out students from the same college can also perform with the band, provided they submit any kind of proof that they belonged to the same college when asked.)",
+      "2 or 3 recent graduates from same college can also perform with the band, provided, they submit any kindof proof that they belonged to the same college",
       "A participant may represent only one band in the competition.",
     ],
   },

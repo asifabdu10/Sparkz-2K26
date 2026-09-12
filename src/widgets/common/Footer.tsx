@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Span } from "next/dist/trace";
 import Image from "next/image";
 import Link from "next/link";
 import { FaInstagram, FaLinkedin } from "react-icons/fa";
@@ -161,7 +162,7 @@ export default function Footer() {
             <div className="text-xs text-[#A1A1AA] text-center md:text-right">
               <p>© 2026 Sparkz.</p>
               <p className="mt-1">
-                Crafted with ♥ by the <Link href="/credits" className="text-[#F3C87A] hover:underline font-semibold">Tech Team</Link>
+                Crafted with ♥ by the <span className="text-[#F3C87A] font-semibold">Tech Team</span>
               </p>
             </div>
           </div>
