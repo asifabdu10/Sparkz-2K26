@@ -282,13 +282,7 @@ export default function Header() {
           {/* Made with Love - Tech Team */}
           <div className="mt-auto pt-8 text-center">
             <p className="text-xs text-white/40">
-              <Link
-                href="/credits"
-                onClick={() => setIsMenuOpen(false)}
-                className="text-white/70 hover:text-white transition-all duration-300 font-semibold hover:underline decoration-dotted underline-offset-2 animate-pulse hover:animate-none"
-              >
-                Tech Team
-              </Link>
+              <span className="text-white/70 font-semibold">Tech Team</span>
             </p>
           </div>
         </div>

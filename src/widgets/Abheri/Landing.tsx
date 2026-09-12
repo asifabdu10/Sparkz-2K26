@@ -141,7 +141,7 @@ export default function AbheriPage() {
               <RisingLines
                 color="#D4A359"
                 horizonColor="#3A270D"
-                particles={500}
+                particles={300}
                 riseSpeed={30}
                 opacity={90}
                 scale={8}
@@ -150,6 +150,8 @@ export default function AbheriPage() {
               />
             </div>
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0B0B0E] via-transparent to-transparent h-64" />
+            {/* Bottom fade to blend rising lines into next section */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 z-[1] bg-gradient-to-t from-[#0B0B0E] via-[#0B0B0E]/70 to-transparent" />
             <div className="pointer-events-none absolute left-[-10%] top-[10%] h-96 w-96 rounded-full bg-[#3A270D]/40 blur-[140px]" />
             <div className="hidden sm:block pointer-events-none absolute right-[-5%] top-[15%] h-96 w-96 rounded-full bg-[#3A270D]/30 blur-[150px]" />
           </>
