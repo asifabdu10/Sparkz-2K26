@@ -7,15 +7,15 @@ import Link from "next/link";
 const coordinators = [
   {
     role: "Staff Coordinator",
-    name: "Dr. Kannan C. Bhanu",
-    phone: "+91 94963 31267",
-    email: "sparkz@carmelcet.in",
+    name: "Mr. Arun P Kuttappan ",
+    phone: "+91 94952 65203",
+    email: "arun@carmelcet.in",
   },
   {
     role: "Student Coordinator",
-    name: "Mr. Steev Palliath",
-    phone: "+91 62358 34190",
-    email: "sparkz@carmelcet.in",
+    name: "Mr. Akash P",
+    phone: "+91 70345 51693",
+    email: "akashppillai6747@gmail.com",
   },
 ];
 
@@ -35,11 +35,11 @@ export default function ContactPage() {
         </title>
         <meta
           name="description"
-          content="Get in touch with Sparkz 2K26 coordinators. Contact Dr. Kannan C. Bhanu (Staff Coordinator) at +91 94963 31267 or Mr. Steev Palliath (Student Coordinator) at +91 62358 34190 for event information, registrations, and inquiries."
+          content="Get in touch with Sparkz 2K26 coordinators. Contact Mr. Arun P Kuttappan (Staff Coordinator) at +91 94963 31267 or Mr. Akash P (Student Coordinator) at +91 62358 34190 for event information, registrations, and inquiries."
         />
         <meta
           name="keywords"
-          content="Sparkz contact, Sparkz 2K26 contact, Carmel College tech fest contact, event coordinators, Sparkz registration help, tech fest Kerala contact, Dr Kannan C Bhanu, Steev Palliath, Carmel College events, college fest contact, event inquiry, Sparkz support, tech fest coordinators, ABHERI contact, band competition contact"
+          content="Sparkz contact, Sparkz 2K26 contact, Carmel College tech fest contact, event coordinators, Sparkz registration help, tech fest Kerala contact, Mr Arun P Kuttappan, Mr Akash P, Carmel College events, college fest contact, event inquiry, Sparkz support, tech fest coordinators, ABHERI contact, band competition contact"
         />
         <meta name="author" content="Sparkz 2K26 Team" />
         <link rel="canonical" href="https://sparkz.carmelcet.in/contact" />

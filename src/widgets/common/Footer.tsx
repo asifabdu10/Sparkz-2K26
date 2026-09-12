@@ -88,15 +88,18 @@ export default function Footer() {
 
           {/* Socials */}
           <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">
-              Join the Circuit
-            </h3>
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
+                Connect With Us
+              </h3>
+              <br />
 
-            <div className="flex items-center gap-4">
               {/* Instagram */}
               <Link
-                href="#"
-                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
+                href="https://www.instagram.com/sparkz_ccet?stkn=dWI2NTZsenhxdG41"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
                 aria-label="Instagram"
               >
                 <FaInstagram
@@ -105,29 +108,9 @@ export default function Footer() {
                 />
                 <span className="sr-only">Instagram</span>
               </Link>
-
-              {/* LinkedIn */}
-              <Link
-                href="#"
-                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
-                aria-label="LinkedIn"
-              >
-                <FaLinkedin className="h-5 w-5 transition-colors" aria-hidden />
-                <span className="sr-only">LinkedIn</span>
-              </Link>
-
-              {/* X / Twitter */}
-              <Link
-                href="#"
-                className="group inline-flex items-center justify-center h-10 w-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] transition-all hover:border-[#F3C87A] hover:scale-110"
-                aria-label="Twitter"
-              >
-                <FaXTwitter className="h-5 w-5 transition-colors" aria-hidden />
-                <span className="sr-only">X</span>
-              </Link>
             </div>
 
-            <p className="mt-4 text-sm text-[#A1A1AA] max-w-xs">
+            <p className="mx-auto max-w-xs text-center text-sm text-[#A1A1AA]">
               Follow us for event updates, behind-the-scenes, and shoutouts.
             </p>
           </div>
