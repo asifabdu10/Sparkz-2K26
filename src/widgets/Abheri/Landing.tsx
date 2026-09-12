@@ -299,8 +299,9 @@ export default function AbheriPage() {
                       Acclaimed Musician &amp; Guitarist.
                     </p>
                     <p className="text-lg text-[#A1A1AA] leading-relaxed max-w-xl mx-auto lg:mx-0">
-                      Bringing his technical expertise and cinematic music experience to judge the performances at Abheri 2K26.
-                      Elevate your performance under the keen eye of a true industry professional.
+                      Bringing his technical expertise and rich cinematic music experience, we are thrilled to welcome our judge for Abheri 2K26!
+                      From captivating audiences on Star Singer Season 7 and Indian Idol to lighting up the playback scene—including his recent hit in Thangalaan—he’s here to evaluate and inspire.
+                      Elevate your performance under the keen eye of a true industry professional!
                     </p>
                   </div>
                 </div>
@@ -396,9 +397,19 @@ export default function AbheriPage() {
                     phone: "+91 94963 31267",
                   },
                   {
+                    title: "Faculty Coordinator",
+                    name: "Ms. Rehna Rose Francis",
+                    phone: "+91 82899 88575",
+                  },
+                  {
                     title: "Student Coordinator",
                     name: "Mr. Steev Palliath",
                     phone: "+91 62358 34190",
+                  },
+                  {
+                    title: "Student Coordinator",
+                    name: "Ms. Kripa Hanna Shiju",
+                    phone: "+91 75608 69165",
                   },
                 ].map((contact, i) => (
                   <div
