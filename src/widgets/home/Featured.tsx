@@ -176,11 +176,10 @@ export default function FeaturedEvents() {
                   }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
-                  className={`relative ${
-                    isCenter
+                  className={`relative ${isCenter
                       ? "z-30 w-[70vw] sm:w-72"
                       : "z-10 hidden sm:block w-64"
-                  } flex-shrink-0`}
+                    } flex-shrink-0`}
                   whileHover={isCenter ? { scale: 1.08, y: -30 } : {}}
                   onMouseEnter={() => isCenter && setPaused(true)}
                   onMouseLeave={() => isCenter && setPaused(false)}
@@ -193,10 +192,9 @@ export default function FeaturedEvents() {
                   >
                     <div
                       className={`relative aspect-4/5 w-full overflow-hidden rounded-3xl border bg-[#131318]
-                        ${
-                          isCenter
-                            ? "border-[#F3C87A] group-hover:scale-105 shadow-2xl shadow-[rgba(212,163,89,0.3)]"
-                            : "border-[rgba(212,163,89,0.2)]"
+                        ${isCenter
+                          ? "border-[#F3C87A] group-hover:scale-105 shadow-2xl shadow-[rgba(212,163,89,0.3)]"
+                          : "border-[rgba(212,163,89,0.2)]"
                         }
                          transition-all duration-500`}
                     >

@@ -56,10 +56,38 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+.split-parent.gold-gradient-text {
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+.split-parent.gold-gradient-text .split-char,
+.split-parent.gold-gradient-text .split-word {
+  background: linear-gradient(135deg, #F3C87A 0%, #FDE6B0 40%, #D4A359 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+}
+
 .gold-gradient-text-subtle {
   background: linear-gradient(135deg, #FFFFFF 0%, #FDE6B0 50%, #D4A359 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.split-parent.gold-gradient-text-subtle {
+  background: none !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+.split-parent.gold-gradient-text-subtle .split-char,
+.split-parent.gold-gradient-text-subtle .split-word {
+  background: linear-gradient(135deg, #FFFFFF 0%, #FDE6B0 50%, #D4A359 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
 }
 
 .btn-gold {

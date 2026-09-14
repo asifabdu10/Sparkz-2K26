@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import ParticleImage from "@/widgets/common/ParticleImage";
+import SplitText from "./SplitText";
 
 export default function Hero() {
+  const handleAnimationComplete = () => {
+    console.log('All letters have animated!');
+  };
 
   const [mounted, setMounted] = useState(false);
 
@@ -190,9 +194,22 @@ export default function Hero() {
             transition={{ duration: 0.7, ease: "easeOut" }}
             className="text-3xl font-bold leading-tight text-white sm:text-3xl lg:text-3xl"
           >
-            <span className="relative block mt-2 text-6xl sm:text-4xl lg:text-7xl font-extrabold gold-gradient-text">
-              Sparkz 2K26
-            </span>
+            <SplitText
+              text="Sparkz 2K26"
+              className="relative block mt-2 text-6xl sm:text-4xl lg:text-7xl font-extrabold gold-gradient-text"
+              delay={60}
+              duration={0.8}
+              ease="bounce.out"
+              splitType="chars"
+              from={{ opacity: 0, y: 40 }}
+              to={{ opacity: 1, y: 0 }}
+              threshold={0.1}
+              rootMargin="-100px"
+              tag="span"
+              onLetterAnimationComplete={handleAnimationComplete}
+              showCallback
+              enterDelay={3200}
+            />
             <span className="text-white font-bold text-2xl sm:text-3xl block mt-1 tracking-wide">
               Innovation Unleashed
             </span>
