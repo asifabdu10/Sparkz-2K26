@@ -20,7 +20,12 @@ export type Event = {
     };
     regLink?: string;
     type: 'technical' | 'nonTechnical' | 'sports';
+    /** Legacy single event date (DD-MM-YYYY). Kept for backward compatibility. */
     date?: string;
+    /** Event start date in DD-MM-YYYY format. */
+    startDate?: string;
+    /** Event end date in DD-MM-YYYY format. */
+    endDate?: string;
     description: string;
     venue?: string;
     memberMaxCount: number;

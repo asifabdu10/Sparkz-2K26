@@ -485,7 +485,7 @@ export default function Register() {
             <div>
               <h1 className="text-3xl md:text-5xl font-bold tracking-tight gold-gradient-text">{event.title} Registration</h1>
               <p className="text-[#A1A1AA] mt-2 flex items-center gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-[#F3C87A]" /> Date: {event.date || "TBA"}
+                <Calendar className="w-4 h-4 text-[#F3C87A]" /> Date: {event.startDate || event.date || "TBA"}{event.endDate && event.endDate !== (event.startDate || event.date) ? ` – ${event.endDate}` : ""}
               </p>
             </div>
             {registrationClosed && !registered && (

@@ -155,6 +155,45 @@ function PrizeCard({
   );
 }
 
+const formatEventDate = (value?: string) => {
+  if (!value) return "TBA";
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return value;
+  const date = new Date(parts[2], parts[1] - 1, parts[0]);
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatEventDateRange = (event: Event) => {
+  const start = event.startDate || event.date;
+  const end = event.endDate || start;
+  if (!start) return "TBA";
+  if (!end || end === start) return formatEventDate(start);
+
+  const startParts = start.split("-").map(Number);
+  const endParts = end.split("-").map(Number);
+  if (startParts.length !== 3 || endParts.length !== 3 || startParts.some(Number.isNaN) || endParts.some(Number.isNaN)) {
+    return `${start} – ${end}`;
+  }
+
+  const startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
+  const endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
+
+  const startMonth = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(startDate);
+  const endFormatted = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "long", year: "numeric" }).format(endDate);
+  const endMonth = new Intl.DateTimeFormat("en-GB", { month: "long" }).format(endDate);
+  const year = endDate.getFullYear();
+
+  if (startParts[1] === endParts[1] && startParts[2] === endParts[2]) {
+    return `${String(startParts[0]).padStart(2, "0")} – ${String(endParts[0]).padStart(2, "0")} ${endMonth} ${year}`;
+  }
+
+  return `${String(startParts[0]).padStart(2, "0")} ${startMonth} ${startParts[2]} – ${endFormatted}`;
+};
+
 export default function EventPage({ eventId }: { eventId: string }) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
@@ -327,7 +366,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
               <InfoCard
                 icon={<FaCalendarDay size={18} />}
                 title="Date"
-                value={event.date || "TBA"}
+                value={formatEventDateRange(event)}
                 delay={0.3}
                 variant="highlight"
               />

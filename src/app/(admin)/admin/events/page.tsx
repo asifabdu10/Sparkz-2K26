@@ -39,6 +39,8 @@ export default function EventsManagement() {
         department: "CSE",
         type: "technical",
         date: "",
+        startDate: "",
+        endDate: "",
         regFinalDate: "",
         registrationFee: "",
         isFree: false,
@@ -379,6 +381,9 @@ export default function EventsManagement() {
         if (event) {
             setFormData({
                 ...event,
+                // Legacy events used a single `date`; use it as the start/end date.
+                startDate: event.startDate || event.date || "",
+                endDate: event.endDate || event.startDate || event.date || "",
                 registrationMode: event.registrationMode || "online",
                 registrationOpen: event.registrationOpen !== false,
                 showParticipation: event.showParticipation !== false,
@@ -449,7 +454,18 @@ export default function EventsManagement() {
         // Strict Validation
         if (!formData.title?.trim()) return toastError("Title is required");
         if (!formData.description?.trim()) return toastError("Description is required");
-        if (!formData.date) return toastError("Event Date is required");
+        if (!formData.startDate) return toastError("Event Start Date is required");
+        if (!formData.endDate) return toastError("Event End Date is required");
+
+        const parseEventDate = (value: string) => {
+            const parts = value.split("-").map(Number);
+            if (parts.length !== 3 || parts.some(Number.isNaN)) return NaN;
+            return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+        };
+
+        if (parseEventDate(formData.endDate) < parseEventDate(formData.startDate)) {
+            return toastError("Event End Date cannot be before the Start Date");
+        }
 
         const registrationMode = formData.registrationMode || "online";
 
@@ -514,6 +530,10 @@ export default function EventsManagement() {
                 department: finalDepartment,
                 RegCloseTime: regCloseTime,
                 id: eventId,
+                // Keep legacy date field populated with the start date.
+                date: formData.startDate || formData.date || "",
+                startDate: formData.startDate || formData.date || "",
+                endDate: formData.endDate || formData.startDate || formData.date || "",
                 imageUrl,
                 bgImageUrl,
                 registrationMode,
@@ -755,37 +775,53 @@ export default function EventsManagement() {
                                     </p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm text-gray-400 mb-1">Event Date</label>
+                                        <label className="block text-sm text-gray-400 mb-1">Event Start Date <span className="text-red-500">*</span></label>
                                         <input
                                             type="date"
                                             required
-                                            value={formData.date ? formData.date.split('-').reverse().join('-') : ''}
+                                            value={formData.startDate ? formData.startDate.split('-').reverse().join('-') : (formData.date ? formData.date.split('-').reverse().join('-') : '')}
                                             onChange={(e) => {
                                                 const val = e.target.value;
-                                                setFormData({ ...formData, date: val ? val.split('-').reverse().join('-') : '' });
+                                                const formatted = val ? val.split('-').reverse().join('-') : '';
+                                                setFormData({ ...formData, startDate: formatted, date: formatted });
                                             }}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
                                         />
                                     </div>
-
-                                    {formData.registrationMode !== "none" && (
-                                        <div>
-                                            <label className="block text-sm text-gray-400 mb-1">Reg Ends On {formData.registrationMode === "online" && <span className="text-red-500">*</span>}</label>
-                                            <input
-                                                type="date"
-                                                required={formData.registrationMode === "online"}
-                                                value={formData.regFinalDate ? formData.regFinalDate.split('-').reverse().join('-') : ''}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData({ ...formData, regFinalDate: val ? val.split('-').reverse().join('-') : '' });
-                                                }}
-                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
-                                            />
-                                        </div>
-                                    )}
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Event End Date <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="date"
+                                            required
+                                            min={formData.startDate ? formData.startDate.split('-').reverse().join('-') : undefined}
+                                            value={formData.endDate ? formData.endDate.split('-').reverse().join('-') : (formData.startDate ? formData.startDate.split('-').reverse().join('-') : '')}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, endDate: val ? val.split('-').reverse().join('-') : '' });
+                                            }}
+                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
+                                        />
+                                    </div>
                                 </div>
+                                <p className="text-xs text-gray-500 -mt-2">For a one-day event, set the same Start and End Date. Example: 08–09 October 2026.</p>
+
+                                {formData.registrationMode !== "none" && (
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Reg Ends On {formData.registrationMode === "online" && <span className="text-red-500">*</span>}</label>
+                                        <input
+                                            type="date"
+                                            required={formData.registrationMode === "online"}
+                                            value={formData.regFinalDate ? formData.regFinalDate.split('-').reverse().join('-') : ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, regFinalDate: val ? val.split('-').reverse().join('-') : '' });
+                                            }}
+                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
+                                        />
+                                    </div>
+                                )}
 
                                 {formData.registrationMode === "online" && (
                                     <>
@@ -1200,7 +1236,7 @@ export default function EventsManagement() {
                                 <h3 className="text-lg font-bold text-white mb-1 truncate">{event.title}</h3>
                                 <div className="flex justify-between text-sm text-gray-500 mb-4">
                                     <span>{event.type}</span>
-                                    <span>{event.date}</span>
+                                    <span>{event.startDate || event.date}{event.endDate && (event.endDate !== (event.startDate || event.date)) ? ` – ${event.endDate}` : ""}</span>
                                 </div>
                                 <div className="flex items-center justify-between mt-4 mb-3">
                                     <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
