@@ -187,6 +187,11 @@ export default function EventPage({ eventId }: { eventId: string }) {
     notFound(); 
   }
 
+  const registrationMode = event.registrationMode || "online";
+  const isDetailsOnly = registrationMode === "none";
+  const isSpotRegistration = registrationMode === "spot";
+  const showParticipation = !isDetailsOnly && event.showParticipation !== false;
+
   return (
     <Suspense fallback={<EventDetailsSkeleton />}>
       <div className="min-h-screen text-white selection:bg-[#3A270D] selection:text-[#F3C87A]">
@@ -283,9 +288,19 @@ export default function EventPage({ eventId }: { eventId: string }) {
 
               <div className="flex flex-wrap gap-3">
                 {/* Event Type / Subtype Tags */}
-                {event.eveType && (
+                {!isDetailsOnly && event.eveType && (
                     <span className="px-3 py-1 rounded-full text-xs border border-[rgba(212,163,89,0.3)] bg-[#3A270D] text-[#F3C87A] font-bold uppercase shadow-sm">
                         {event.eveType === 'ind' ? 'Individual' : 'Team Event'}
+                    </span>
+                )}
+                {isDetailsOnly && (
+                    <span className="px-3 py-1 rounded-full text-xs border border-sky-500/30 bg-sky-950/30 text-sky-300 font-bold uppercase shadow-sm">
+                        Details Only
+                    </span>
+                )}
+                {isSpotRegistration && (
+                    <span className="px-3 py-1 rounded-full text-xs border border-amber-500/30 bg-amber-950/30 text-amber-300 font-bold uppercase shadow-sm">
+                        Spot Registration
                     </span>
                 )}
               </div>
@@ -322,13 +337,15 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 value={event.isOnline ? "Online" : event.venue || "TBA"}
                 delay={0.35}
               />
-              <InfoCard
-                icon={<LuIndianRupee size={18} />}
-                title="Registration Fee"
-                value={event.isFree ? "Free" : (event.registrationFee || "Free")}
-                delay={0.4}
-              />
-              {(event.maxParticipation || event.memberMaxCount > 0) && (
+              {!isDetailsOnly && (
+                <InfoCard
+                  icon={<LuIndianRupee size={18} />}
+                  title="Registration Fee"
+                  value={event.isFree ? "Free" : (event.registrationFee || "Free")}
+                  delay={0.4}
+                />
+              )}
+              {showParticipation && (event.maxParticipation || event.memberMaxCount > 0) && (
                 <InfoCard
                   icon={<LuUsers size={18} />}
                   title="Participation"
@@ -427,7 +444,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
               )}
               
                {/* Extra Fields Notice */}
-               {event.extraFields && event.extraFields.length > 0 && (
+               {!isDetailsOnly && registrationMode === "online" && event.extraFields && event.extraFields.length > 0 && (
                  <div className="p-4 rounded-xl border border-[rgba(212,163,89,0.25)] bg-[#131318] shadow-sm">
                      <p className="text-white text-sm font-semibold mb-2">Registration Information Required:</p>
                      <div className="flex flex-wrap gap-2">

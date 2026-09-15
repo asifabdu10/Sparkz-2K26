@@ -103,7 +103,7 @@ export default function DroneExhibition() {
             </div>
 
             <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Drone Expo
+              Drone Arena
             </h2>
 
             <p className="mt-6 text-lg leading-8 text-slate-300">

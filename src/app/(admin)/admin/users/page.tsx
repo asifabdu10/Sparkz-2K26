@@ -119,6 +119,7 @@ export default function UsersManagement() {
         const now = new Date();
 
         return events.filter((event) => {
+            if ((event.registrationMode || "online") !== "online") return false;
             if (event.registrationOpen === false) return false;
 
             if (event.regFinalDate) {
@@ -211,6 +212,11 @@ export default function UsersManagement() {
 
         if (!event) {
             toastError("Event not found.");
+            return;
+        }
+
+        if ((event.registrationMode || "online") !== "online") {
+            toastError("This event does not accept online registration.");
             return;
         }
 

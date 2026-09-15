@@ -42,7 +42,9 @@ export default function EventsManagement() {
         regFinalDate: "",
         registrationFee: "",
         isFree: false,
+        registrationMode: "online",
         registrationOpen: true,
+        showParticipation: true,
         showMemberYear: true,
         firstPrize: "",
         memberMaxCount: 1,
@@ -197,6 +199,11 @@ export default function EventsManagement() {
 
 
     const toggleEventRegistration = async (event: Event) => {
+        if ((event.registrationMode || "online") !== "online") {
+            toastError("Only online-registration events can be opened or closed here.");
+            return;
+        }
+
         const nextOpen = event.registrationOpen === false;
         try {
             await updateDoc(doc(db, "events", event.id), {
@@ -211,18 +218,23 @@ export default function EventsManagement() {
     };
 
     const toggleAllRegistrations = async () => {
-        if (events.length === 0) return;
-        const shouldOpen = !events.every(e => e.registrationOpen !== false);
+        const onlineEvents = events.filter(e => (e.registrationMode || "online") === "online");
+        if (onlineEvents.length === 0) return;
+        const shouldOpen = !onlineEvents.every(e => e.registrationOpen !== false);
         try {
             await Promise.all(
-                events.map(event =>
+                onlineEvents.map(event =>
                     updateDoc(doc(db, "events", event.id), {
                         registrationOpen: shouldOpen,
                     })
                 )
             );
-            setEvents(prev => prev.map(e => ({ ...e, registrationOpen: shouldOpen })));
-            toastSuccess(shouldOpen ? "Registration opened for all events" : "Registration closed for all events");
+            setEvents(prev => prev.map(e =>
+                (e.registrationMode || "online") === "online"
+                    ? { ...e, registrationOpen: shouldOpen }
+                    : e
+            ));
+            toastSuccess(shouldOpen ? "All online registrations opened" : "All online registrations closed");
         } catch (error) {
             console.error("All registration toggle failed:", error);
             toastError("Failed to update all event registrations");
@@ -367,7 +379,9 @@ export default function EventsManagement() {
         if (event) {
             setFormData({
                 ...event,
+                registrationMode: event.registrationMode || "online",
                 registrationOpen: event.registrationOpen !== false,
+                showParticipation: event.showParticipation !== false,
                 isFree: event.isFree === true || Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, "")) === 0,
             });
         } else {
@@ -436,8 +450,16 @@ export default function EventsManagement() {
         if (!formData.title?.trim()) return toastError("Title is required");
         if (!formData.description?.trim()) return toastError("Description is required");
         if (!formData.date) return toastError("Event Date is required");
-        if (!formData.regFinalDate) return toastError("Registration Closing Date is required");
-        if (!formData.isFree && !formData.registrationFee) return toastError("Registration Fee is required");
+
+        const registrationMode = formData.registrationMode || "online";
+
+        if (registrationMode === "online" && !formData.regFinalDate) {
+            return toastError("Registration Closing Date is required for online registration");
+        }
+
+        if (registrationMode !== "none" && !formData.isFree && !formData.registrationFee) {
+            return toastError("Registration Fee is required");
+        }
 
         if (!formData.coordinators || formData.coordinators.length === 0 || !formData.coordinators[0].name || !formData.coordinators[0].phone) {
             return toastError("At least one Coordinator is required");
@@ -494,11 +516,13 @@ export default function EventsManagement() {
                 id: eventId,
                 imageUrl,
                 bgImageUrl,
-                isFree: Boolean(formData.isFree),
-                registrationOpen: formData.registrationOpen !== false,
+                registrationMode,
+                isFree: registrationMode === "none" ? true : Boolean(formData.isFree),
+                registrationOpen: registrationMode === "online" ? formData.registrationOpen !== false : false,
                 // Legacy events default to collecting Year unless explicitly turned off.
                 showMemberYear: formData.showMemberYear !== false,
-                registrationFee: formData.isFree ? "0" : formData.registrationFee,
+                showParticipation: registrationMode === "none" ? false : formData.showParticipation !== false,
+                registrationFee: registrationMode === "none" || formData.isFree ? "0" : (formData.registrationFee || "0"),
                 // Ensure numbers are numbers
                 memberMaxCount: Number(formData.memberMaxCount),
                 memberMinCount: Number(formData.memberMinCount),
@@ -535,11 +559,11 @@ export default function EventsManagement() {
                 <div className="flex gap-3 w-full md:w-auto">
                     <button
                         onClick={toggleAllRegistrations}
-                        disabled={events.length === 0}
-                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${events.length > 0 && events.every(e => e.registrationOpen !== false) ? "bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30" : "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"}`}
+                        disabled={events.filter(e => (e.registrationMode || "online") === "online").length === 0}
+                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30" : "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"}`}
                     >
                         <FiPower size={18} />
-                        {events.length > 0 && events.every(e => e.registrationOpen !== false) ? "Close All Registrations" : "Open All Registrations"}
+                        {events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "Close All Online Registrations" : "Open All Online Registrations"}
                     </button>
                     <button
                         onClick={() => startEdit()}
@@ -705,80 +729,109 @@ export default function EventsManagement() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-indigo-400 border-b border-gray-800 pb-2">Registration</h3>
+
+                                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                                    <label className="block text-sm font-medium text-gray-200 mb-2">Registration Mode</label>
+                                    <select
+                                        value={formData.registrationMode || "online"}
+                                        onChange={(e) => {
+                                            const mode = e.target.value as "online" | "spot" | "none";
+                                            setFormData({
+                                                ...formData,
+                                                registrationMode: mode,
+                                                registrationOpen: mode === "online",
+                                                showParticipation: mode === "none" ? false : formData.showParticipation !== false,
+                                                ...(mode === "none" ? { isFree: true, registrationFee: "0" } : {}),
+                                            });
+                                        }}
+                                        className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="online">Online Registration</option>
+                                        <option value="spot">Spot Registration (On-site)</option>
+                                        <option value="none">Details Only — No Registration</option>
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Online shows the registration form. Spot shows that registration is available at the venue. Details Only is for expos and informational activities.
+                                    </p>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-
                                         <label className="block text-sm text-gray-400 mb-1">Event Date</label>
                                         <input
                                             type="date"
                                             required
                                             value={formData.date ? formData.date.split('-').reverse().join('-') : ''}
                                             onChange={(e) => {
-                                                // Convert YYYY-MM-DD to DD-MM-YYYY
                                                 const val = e.target.value;
-                                                if (val) {
-                                                    setFormData({ ...formData, date: val.split('-').reverse().join('-') });
-                                                } else {
-                                                    setFormData({ ...formData, date: '' });
-                                                }
+                                                setFormData({ ...formData, date: val ? val.split('-').reverse().join('-') : '' });
                                             }}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
                                         />
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-1">Reg Ends On <span className="text-red-500">*</span></label>
-                                        <input
-                                            type="date"
-                                            required
-                                            value={formData.regFinalDate ? formData.regFinalDate.split('-').reverse().join('-') : ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val) {
-                                                    setFormData({ ...formData, regFinalDate: val.split('-').reverse().join('-') });
-                                                } else {
-                                                    setFormData({ ...formData, regFinalDate: '' });
-                                                }
-                                            }}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-sm text-gray-400 mb-1">Reg Ends Time <span className="text-red-500">*</span></label>
-                                        <div className="flex items-center gap-2 bg-black/50 border border-gray-700 rounded-lg px-4 py-2 w-full sm:w-1/2">
+                                    {formData.registrationMode !== "none" && (
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Reg Ends On {formData.registrationMode === "online" && <span className="text-red-500">*</span>}</label>
                                             <input
-                                                type="number" min="0" max="23"
-                                                value={isNaN(regCloseTime.hours) ? '' : regCloseTime.hours}
-                                                onChange={e => setRegCloseTime({ ...regCloseTime, hours: Number(e.target.value) })}
-                                                className="w-full bg-transparent text-center outline-none text-lg font-mono"
-                                                placeholder="HH"
-                                            />
-                                            <span className="text-gray-500">:</span>
-                                            <input
-                                                type="number" min="0" max="59"
-                                                value={isNaN(regCloseTime.minutes) ? '' : regCloseTime.minutes}
-                                                onChange={e => setRegCloseTime({ ...regCloseTime, minutes: Number(e.target.value) })}
-                                                className="w-full bg-transparent text-center outline-none text-lg font-mono"
-                                                placeholder="MM"
+                                                type="date"
+                                                required={formData.registrationMode === "online"}
+                                                value={formData.regFinalDate ? formData.regFinalDate.split('-').reverse().join('-') : ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({ ...formData, regFinalDate: val ? val.split('-').reverse().join('-') : '' });
+                                                }}
+                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
                                             />
                                         </div>
-                                    </div>
+                                    )}
+                                </div>
 
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-1">External Reg Link (Optional)</label>
+                                {formData.registrationMode === "online" && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Reg Ends Time <span className="text-red-500">*</span></label>
+                                            <div className="flex items-center gap-2 bg-black/50 border border-gray-700 rounded-lg px-4 py-2 w-full sm:w-1/2">
+                                                <input type="number" min="0" max="23" value={isNaN(regCloseTime.hours) ? '' : regCloseTime.hours} onChange={e => setRegCloseTime({ ...regCloseTime, hours: Number(e.target.value) })} className="w-full bg-transparent text-center outline-none text-lg font-mono" placeholder="HH" />
+                                                <span className="text-gray-500">:</span>
+                                                <input type="number" min="0" max="59" value={isNaN(regCloseTime.minutes) ? '' : regCloseTime.minutes} onChange={e => setRegCloseTime({ ...regCloseTime, minutes: Number(e.target.value) })} className="w-full bg-transparent text-center outline-none text-lg font-mono" placeholder="MM" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">External Reg Link (Optional)</label>
+                                            <input type="text" value={formData.regLink || ''} onChange={(e) => setFormData({ ...formData, regLink: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        </div>
+                                    </>
+                                )}
+
+                                <label className={`flex items-center gap-3 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 ${formData.registrationMode === "none" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                                     <input
-                                        type="text"
-                                        value={formData.regLink || ''}
-                                        onChange={(e) => setFormData({ ...formData, regLink: e.target.value })}
-                                        className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        type="checkbox"
+                                        checked={formData.registrationMode === "online" && formData.registrationOpen !== false}
+                                        disabled={formData.registrationMode !== "online"}
+                                        onChange={(e) => setFormData({ ...formData, registrationOpen: e.target.checked })}
+                                        className="h-4 w-4 accent-emerald-500"
                                     />
-                                </div>
+                                    <span className="text-sm text-gray-200">Online Registration Open</span>
+                                </label>
                             </div>
 
                             <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-indigo-400 border-b border-gray-800 pb-2">Participation Limits</h3>
-                                <div className="grid grid-cols-2 gap-4">
+                                <h3 className="text-lg font-semibold text-indigo-400 border-b border-gray-800 pb-2">Participation</h3>
+                                <label className="flex items-center justify-between gap-4 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 cursor-pointer">
+                                    <div>
+                                        <span className="text-sm text-gray-200">Show participation / member details</span>
+                                        <p className="text-xs text-gray-500 mt-1">Turn this off for expos or activities where team/member count is not relevant.</p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.showParticipation !== false && formData.registrationMode !== "none"}
+                                        disabled={formData.registrationMode === "none"}
+                                        onChange={(e) => setFormData({ ...formData, showParticipation: e.target.checked })}
+                                        className="h-4 w-4 accent-indigo-500"
+                                    />
+                                </label>
+                                <div className={`grid grid-cols-2 gap-4 ${formData.showParticipation === false || formData.registrationMode === "none" ? "opacity-50" : ""}`}>
                                     <div>
                                         <label className="block text-sm text-gray-400 mb-1">Min Members</label>
                                         <input
@@ -827,11 +880,17 @@ export default function EventsManagement() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-indigo-400 border-b border-gray-800 pb-2">Financials</h3>
+                                {formData.registrationMode === "none" && (
+                                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200">
+                                        This event is informational only. Fee/payment fields are ignored and will be saved as free.
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <label className="flex items-center gap-3 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 cursor-pointer">
+                                    <label className={`flex items-center gap-3 rounded-lg border border-gray-700 bg-black/30 px-4 py-3 ${formData.registrationMode === "none" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                                         <input
                                             type="checkbox"
-                                            checked={Boolean(formData.isFree)}
+                                            checked={formData.registrationMode === "none" || Boolean(formData.isFree)}
+                                            disabled={formData.registrationMode === "none"}
                                             onChange={(e) => setFormData({ ...formData, isFree: e.target.checked, registrationFee: e.target.checked ? "0" : (formData.registrationFee === "0" ? "" : formData.registrationFee) })}
                                             className="h-4 w-4 accent-indigo-500"
                                         />
@@ -1144,15 +1203,29 @@ export default function EventsManagement() {
                                     <span>{event.date}</span>
                                 </div>
                                 <div className="flex items-center justify-between mt-4 mb-3">
-                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${event.registrationOpen === false ? "text-red-300 bg-red-950/40 border-red-500/30" : "text-emerald-300 bg-emerald-950/40 border-emerald-500/30"}`}>
-                                        {event.registrationOpen === false ? "Registration Closed" : "Registration Open"}
+                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
+                                        (event.registrationMode || "online") === "none"
+                                            ? "text-sky-300 bg-sky-950/40 border-sky-500/30"
+                                            : (event.registrationMode || "online") === "spot"
+                                                ? "text-amber-300 bg-amber-950/40 border-amber-500/30"
+                                                : event.registrationOpen === false
+                                                    ? "text-red-300 bg-red-950/40 border-red-500/30"
+                                                    : "text-emerald-300 bg-emerald-950/40 border-emerald-500/30"
+                                    }`}>
+                                        {(event.registrationMode || "online") === "none"
+                                            ? "Details Only"
+                                            : (event.registrationMode || "online") === "spot"
+                                                ? "Spot Registration"
+                                                : event.registrationOpen === false ? "Registration Closed" : "Registration Open"}
                                     </span>
-                                    <button
-                                        onClick={() => toggleEventRegistration(event)}
-                                        className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${event.registrationOpen === false ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-red-300 border-red-500/30 hover:bg-red-500/10"}`}
-                                    >
-                                        {event.registrationOpen === false ? "Open" : "Close"}
-                                    </button>
+                                    {(event.registrationMode || "online") === "online" && (
+                                        <button
+                                            onClick={() => toggleEventRegistration(event)}
+                                            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${event.registrationOpen === false ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-red-300 border-red-500/30 hover:bg-red-600/10"}`}
+                                        >
+                                            {event.registrationOpen === false ? "Open" : "Close"}
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button

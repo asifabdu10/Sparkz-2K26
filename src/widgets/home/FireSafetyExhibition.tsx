@@ -96,8 +96,8 @@ export default function FireSafetyExhibition() {
                 </span>
 
                 <span className="text-xl font-bold tracking-tight text-white uppercase leading-none">
-                  Fire & Safety <br />
-                  Emergency Response
+                  Kerala Fire & <br />
+                  Rescue Service
                 </span>
               </div>
             </div>

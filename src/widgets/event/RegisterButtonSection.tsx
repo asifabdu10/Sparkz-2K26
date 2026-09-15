@@ -34,6 +34,8 @@ export default function RegisterButtonSection({ event }: Props) {
   const [registered, setRegistered] = useState(false);
   const [checking, setChecking] = useState(true);
 
+  const registrationMode = event.registrationMode || "online";
+
   const feeNumber = event.isFree
     ? 0
     : Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, ""));
@@ -81,6 +83,22 @@ export default function RegisterButtonSection({ event }: Props) {
       cancelled = true;
     };
   }, [event.id, user]);
+
+  if (registrationMode === "none") {
+    return (
+      <div className="w-full rounded-2xl p-4 bg-sky-950/30 border border-sky-500/30 text-sky-200 text-center font-semibold">
+        Event Details Only · No Registration Required
+      </div>
+    );
+  }
+
+  if (registrationMode === "spot") {
+    return (
+      <div className="w-full rounded-2xl p-4 bg-amber-950/30 border border-amber-500/30 text-amber-200 text-center font-semibold">
+        Spot Registration Available at the Venue
+      </div>
+    );
+  }
 
   if (checking) {
     return (

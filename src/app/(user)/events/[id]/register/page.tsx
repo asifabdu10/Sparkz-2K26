@@ -155,7 +155,7 @@ export default function Register() {
   }, [id]);
 
   useEffect(() => {
-    if (!event) return;
+    if (!event || (event.registrationMode && event.registrationMode !== "online")) return;
     const deadline = getDeadline(event);
     setRegistrationClosed(
       event.registrationOpen === false || Boolean(deadline && new Date() > deadline)
@@ -163,7 +163,7 @@ export default function Register() {
   }, [event]);
 
   useEffect(() => {
-    if (!event || !user || authLoading) return;
+    if (!event || !user || authLoading || (event.registrationMode && event.registrationMode !== "online")) return;
 
     const loadRegistration = async () => {
       try {
@@ -456,6 +456,24 @@ export default function Register() {
 
   if (!event) {
     return <div className="min-h-screen bg-[#0B0B0E] flex items-center justify-center text-white">Event not found</div>;
+  }
+
+  if (event.registrationMode === "none" || event.registrationMode === "spot") {
+    return (
+      <div className="min-h-screen bg-[#0B0B0E] text-white flex items-center justify-center px-4">
+        <div className="max-w-xl w-full rounded-3xl border border-[rgba(212,163,89,0.25)] bg-[#131318] p-8 text-center shadow-2xl">
+          <h1 className="text-3xl md:text-4xl font-bold gold-gradient-text">{event.title}</h1>
+          <p className="text-[#A1A1AA] mt-4">
+            {event.registrationMode === "spot"
+              ? "This event uses spot registration at the venue. Online registration is not available."
+              : "This event is for information/details only. Registration is not required."}
+          </p>
+          <Link href={`/events/${event.id}`} className="inline-block mt-8 px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]">
+            Back to Event Details
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
