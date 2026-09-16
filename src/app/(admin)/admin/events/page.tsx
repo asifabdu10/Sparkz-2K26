@@ -49,6 +49,8 @@ export default function EventsManagement() {
         showParticipation: true,
         showMemberYear: true,
         firstPrize: "",
+        prizePool: "",
+        showPrizePool: false,
         memberMaxCount: 1,
         memberMinCount: 1,
         coordinators: [{ name: "", phone: "" }],
@@ -387,6 +389,8 @@ export default function EventsManagement() {
                 registrationMode: event.registrationMode || "online",
                 registrationOpen: event.registrationOpen !== false,
                 showParticipation: event.showParticipation !== false,
+                showPrizePool: event.showPrizePool === true,
+                prizePool: event.prizePool || "",
                 isFree: event.isFree === true || Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, "")) === 0,
             });
         } else {
@@ -446,6 +450,22 @@ export default function EventsManagement() {
         }
     };
 
+
+    const formatMoneyInput = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return "";
+
+        const withoutSymbol = trimmed.replace(/^₹\s*/, "");
+        const numeric = withoutSymbol.replace(/,/g, "");
+
+        // Automatically format numeric money values as "₹ 100".
+        if (/^\d+(?:\.\d{0,2})?$/.test(numeric)) {
+            return `₹ ${numeric}`;
+        }
+
+        // Keep non-numeric legacy text such as "Subject to the number of Participants." intact.
+        return trimmed;
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -542,6 +562,8 @@ export default function EventsManagement() {
                 // Legacy events default to collecting Year unless explicitly turned off.
                 showMemberYear: formData.showMemberYear !== false,
                 showParticipation: registrationMode === "none" ? false : formData.showParticipation !== false,
+                showPrizePool: formData.showPrizePool === true,
+                prizePool: formData.showPrizePool ? formatMoneyInput(formData.prizePool || "") : "",
                 registrationFee: registrationMode === "none" || formData.isFree ? "0" : (formData.registrationFee || "0"),
                 // Ensure numbers are numbers
                 memberMaxCount: Number(formData.memberMaxCount),
@@ -950,7 +972,7 @@ export default function EventsManagement() {
                                             required
                                             value={formData.isFree ? "0" : (formData.registrationFee || "")}
                                             disabled={Boolean(formData.isFree)}
-                                            onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })}
+                                            onChange={(e) => setFormData({ ...formData, registrationFee: formatMoneyInput(e.target.value) })}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                                         />
                                     </div>
@@ -984,30 +1006,58 @@ export default function EventsManagement() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="space-y-2 mt-4">
-                                    <label className="block text-sm text-gray-400 mb-1">Prizes (Optional)</label>
-                                    <div className="grid grid-cols-3 gap-2">
+                                <div className="space-y-3 mt-4">
+                                    <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-700 bg-black/30 px-4 py-3">
+                                        <div>
+                                            <label className="text-sm text-gray-200 font-medium">Show Prize Pool</label>
+                                            <p className="text-xs text-gray-500 mt-1">Enable this when an event has a total prize pool even if there are no 1st, 2nd or 3rd place prizes.</p>
+                                        </div>
                                         <input
-                                            type="text"
-                                            placeholder="1st Prize"
-                                            value={formData.firstPrize}
-                                            onChange={(e) => setFormData({ ...formData, firstPrize: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                            type="checkbox"
+                                            checked={Boolean(formData.showPrizePool)}
+                                            onChange={(e) => setFormData({ ...formData, showPrizePool: e.target.checked })}
+                                            className="h-4 w-4 accent-indigo-500"
                                         />
-                                        <input
-                                            type="text"
-                                            placeholder="2nd Prize"
-                                            value={formData.secondPrize || ''}
-                                            onChange={(e) => setFormData({ ...formData, secondPrize: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="3rd Prize"
-                                            value={formData.thirdPrize || ''}
-                                            onChange={(e) => setFormData({ ...formData, thirdPrize: e.target.value })}
-                                            className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                                        />
+                                    </div>
+
+                                    {formData.showPrizePool && (
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Total Prize Pool</label>
+                                            <input
+                                                type="text"
+                                                placeholder="₹ 5000"
+                                                value={formData.prizePool || ""}
+                                                onChange={(e) => setFormData({ ...formData, prizePool: formatMoneyInput(e.target.value) })}
+                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-1">Individual Prizes (Optional)</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="1st Prize"
+                                                value={formData.firstPrize || ""}
+                                                onChange={(e) => setFormData({ ...formData, firstPrize: formatMoneyInput(e.target.value) })}
+                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="2nd Prize"
+                                                value={formData.secondPrize || ""}
+                                                onChange={(e) => setFormData({ ...formData, secondPrize: formatMoneyInput(e.target.value) })}
+                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="3rd Prize"
+                                                value={formData.thirdPrize || ""}
+                                                onChange={(e) => setFormData({ ...formData, thirdPrize: formatMoneyInput(e.target.value) })}
+                                                className="w-full bg-black/50 border border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -530,7 +530,7 @@ export default function UsersManagement() {
                                     {event.isFree
                                         ? " — Free"
                                         : event.registrationFee
-                                        ? ` — ₹${event.registrationFee}`
+                                        ? ` — ${String(event.registrationFee).trim().startsWith("₹") ? event.registrationFee : `₹ ${event.registrationFee}`}`
                                         : ""}
                                 </option>
                             ))}

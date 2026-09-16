@@ -118,6 +118,16 @@ function CoordinatorCard({
   );
 }
 
+const formatMoneyDisplay = (value?: string) => {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (/^₹\s*/.test(trimmed)) return trimmed;
+  if (/^\d+(?:\.\d+)?$/.test(trimmed.replace(/,/g, ""))) {
+    return `₹ ${trimmed.replace(/,/g, "")}`;
+  }
+  return trimmed;
+};
+
 // Prize Card Component
 function PrizeCard({
   prize,
@@ -380,7 +390,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 <InfoCard
                   icon={<LuIndianRupee size={18} />}
                   title="Registration Fee"
-                  value={event.isFree ? "Free" : (event.registrationFee || "Free")}
+                  value={event.isFree ? "Free" : formatMoneyDisplay(event.registrationFee || "Free")}
                   delay={0.4}
                 />
               )}
@@ -403,7 +413,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
             </div>
 
             {/* Prize Pool */}
-            {(event.firstPrize || event.secondPrize || event.thirdPrize) && (
+            {((event.showPrizePool && event.prizePool) || event.firstPrize || event.secondPrize || event.thirdPrize) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -415,9 +425,17 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   <div className="h-px flex-1 bg-[rgba(212,163,89,0.25)]" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {event.prizePool && (
+                    <PrizeCard
+                      prize={formatMoneyDisplay(event.prizePool)}
+                      title="Total Prize Pool"
+                      color="gold"
+                      icon={<LuTrophy />}
+                    />
+                  )}
                   {event.firstPrize && (
                     <PrizeCard
-                      prize={event.firstPrize}
+                      prize={formatMoneyDisplay(event.firstPrize)}
                       title="1st Place"
                       color="gold"
                       icon={<LuTrophy />}
@@ -425,7 +443,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   )}
                   {event.secondPrize && (
                     <PrizeCard
-                      prize={event.secondPrize}
+                      prize={formatMoneyDisplay(event.secondPrize)}
                       title="2nd Place"
                       color="silver"
                       icon={<LuAward />}
@@ -433,7 +451,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                   )}
                   {event.thirdPrize && (
                     <PrizeCard
-                      prize={event.thirdPrize}
+                      prize={formatMoneyDisplay(event.thirdPrize)}
                       title="3rd Place"
                       color="bronze"
                       icon={<LuAward />}

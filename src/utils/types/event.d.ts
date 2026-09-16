@@ -44,6 +44,10 @@ export type Event = {
     registrationOpen?: boolean;
     /** Controls whether participation/member information is shown on the public event page. */
     showParticipation?: boolean;
+    /** Optional total prize pool amount, e.g. "₹ 5000". */
+    prizePool?: string;
+    /** Controls whether the total prize pool is shown on the public event page. */
+    showPrizePool?: boolean;
     firstPrize: string;
     secondPrize?: string;
     thirdPrize?: string;
