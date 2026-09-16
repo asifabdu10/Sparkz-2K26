@@ -807,7 +807,22 @@ export default function EventsManagement() {
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 const formatted = val ? val.split('-').reverse().join('-') : '';
-                                                setFormData({ ...formData, startDate: formatted, date: formatted });
+
+                                                // Keep the end date usable for every registration mode.
+                                                // When a start date is selected for a new/blank event,
+                                                // default the end date to the same day. Admins can then
+                                                // change it to a later date for multi-day events.
+                                                const nextEndDate =
+                                                    formatted && !formData.endDate
+                                                        ? formatted
+                                                        : formData.endDate;
+
+                                                setFormData({
+                                                    ...formData,
+                                                    startDate: formatted,
+                                                    date: formatted,
+                                                    endDate: nextEndDate,
+                                                });
                                             }}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
                                         />
@@ -818,7 +833,13 @@ export default function EventsManagement() {
                                             type="date"
                                             required
                                             min={formData.startDate ? formData.startDate.split('-').reverse().join('-') : undefined}
-                                            value={formData.endDate ? formData.endDate.split('-').reverse().join('-') : (formData.startDate ? formData.startDate.split('-').reverse().join('-') : '')}
+                                            value={
+                                                formData.endDate
+                                                    ? formData.endDate.split('-').reverse().join('-')
+                                                    : formData.startDate
+                                                        ? formData.startDate.split('-').reverse().join('-')
+                                                        : ''
+                                            }
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setFormData({ ...formData, endDate: val ? val.split('-').reverse().join('-') : '' });
