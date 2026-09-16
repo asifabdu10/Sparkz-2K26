@@ -237,7 +237,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
   }
 
   const registrationMode = event.registrationMode || "online";
-  const isDetailsOnly = registrationMode === "none";
+  const isDetailsOnly = registrationMode === "none" || event.department === "Expo";
   const isSpotRegistration = registrationMode === "spot";
   const showParticipation = !isDetailsOnly && event.showParticipation !== false;
 
@@ -344,7 +344,7 @@ export default function EventPage({ eventId }: { eventId: string }) {
                 )}
                 {isDetailsOnly && (
                     <span className="px-3 py-1 rounded-full text-xs border border-sky-500/30 bg-sky-950/30 text-sky-300 font-bold uppercase shadow-sm">
-                        Details Only
+                        Expo
                     </span>
                 )}
                 {isSpotRegistration && (

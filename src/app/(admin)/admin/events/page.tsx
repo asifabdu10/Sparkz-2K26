@@ -386,7 +386,7 @@ export default function EventsManagement() {
                 // Legacy events used a single `date`; use it as the start/end date.
                 startDate: event.startDate || event.date || "",
                 endDate: event.endDate || event.startDate || event.date || "",
-                registrationMode: event.registrationMode || "online",
+                registrationMode: event.department === "Expo" ? "none" : (event.registrationMode || "online"),
                 registrationOpen: event.registrationOpen !== false,
                 showParticipation: event.showParticipation !== false,
                 showPrizePool: event.showPrizePool === true,
@@ -487,7 +487,9 @@ export default function EventsManagement() {
             return toastError("Event End Date cannot be before the Start Date");
         }
 
-        const registrationMode = formData.registrationMode || "online";
+        const registrationMode = formData.department === "Expo"
+            ? "none"
+            : formData.registrationMode || "online";
 
         if (registrationMode === "online" && !formData.regFinalDate) {
             return toastError("Registration Closing Date is required for online registration");
@@ -545,6 +547,10 @@ export default function EventsManagement() {
                 finalDepartment = userData.department;
             }
 
+            const isFootball = finalDepartment === "Football";
+            const isExpo = finalDepartment === "Expo";
+            const finalRegistrationMode = isExpo ? "none" : registrationMode;
+
             const eventData = {
                 ...formData,
                 department: finalDepartment,
@@ -556,18 +562,18 @@ export default function EventsManagement() {
                 endDate: formData.endDate || formData.startDate || formData.date || "",
                 imageUrl,
                 bgImageUrl,
-                registrationMode,
+                registrationMode: finalRegistrationMode,
                 isFree: registrationMode === "none" ? true : Boolean(formData.isFree),
-                registrationOpen: registrationMode === "online" ? formData.registrationOpen !== false : false,
+                registrationOpen: finalRegistrationMode === "online" ? formData.registrationOpen !== false : false,
                 // Legacy events default to collecting Year unless explicitly turned off.
                 showMemberYear: formData.showMemberYear !== false,
-                showParticipation: registrationMode === "none" ? false : formData.showParticipation !== false,
+                showParticipation: finalRegistrationMode === "none" ? false : formData.showParticipation !== false,
                 showPrizePool: formData.showPrizePool === true,
                 prizePool: formData.showPrizePool ? formatMoneyInput(formData.prizePool || "") : "",
-                registrationFee: registrationMode === "none" || formData.isFree ? "0" : (formData.registrationFee || "0"),
+                registrationFee: finalRegistrationMode === "none" || formData.isFree ? "0" : (formData.registrationFee || "0"),
                 // Ensure numbers are numbers
-                memberMaxCount: Number(formData.memberMaxCount),
-                memberMinCount: Number(formData.memberMinCount),
+                memberMaxCount: isFootball ? 20 : Number(formData.memberMaxCount),
+                memberMinCount: isFootball ? 1 : Number(formData.memberMinCount),
                 // Ensure arrays are cleaned
                 upi: formData.upi?.filter(u => u) || [],
                 rules: formData.rules?.filter(r => r) || [],
@@ -655,7 +661,18 @@ export default function EventsManagement() {
                                         <label className="block text-sm text-gray-400 mb-1">Department</label>
                                         <select
                                             value={formData.department}
-                                            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                            onChange={(e) => {
+                                                const department = e.target.value;
+                                                setFormData({
+                                                    ...formData,
+                                                    department,
+                                                    ...(department === "Expo"
+                                                        ? { registrationMode: "none", registrationOpen: false, showParticipation: false, isFree: true, registrationFee: "0", eveType: "ind" }
+                                                        : department === "Football"
+                                                            ? { registrationMode: "online", registrationOpen: true, showParticipation: true, eveType: "team", memberMinCount: 1, memberMaxCount: 20, showMemberYear: false }
+                                                            : {}),
+                                                });
+                                            }}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                             disabled={!isSuperAdmin}
                                         >
@@ -790,10 +807,10 @@ export default function EventsManagement() {
                                     >
                                         <option value="online">Online Registration</option>
                                         <option value="spot">Spot Registration (On-site)</option>
-                                        <option value="none">Details Only — No Registration</option>
+                                        <option value="none">Expo — Details Only</option>
                                     </select>
                                     <p className="text-xs text-gray-500 mt-2">
-                                        Online shows the registration form. Spot shows that registration is available at the venue. Details Only is for expos and informational activities.
+                                        Online shows the registration form. Spot shows that registration is available at the venue. Expo is for informational/exhibition activities and does not require registration.
                                     </p>
                                 </div>
 
@@ -1320,7 +1337,7 @@ export default function EventsManagement() {
                                                     : "text-emerald-300 bg-emerald-950/40 border-emerald-500/30"
                                     }`}>
                                         {(event.registrationMode || "online") === "none"
-                                            ? "Details Only"
+                                            ? "Expo"
                                             : (event.registrationMode || "online") === "spot"
                                                 ? "Spot Registration"
                                                 : event.registrationOpen === false ? "Registration Closed" : "Registration Open"}

@@ -118,6 +118,13 @@ export default function Register() {
 
   const memberFields = useMemo<RegistrationField[]>(() => {
     if (!event || event.eveType !== "team") return [];
+
+    // Football has a simplified roster: each additional player only needs
+    // name and phone number.
+    if (event.department === "Football") {
+      return [{ name: "Phone Number", type: "tel", required: true }];
+    }
+
     const custom = event.teamMemberFields || [];
     const collectYear = event.showMemberYear !== false;
     const customNames = new Set(custom.map((field) => field.name.toLowerCase().trim()));
@@ -130,9 +137,15 @@ export default function Register() {
     return combined.filter((field) => collectYear || field.name.toLowerCase().trim() !== "year");
   }, [event]);
 
-  const minMembers = event?.eveType === "team" ? Math.max(1, Number(event.memberMinCount) || 1) : 1;
+  const minMembers = event?.eveType === "team"
+    ? event.department === "Football"
+      ? 1
+      : Math.max(1, Number(event.memberMinCount) || 1)
+    : 1;
   const maxMembers = event?.eveType === "team"
-    ? Math.max(minMembers, Number(event.memberMaxCount) || minMembers)
+    ? event.department === "Football"
+      ? 20
+      : Math.max(minMembers, Number(event.memberMaxCount) || minMembers)
     : 1;
 
   useEffect(() => {
@@ -300,7 +313,9 @@ export default function Register() {
       ["Email", formData.leaderEmail],
       ["Mobile", formData.leaderMobile],
       ["School / College", formData.leaderCollege],
-      ["Department / Year", formData.leaderDepartment],
+      ...(event?.department === "Football"
+        ? []
+        : ([["Department / Year", formData.leaderDepartment]] as const)),
     ] as const;
 
     for (const [label, value] of requiredLeader) {
@@ -312,7 +327,7 @@ export default function Register() {
 
     if (event?.eveType === "team") {
       const count = 1 + formData.teamMembers.length;
-      if (count < minMembers || count > maxMembers) {
+      if (count < minMembers || count > maxMembers || (event?.department === "Football" && count > 20)) {
         toastError(
           minMembers === maxMembers
             ? `Team size must be ${minMembers} ${minMembers === 1 ? "member" : "members"}.`
@@ -362,7 +377,7 @@ export default function Register() {
       leaderCollege: formData.leaderCollege,
       leaderDepartment: formData.leaderDepartment,
       leaderYear:
-        event.showMemberYear === false
+        event.showMemberYear === false || event.department === "Football"
           ? deleteField()
           : formData.leaderYear,
       extraData: formData.extraData,
@@ -466,7 +481,7 @@ export default function Register() {
           <p className="text-[#A1A1AA] mt-4">
             {event.registrationMode === "spot"
               ? "This event uses spot registration at the venue. Online registration is not available."
-              : "This event is for information/details only. Registration is not required."}
+              : "This Expo event is for information/details only. Registration is not required."}
           </p>
           <Link href={`/events/${event.id}`} className="inline-block mt-8 px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]">
             Back to Event Details
@@ -516,12 +531,14 @@ export default function Register() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {[
-                    ["leaderName", "Name", "text", "Full Name"],
+                    ["leaderName", event.department === "Football" ? "Captain Name" : "Name", "text", "Full Name"],
                     ["leaderMobile", "Phone Number", "tel", "Mobile Number"],
-                    ["leaderEmail", "Email", "email", "Email Address"],
-                    ["leaderCollege", "School / College", "text", "School or College Name"],
-                    ["leaderDepartment", "Department / Class", "text", "e.g. CSE S5"],
-                    ...(event.showMemberYear !== false
+                    ["leaderEmail", "Email ID", "email", "Email Address"],
+                    ["leaderCollege", "College Name", "text", "College Name"],
+                    ...(event.department === "Football"
+                      ? []
+                      : [["leaderDepartment", "Department / Class", "text", "e.g. CSE S5"]]),
+                    ...(event.department !== "Football" && event.showMemberYear !== false
                       ? [["leaderYear", "Year", "text", "e.g. 2nd Year"]]
                       : []),
                   ].map(([name, label, type, placeholder]) => (
@@ -544,8 +561,8 @@ export default function Register() {
                 <section className="space-y-5">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[rgba(212,163,89,0.2)] pb-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-[#FDE6B0]">Team Members</h3>
-                      <p className="text-xs text-[#71717A] mt-1">Add or remove members within the configured team limit.</p>
+                      <h3 className="text-lg font-semibold text-[#FDE6B0]">{event.department === "Football" ? "Team Members" : "Team Members"}</h3>
+                      <p className="text-xs text-[#71717A] mt-1">{event.department === "Football" ? "Add up to 19 additional players. Maximum team size is 20 including the captain." : "Add or remove members within the configured team limit."}</p>
                     </div>
                     <div className="text-xs font-semibold text-[#F3C87A] bg-[#3A270D] px-3 py-1 rounded-full border border-[rgba(212,163,89,0.3)]">
                       Team size: {1 + formData.teamMembers.length} / {minMembers === maxMembers ? minMembers : `${minMembers}-${maxMembers}`}

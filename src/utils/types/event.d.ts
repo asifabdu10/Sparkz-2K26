@@ -39,7 +39,7 @@ export type Event = {
     eveType?: "ind" | "team";
     registrationFee: string;
     isFree?: boolean;
-    /** Online registration, on-site/spot registration, or informational event only. */
+    /** Online registration, on-site/spot registration, or Expo/informational event only. */
     registrationMode?: "online" | "spot" | "none";
     registrationOpen?: boolean;
     /** Controls whether participation/member information is shown on the public event page. */
