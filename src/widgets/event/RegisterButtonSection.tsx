@@ -87,7 +87,7 @@ export default function RegisterButtonSection({ event }: Props) {
   if (registrationMode === "none") {
     return (
       <div className="w-full rounded-2xl p-4 bg-sky-950/30 border border-sky-500/30 text-sky-200 text-center font-semibold">
-        Event Details Only · No Registration Required
+        Registration is open to all
       </div>
     );
   }
