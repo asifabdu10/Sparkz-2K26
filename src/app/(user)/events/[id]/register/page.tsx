@@ -327,7 +327,7 @@ export default function Register() {
 
     if (event?.eveType === "team") {
       const count = 1 + formData.teamMembers.length;
-      if (count < minMembers || count > maxMembers || (event?.department === "Football" && count > 20)) {
+      if (count < minMembers || count > maxMembers) {
         toastError(
           minMembers === maxMembers
             ? `Team size must be ${minMembers} ${minMembers === 1 ? "member" : "members"}.`
