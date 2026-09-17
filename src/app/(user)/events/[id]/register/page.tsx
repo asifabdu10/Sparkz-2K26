@@ -143,10 +143,10 @@ export default function Register() {
       : Math.max(1, Number(event.memberMinCount) || 1)
     : 1;
   const maxMembers = event?.eveType === "team"
-    ? event.department === "Football"
-      ? 20
-      : Math.max(minMembers, Number(event.memberMaxCount) || minMembers)
-    : 1;
+  ? event.department === "Football"
+    ? Infinity
+    : Math.max(minMembers, Number(event.memberMaxCount) || minMembers)
+  : 1;
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -276,15 +276,19 @@ export default function Register() {
   };
 
   const addMember = () => {
-    if (formData.teamMembers.length + 1 >= maxMembers) {
-      toastError(`Maximum team size is ${maxMembers} members.`);
-      return;
-    }
-    setFormData((current) => ({
-      ...current,
-      teamMembers: [...current.teamMembers, emptyMember(memberFields)],
-    }));
-  };
+  if (
+    event?.department !== "Football" &&
+    formData.teamMembers.length + 1 >= maxMembers
+  ) {
+    toastError(`Maximum team size is ${maxMembers} members.`);
+    return;
+  }
+
+  setFormData((current) => ({
+    ...current,
+    teamMembers: [...current.teamMembers, emptyMember(memberFields)],
+  }));
+};
 
   const removeMember = (index: number) => {
     if (formData.teamMembers.length <= minMembers - 1) {
@@ -598,7 +602,8 @@ export default function Register() {
                     </div>
                   ))}
 
-                  {1 + formData.teamMembers.length < maxMembers && (
+                  {(event.department === "Football" ||
+  1 + formData.teamMembers.length < maxMembers) && (
                     <button type="button" onClick={addMember} className="w-full py-3 border border-dashed border-[rgba(212,163,89,0.3)] rounded-2xl text-[#F3C87A] hover:border-[#F3C87A] hover:bg-[#3A270D]/30 transition-all font-medium flex items-center justify-center gap-2">
                       <Plus className="w-5 h-5" /> Add Team Member
                     </button>

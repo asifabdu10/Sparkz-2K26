@@ -115,32 +115,15 @@ export default function UsersManagement() {
         }
     };
 
+    // Super Admin manual registration:
+    // Allow registration for any event that accepts a registration record.
+    // This bypasses public registration-open/deadline checks because the
+    // Super Admin is registering the existing user manually without payment.
+    // Expo/details-only events (registrationMode === "none") remain excluded.
     const availableEvents = useMemo(() => {
-        const now = new Date();
-
-        return events.filter((event) => {
-            if ((event.registrationMode || "online") !== "online") return false;
-            if (event.registrationOpen === false) return false;
-
-            if (event.regFinalDate) {
-                const closeDate = new Date(event.regFinalDate);
-
-                if (!Number.isNaN(closeDate.getTime())) {
-                    if (event.RegCloseTime) {
-                        closeDate.setHours(
-                            Number(event.RegCloseTime.hours || 0),
-                            Number(event.RegCloseTime.minutes || 0),
-                            0,
-                            0
-                        );
-                    }
-
-                    if (now > closeDate) return false;
-                }
-            }
-
-            return true;
-        });
+        return events.filter(
+            (event) => (event.registrationMode || "online") !== "none"
+        );
     }, [events]);
 
     const startEdit = (user: UserData) => {
@@ -514,7 +497,7 @@ export default function UsersManagement() {
                         </div>
 
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Select Available Event
+                            Select Event
                         </label>
 
                         <select
@@ -544,7 +527,7 @@ export default function UsersManagement() {
 
                         {!eventsLoading && availableEvents.length === 0 && (
                             <p className="text-sm text-amber-400 mt-2">
-                                No currently available events found.
+                                No registrable events found.
                             </p>
                         )}
 
@@ -554,7 +537,7 @@ export default function UsersManagement() {
                                     This event will be added to the user's registered events and a registration record will be created in Firestore.
                                 </p>
                                 <p className="text-amber-400 mt-2">
-                                    This is a Super Admin manual registration. No payment will be requested from the user.
+                                    This is a Super Admin manual registration. Public registration status, closing date, and payment are bypassed. No payment will be requested from the user.
                                 </p>
                             </div>
                         )}
