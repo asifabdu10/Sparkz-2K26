@@ -1,16 +1,4 @@
-isAuthenticated()
-          &&
-          regId == request.auth.uid
-          &&
-          request.resource.data.userId == request.auth.uid
-          &&
-          !exists(
-            /databases/$(database)/documents/abheri_registrations/$(request.auth.uid)
-          )
-          &&
-          get(
-            /databases/$(database)/documents/eventSettings/abheri
-          ).data.registrationOpen == true;rules_version = '2';
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -34,6 +22,20 @@ service cloud.firestore {
       ).data;
     }
 
+    function isAbheriRegistrationOpen() {
+      return !exists(/databases/$(database)/documents/eventSettings/abheri)
+        ||
+        !(
+          'registrationOpen' in get(
+            /databases/$(database)/documents/eventSettings/abheri
+          ).data
+        )
+        ||
+        get(
+          /databases/$(database)/documents/eventSettings/abheri
+        ).data.registrationOpen == true;
+    }
+
     // =========================================================
     // SUPER ADMIN
     // =========================================================
@@ -51,9 +53,17 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated()
         && (
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'superAdmin'
+          (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            &&
+            'role' in get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role == 'superAdmin'
+          )
           ||
           request.auth.token.email
             in ['joeljoy1237@gmail.com']
@@ -69,9 +79,17 @@ service cloud.firestore {
         && (
           isSuperAdmin()
           ||
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'abheriAdmin'
+          (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            &&
+            'role' in get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role == 'abheriAdmin'
+          )
         );
     }
 
@@ -410,9 +428,7 @@ service cloud.firestore {
 
           ||
 
-          get(
-            /databases/$(database)/documents/eventSettings/abheri
-          ).data.registrationOpen == true
+          isAbheriRegistrationOpen()
         );
 
 
@@ -430,6 +446,11 @@ service cloud.firestore {
         &&
         (
           regId ==
+            request.auth.uid
+
+          ||
+
+          resource.data.userId ==
             request.auth.uid
 
           ||
@@ -472,9 +493,7 @@ service cloud.firestore {
 
             &&
 
-            get(
-              /databases/$(database)/documents/eventSettings/abheri
-            ).data.registrationOpen == true
+            isAbheriRegistrationOpen()
           )
         );
 
