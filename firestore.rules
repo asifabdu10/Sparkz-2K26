@@ -1,4 +1,16 @@
-rules_version = '2';
+isAuthenticated()
+          &&
+          regId == request.auth.uid
+          &&
+          request.resource.data.userId == request.auth.uid
+          &&
+          !exists(
+            /databases/$(database)/documents/abheri_registrations/$(request.auth.uid)
+          )
+          &&
+          get(
+            /databases/$(database)/documents/eventSettings/abheri
+          ).data.registrationOpen == true;rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
