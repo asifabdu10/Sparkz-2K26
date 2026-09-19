@@ -77,18 +77,16 @@ export default function UsersManagement() {
     const [registeringUser, setRegisteringUser] = useState<UserData | null>(null);
     const [selectedEventId, setSelectedEventId] = useState("");
     const [registering, setRegistering] = useState(false);
-    const createEmptyManualForm = () => ({
+    const [manualForm, setManualForm] = useState({
         leaderName: "",
         leaderEmail: "",
-        leaderMobile: "",
         leaderCollege: "",
+        leaderMobile: "",
         leaderDepartment: "",
         leaderYear: "",
         extraData: {} as Record<string, string>,
         teamMembers: [] as MemberData[],
     });
-
-    const [manualForm, setManualForm] = useState(createEmptyManualForm());
 
     const [abheriUser, setAbheriUser] = useState<UserData | null>(null);
     const [abheriRegistering, setAbheriRegistering] = useState(false);
@@ -260,14 +258,14 @@ export default function UsersManagement() {
         if (registering) return;
         setRegisteringUser(null);
         setSelectedEventId("");
-        setManualForm(createEmptyManualForm());
+        setManualForm({ leaderName: "", leaderEmail: "", leaderCollege: "", leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
     };
 
     const handleManualEventChange = (eventId: string) => {
         setSelectedEventId(eventId);
         const nextEvent = events.find((item) => item.id === eventId);
         if (!nextEvent) {
-            setManualForm(createEmptyManualForm());
+            setManualForm({ leaderName: "", leaderEmail: "", leaderCollege: "", leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
             return;
         }
         const min = nextEvent.eveType === "team"
@@ -282,7 +280,13 @@ export default function UsersManagement() {
                     .filter((field) => nextEvent.showMemberYear !== false || field.name.toLowerCase().trim() !== "year");
             })();
         setManualForm({
-            ...createEmptyManualForm(),
+            leaderName: "",
+            leaderEmail: "",
+            leaderCollege: "",
+            leaderMobile: "",
+            leaderDepartment: "",
+            leaderYear: "",
+            extraData: {},
             teamMembers: nextEvent.eveType === "team"
                 ? Array.from({ length: Math.max(0, min - 1) }, () => emptyMember(custom))
                 : [],
