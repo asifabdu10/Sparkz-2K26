@@ -444,7 +444,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await savePendingRegistration();
+      const savedRegId = await savePendingRegistration();
       localStorage.removeItem(STORAGE_KEY);
 
       if (isFree) {
@@ -458,7 +458,7 @@ export default function Register() {
         if (isSpotRegistration) {
           // Free spot events still receive the same ticket + email after the
           // registration is actually created. No payment is needed.
-          await sendSpotTicket(registrationId || `${user.uid}_${event.id}`);
+          await sendSpotTicket(savedRegId || registrationId || `${user.uid}_${event.id}`);
         } else {
           toastSuccess("Registration successful! 🎉");
         }
@@ -489,6 +489,7 @@ export default function Register() {
     try {
       // Ticket generation/email happens only after the registration is already
       // registered (for paid spot registrations, after Razorpay verification).
+      const resolvedEmail = String(user.email || formData.leaderEmail || "").trim();
       const response = await fetch("/api/events/send-spot-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -498,7 +499,8 @@ export default function Register() {
           registration: {
             ...formData,
             userId: user.uid,
-            userEmail: user.email || formData.leaderEmail,
+            userEmail: resolvedEmail,
+            leaderEmail: String(formData.leaderEmail || user.email || "").trim(),
             userName: user.displayName || formData.leaderName,
             teamSize: event.eveType === "team" ? 1 + formData.teamMembers.length : 1,
           },
