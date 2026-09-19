@@ -200,9 +200,9 @@ export async function POST(request: NextRequest) {
     const smtpPass = process.env.SMTP_PASS;
 
     if (!apiKey && !smtpPass) {
-      console.error("Missing email configuration: neither RESEND_API_KEY nor SMTP_PASS is configured.");
+      console.error("Missing email configuration: neither SMTP_PASS nor RESEND_API_KEY is configured.");
       return NextResponse.json(
-        { error: "Email service is not configured (missing RESEND_API_KEY and SMTP_PASS). Registration was saved, but ticket email is unavailable." },
+        { error: "Email service is not configured (missing SMTP_PASS and RESEND_API_KEY). Registration was saved, but ticket email is unavailable." },
         { status: 500 }
       );
     }
@@ -226,63 +226,86 @@ export async function POST(request: NextRequest) {
         <p>The event ticket PDF is attached to this email. Please keep it available at the venue.</p>
       </div>`;
 
-    if (apiKey) {
-      // Send via Resend API
-      const from = cleanFromEmail(process.env.EVENT_EMAIL_FROM || process.env.ABHERI_EMAIL_FROM);
-      const emailResponse = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          from,
-          to: [email],
+    let emailSent = false;
+    let lastError: unknown = null;
+
+    // 1. First choice: Use SMTP (Google Workspace / Gmail App Password) - exact same as Abheri
+    if (smtpPass) {
+      try {
+        const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpPort = Number(process.env.SMTP_PORT || 465);
+        const smtpUser = process.env.SMTP_USER || "sparkz@carmelcet.in";
+        const fromEmail =
+          process.env.ABHERI_EMAIL_FROM ||
+          process.env.EVENT_EMAIL_FROM ||
+          process.env.SMTP_FROM ||
+          `"Sparkz 2K26" <sparkz@carmelcet.in>`;
+
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+
+        await transporter.sendMail({
+          from: fromEmail,
+          to: email,
           subject: emailSubject,
           html: emailHtml,
-          attachments: [{ filename: attachmentFilename, content: base64 }],
-        }),
-      });
+          attachments: [
+            {
+              filename: attachmentFilename,
+              content: Buffer.from(pdfBytes),
+              contentType: "application/pdf",
+            },
+          ],
+        });
 
-      if (!emailResponse.ok) {
-        const text = await emailResponse.text();
-        console.error("Resend delivery failed:", emailResponse.status, text);
-        return NextResponse.json({
-          error: "Ticket generated, but email delivery failed.",
-          details: text,
-        }, { status: 502 });
+        emailSent = true;
+      } catch (smtpErr) {
+        console.error("SMTP sending error in send-spot-ticket:", smtpErr);
+        lastError = smtpErr;
       }
-    } else {
-      // Send via SMTP (using the same verified credentials as Abheri)
-      const smtpHost = process.env.SMTP_HOST || "mail.carmelcet.in";
-      const smtpPort = Number(process.env.SMTP_PORT || 465);
-      const smtpUser = process.env.SMTP_USER || "sparkz@carmelcet.in";
-      const fromEmail =
-        process.env.EVENT_EMAIL_FROM ||
-        process.env.ABHERI_EMAIL_FROM ||
-        process.env.SMTP_FROM ||
-        `"Sparkz 2K26" <sparkz@carmelcet.in>`;
+    }
 
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
+    // 2. Fallback: Use Resend if SMTP failed or SMTP_PASS was not provided
+    if (!emailSent && apiKey) {
+      try {
+        const from = cleanFromEmail(process.env.EVENT_EMAIL_FROM || process.env.ABHERI_EMAIL_FROM);
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            from,
+            to: [email],
+            subject: emailSubject,
+            html: emailHtml,
+            attachments: [{ filename: attachmentFilename, content: base64 }],
+          }),
+        });
 
-      await transporter.sendMail({
-        from: fromEmail,
-        to: email,
-        subject: emailSubject,
-        html: emailHtml,
-        attachments: [
-          {
-            filename: attachmentFilename,
-            content: Buffer.from(pdfBytes),
-            contentType: "application/pdf",
-          },
-        ],
-      });
+        if (emailResponse.ok) {
+          emailSent = true;
+        } else {
+          const text = await emailResponse.text();
+          console.error("Resend delivery failed:", emailResponse.status, text);
+          lastError = new Error(`Resend error (${emailResponse.status}): ${text}`);
+        }
+      } catch (resendErr) {
+        console.error("Resend fetch exception:", resendErr);
+        lastError = resendErr;
+      }
+    }
+
+    if (!emailSent) {
+      return NextResponse.json({
+        error: "Ticket generated, but email delivery failed.",
+        details: lastError instanceof Error ? lastError.message : String(lastError || "Unknown email error"),
+      }, { status: 502 });
     }
 
     return NextResponse.json({ success: true, ticketNumber });
