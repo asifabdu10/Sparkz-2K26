@@ -91,6 +91,7 @@ export default function Register() {
   const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [registrationClosed, setRegistrationClosed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [spotEmailSending, setSpotEmailSending] = useState(false);
 
   const [formData, setFormData] = useState<RegistrationData>({
     leaderName: "",
@@ -110,6 +111,8 @@ export default function Register() {
     const fee = Number(String(event.registrationFee || "0").replace(/[^0-9.]/g, ""));
     return event.isFree === true || !fee || Number.isNaN(fee);
   }, [event]);
+
+  const isSpotRegistration = event?.registrationMode === "spot";
 
   const feeNumber = useMemo(() => {
     if (!event || isFree) return 0;
@@ -168,7 +171,23 @@ export default function Register() {
   }, [id]);
 
   useEffect(() => {
-    if (!event || (event.registrationMode && event.registrationMode !== "online")) return;
+    if (!event) return;
+    if (event.registrationMode === "spot") {
+      if (event.spotRegistrationOpen !== true) {
+        setRegistrationClosed(true);
+        return;
+      }
+      if (!event.spotRegistrationDate) {
+        setRegistrationClosed(false);
+        return;
+      }
+      const [day, month, year] = event.spotRegistrationDate.split("-").map(Number);
+      const [hours, minutes] = String(event.spotRegistrationTime || "09:00").split(":").map(Number);
+      const start = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+      setRegistrationClosed(new Date() < start);
+      return;
+    }
+    if (event.registrationMode && event.registrationMode !== "online") return;
     const deadline = getDeadline(event);
     setRegistrationClosed(
       event.registrationOpen === false || Boolean(deadline && new Date() > deadline)
@@ -176,7 +195,7 @@ export default function Register() {
   }, [event]);
 
   useEffect(() => {
-    if (!event || !user || authLoading || (event.registrationMode && event.registrationMode !== "online")) return;
+    if (!event || !user || authLoading || event.registrationMode === "none") return;
 
     const loadRegistration = async () => {
       try {
@@ -399,8 +418,13 @@ export default function Register() {
       teamSize: event.eveType === "team" ? 1 + formData.teamMembers.length : 1,
       registrationFee: feeNumber,
       department: event.department || "",
+      // A paid registration is only considered registered after Razorpay
+      // signature verification. Spot registration uses the same payment flow
+      // as online registration; before payment it remains pending.
       status: isFree ? "registered" : "pending",
       paymentStatus: isFree ? "free" : "pending",
+      registrationMethod: isSpotRegistration ? "spot" : (isFree ? "free" : "online"),
+      spotRegistration: isSpotRegistration,
       updatedAt: new Date(),
     };
 
@@ -430,10 +454,25 @@ export default function Register() {
         await refetchUserProfile();
         setRegistered(true);
         setAcknowledged(true);
-        toastSuccess("Registration successful! 🎉");
+
+        if (isSpotRegistration) {
+          // Free spot events still receive the same ticket + email after the
+          // registration is actually created. No payment is needed.
+          await sendSpotTicket(registrationId || `${user.uid}_${event.id}`);
+        } else {
+          toastSuccess("Registration successful! 🎉");
+        }
       } else {
+        // Paid SPOT registrations use the exact same Razorpay flow as normal
+        // online registrations. The pending document is only a saved draft;
+        // it is not marked as paid/registered until Razorpay verification
+        // succeeds.
         setPaymentReady(true);
-        toastSuccess("Details saved. Complete the payment to finish registration.");
+        toastSuccess(
+          isSpotRegistration
+            ? "Details saved. Complete the spot registration payment to receive your ticket."
+            : "Details saved. Complete the payment to finish registration."
+        );
       }
     } catch (error) {
       console.error("Registration save error:", error);
@@ -443,9 +482,57 @@ export default function Register() {
     }
   };
 
+  const sendSpotTicket = async (regId: string) => {
+    if (!user || !event) throw new Error("Registration session expired.");
+
+    setSpotEmailSending(true);
+    try {
+      // Ticket generation/email happens only after the registration is already
+      // registered (for paid spot registrations, after Razorpay verification).
+      const response = await fetch("/api/events/send-spot-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registrationId: regId,
+          event,
+          registration: {
+            ...formData,
+            userId: user.uid,
+            userEmail: user.email || formData.leaderEmail,
+            userName: user.displayName || formData.leaderName,
+            teamSize: event.eveType === "team" ? 1 + formData.teamMembers.length : 1,
+          },
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Ticket email failed");
+
+      if (result.ticketNumber) {
+        await updateDoc(doc(db, "registrations", regId), {
+          ticketNumber: result.ticketNumber,
+          ticketEmailStatus: "sent",
+          ticketEmailedAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      toastSuccess("Spot registration successful! Ticket sent to your email. 🎟️");
+    } catch (emailError) {
+      console.error("Spot ticket email failed:", emailError);
+      // Do not undo the successful registration/payment. The ticket can be
+      // resent by an authorised admin later.
+      toastError("Registration succeeded, but the ticket email could not be sent. Please contact the registration desk.");
+    } finally {
+      setSpotEmailSending(false);
+    }
+  };
+
   const completePaidRegistration = async (paymentId: string, orderId: string) => {
     if (!user || !event || !registrationId) throw new Error("Registration session expired.");
 
+    // This function is called only after /api/razorpay/verify-payment has
+    // verified the Razorpay signature. Only now do we turn the pending draft
+    // into a real paid registration.
     await updateDoc(doc(db, "registrations", registrationId), {
       status: "paid",
       paymentStatus: "paid",
@@ -462,7 +549,12 @@ export default function Register() {
     await refetchUserProfile();
     setRegistered(true);
     setPaymentReady(false);
-    toastSuccess("Payment successful! You are registered 🎉");
+
+    if (isSpotRegistration) {
+      await sendSpotTicket(registrationId);
+    } else {
+      toastSuccess("Payment successful! You are registered 🎉");
+    }
   };
 
   if (pageLoading || authLoading) {
@@ -477,19 +569,13 @@ export default function Register() {
     return <div className="min-h-screen bg-[#0B0B0E] flex items-center justify-center text-white">Event not found</div>;
   }
 
-  if (event.registrationMode === "none" || event.registrationMode === "spot") {
+  if (event.registrationMode === "none") {
     return (
       <div className="min-h-screen bg-[#0B0B0E] text-white flex items-center justify-center px-4">
         <div className="max-w-xl w-full rounded-3xl border border-[rgba(212,163,89,0.25)] bg-[#131318] p-8 text-center shadow-2xl">
           <h1 className="text-3xl md:text-4xl font-bold gold-gradient-text">{event.title}</h1>
-          <p className="text-[#A1A1AA] mt-4">
-            {event.registrationMode === "spot"
-              ? "This event uses spot registration at the venue. Online registration is not available."
-              : "This Expo event is for information/details only. Registration is not required."}
-          </p>
-          <Link href={`/events/${event.id}`} className="inline-block mt-8 px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]">
-            Back to Event Details
-          </Link>
+          <p className="text-[#A1A1AA] mt-4">This Expo event is for information/details only. Registration is not required.</p>
+          <Link href={`/events/${event.id}`} className="inline-block mt-8 px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]">Back to Event Details</Link>
         </div>
       </div>
     );
@@ -634,13 +720,13 @@ export default function Register() {
               <div className="pt-4 border-t border-gray-800">
                 {!paymentReady ? (
                   <button type="submit" disabled={loading} className="btn-gold w-full rounded-full p-4 font-bold text-lg text-[#0B0B0E] disabled:opacity-60">
-                    {loading ? "Saving Details..." : isFree ? "Register Free" : `Continue to Payment · ₹${feeNumber}`}
+                    {loading ? "Saving Details..." : isFree ? (isSpotRegistration ? "Register at Spot" : "Register Free") : `Continue to Payment · ₹${feeNumber}`}
                   </button>
                 ) : (
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-[#D4A359]/20 bg-[#0B0B0E] p-4 text-center">
                       <p className="text-[#FDE6B0] font-semibold">Your team details are saved.</p>
-                      <p className="text-sm text-[#A1A1AA] mt-1">Complete the payment below to finish registration.</p>
+                      <p className="text-sm text-[#A1A1AA] mt-1">{isSpotRegistration ? "Complete the payment below to confirm your spot registration. Your ticket will be emailed after successful payment." : "Complete the payment below to finish registration."}</p>
                     </div>
                     <RazorpayButton
                       amountRupees={feeNumber}

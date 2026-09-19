@@ -13,6 +13,7 @@ import {
     updateDoc,
     writeBatch,
     arrayRemove,
+    Timestamp,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower } from "react-icons/fi";
@@ -46,6 +47,10 @@ export default function EventsManagement() {
         isFree: false,
         registrationMode: "online",
         registrationOpen: true,
+        spotRegistrationOpen: false,
+        spotRegistrationDate: "",
+        spotRegistrationTime: "09:00",
+        spotRegistrationDesk: "Registration Desk",
         showParticipation: true,
         showMemberYear: true,
         firstPrize: "",
@@ -254,6 +259,101 @@ export default function EventsManagement() {
     };
 
 
+    const switchAllToSpotRegistration = async () => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can switch all events to spot registration.");
+            return;
+        }
+
+        const eligibleEvents = events.filter(
+            (event) => (event.registrationMode || "online") !== "none"
+        );
+
+        if (eligibleEvents.length === 0) {
+            toastError("No registrable events found.");
+            return;
+        }
+
+        if (
+            !confirm(
+                `Switch ${eligibleEvents.length} event(s) to Spot Registration?\n\n` +
+                `Online registration will be disabled for all eligible events.\n` +
+                `Spot registration will remain OFF until its configured date/time and the Super Admin enables it.`
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            eligibleEvents.forEach((event) => {
+                batch.update(doc(db, "events", event.id), {
+                    registrationMode: "spot",
+                    registrationOpen: false,
+                    spotRegistrationOpen: false,
+                });
+            });
+            await batch.commit();
+
+            setEvents((prev) =>
+                prev.map((event) =>
+                    (event.registrationMode || "online") !== "none"
+                        ? {
+                              ...event,
+                              registrationMode: "spot",
+                              registrationOpen: false,
+                              spotRegistrationOpen: false,
+                          }
+                        : event
+                )
+            );
+
+            toastSuccess(`All ${eligibleEvents.length} registrable events switched to Spot Registration.`);
+        } catch (error) {
+            console.error("Bulk spot registration switch failed:", error);
+            toastError("Failed to switch all events to Spot Registration.");
+        }
+    };
+
+    const closeAllSpotRegistrations = async () => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can close spot registrations.");
+            return;
+        }
+
+        const spotEvents = events.filter(
+            (event) => (event.registrationMode || "online") === "spot"
+        );
+
+        if (spotEvents.length === 0) {
+            toastError("No events are currently in Spot Registration mode.");
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            spotEvents.forEach((event) => {
+                batch.update(doc(db, "events", event.id), {
+                    spotRegistrationOpen: false,
+                });
+            });
+            await batch.commit();
+
+            setEvents((prev) =>
+                prev.map((event) =>
+                    (event.registrationMode || "online") === "spot"
+                        ? { ...event, spotRegistrationOpen: false }
+                        : event
+                )
+            );
+
+            toastSuccess(`Spot registration closed for all ${spotEvents.length} spot event(s).`);
+        } catch (error) {
+            console.error("Bulk spot registration close failed:", error);
+            toastError("Failed to close all spot registrations.");
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!isSuperAdmin) {
             toastError("Only Super Admin can delete events.");
@@ -404,6 +504,11 @@ export default function EventsManagement() {
                 endDate: event.endDate || event.startDate || event.date || "",
                 registrationMode: event.department === "Expo" ? "none" : (event.registrationMode || "online"),
                 registrationOpen: event.registrationOpen !== false,
+                spotRegistrationOpen: event.spotRegistrationOpen === true,
+                spotRegistrationDate: event.spotRegistrationDate || event.startDate || event.date || "",
+                spotRegistrationTime: event.spotRegistrationTime || "09:00",
+                spotRegistrationDesk: event.spotRegistrationDesk || "Registration Desk",
+                spotRegistrationStartsAt: event.spotRegistrationStartsAt || null,
                 showParticipation: event.showParticipation !== false,
                 showPrizePool: event.showPrizePool === true,
                 prizePool: event.prizePool || "",
@@ -586,6 +691,18 @@ export default function EventsManagement() {
                 registrationMode: finalRegistrationMode,
                 isFree: registrationMode === "none" ? true : Boolean(formData.isFree),
                 registrationOpen: finalRegistrationMode === "online" ? formData.registrationOpen !== false : false,
+                spotRegistrationOpen: finalRegistrationMode === "spot" ? formData.spotRegistrationOpen === true : false,
+                spotRegistrationDate: formData.spotRegistrationDate || formData.startDate || formData.date || "",
+                spotRegistrationTime: formData.spotRegistrationTime || "09:00",
+                spotRegistrationDesk: formData.spotRegistrationDesk || "Registration Desk",
+                spotRegistrationStartsAt: (() => {
+                    const value = formData.spotRegistrationDate || formData.startDate || formData.date || "";
+                    if (!value) return null;
+                    const [day, month, year] = value.split("-").map(Number);
+                    const [hours, minutes] = String(formData.spotRegistrationTime || "09:00").split(":").map(Number);
+                    if (!day || !month || !year) return null;
+                    return Timestamp.fromDate(new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0));
+                })(),
                 // Legacy events default to collecting Year unless explicitly turned off.
                 showMemberYear: formData.showMemberYear !== false,
                 showParticipation: finalRegistrationMode === "none" ? false : formData.showParticipation !== false,
@@ -635,6 +752,20 @@ export default function EventsManagement() {
                             >
                                 <FiPower size={18} />
                                 {events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "Close All Online Registrations" : "Open All Online Registrations"}
+                            </button>
+                            <button
+                                onClick={switchAllToSpotRegistration}
+                                disabled={events.filter(e => (e.registrationMode || "online") !== "none").length === 0}
+                                className="w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors bg-amber-600/20 text-amber-200 border border-amber-500/30 hover:bg-amber-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <FiPower size={18} /> Switch All to Spot
+                            </button>
+                            <button
+                                onClick={closeAllSpotRegistrations}
+                                disabled={events.filter(e => (e.registrationMode || "online") === "spot").length === 0}
+                                className="w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <FiPower size={18} /> Close All Spot
                             </button>
                             <button
                                 onClick={() => startEdit()}
@@ -905,6 +1036,33 @@ export default function EventsManagement() {
                                             }}
                                             className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none date-picker-invert"
                                         />
+                                    </div>
+                                )}
+
+                                {formData.registrationMode === "spot" && (
+                                    <div className="space-y-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-amber-200 mb-1">Spot Registration Starts</label>
+                                            <p className="text-xs text-gray-500">After this date and time, the public event page will show the Spot Registration button.</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Date</label>
+                                                <input type="date" value={formData.spotRegistrationDate ? formData.spotRegistrationDate.split('-').reverse().join('-') : ''} onChange={(e) => setFormData({ ...formData, spotRegistrationDate: e.target.value ? e.target.value.split('-').reverse().join('-') : '' })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none date-picker-invert" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Time</label>
+                                                <input type="time" value={formData.spotRegistrationTime || '09:00'} onChange={(e) => setFormData({ ...formData, spotRegistrationTime: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-1">Registration Desk</label>
+                                            <input type="text" value={formData.spotRegistrationDesk || 'Registration Desk'} onChange={(e) => setFormData({ ...formData, spotRegistrationDesk: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none" />
+                                        </div>
+                                        <label className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-black/30 px-4 py-3 cursor-pointer">
+                                            <input type="checkbox" checked={formData.spotRegistrationOpen === true} onChange={(e) => setFormData({ ...formData, spotRegistrationOpen: e.target.checked, registrationOpen: false })} className="h-4 w-4 accent-amber-500" />
+                                            <span className="text-sm text-amber-100">Enable Spot Registration</span>
+                                        </label>
                                     </div>
                                 )}
 

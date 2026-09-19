@@ -429,6 +429,45 @@ export default function UsersManagement() {
 
             await batch.commit();
 
+            if (event.registrationMode === "spot") {
+                try {
+                    const ticketResponse = await fetch("/api/events/send-spot-ticket", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            registrationId: registrationRef.id,
+                            event,
+                            registration: {
+                                ...manualForm,
+                                userId: registeringUser.id,
+                                userEmail: registeringUser.email || manualForm.leaderEmail,
+                                userName: registeringUser.name || manualForm.leaderName,
+                                leaderName: registeringUser.name || manualForm.leaderName,
+                                leaderEmail: registeringUser.email || manualForm.leaderEmail,
+                                leaderMobile: manualForm.leaderMobile,
+                                leaderCollege: registeringUser.college || manualForm.leaderCollege,
+                                teamSize,
+                                teamMembers: cleanedMembers,
+                            },
+                        }),
+                    });
+                    const ticketResult = await ticketResponse.json().catch(() => ({}));
+                    if (!ticketResponse.ok) {
+                        console.error("Spot ticket email failed for manual registration");
+                        toastError("Registration was added, but the ticket email could not be sent.");
+                    } else if (ticketResult.ticketNumber) {
+                        await updateDoc(registrationRef, {
+                            ticketNumber: ticketResult.ticketNumber,
+                            ticketEmailStatus: "sent",
+                            ticketEmailedAt: new Date(),
+                        });
+                    }
+                } catch (ticketError) {
+                    console.error("Spot ticket email failed:", ticketError);
+                    toastError("Registration was added, but the ticket email could not be sent.");
+                }
+            }
+
             setUsers((current) =>
                 current.map((u) =>
                     u.id === registeringUser.id

@@ -28,6 +28,14 @@ function getDeadline(event: Event): Date | null {
   return deadline;
 }
 
+function getSpotStart(event: Event): Date | null {
+  if (!event.spotRegistrationDate) return null;
+  const [day, month, year] = event.spotRegistrationDate.split("-").map(Number);
+  if (!day || !month || !year) return null;
+  const [hours, minutes] = String(event.spotRegistrationTime || "09:00").split(":").map(Number);
+  return new Date(year, month - 1, day, Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0, 0, 0);
+}
+
 export default function RegisterButtonSection({ event }: Props) {
   const { user } = useAuth();
   const router = useRouter();
@@ -93,10 +101,41 @@ export default function RegisterButtonSection({ event }: Props) {
   }
 
   if (registrationMode === "spot") {
+    const spotStart = getSpotStart(event);
+    const spotReady = event.spotRegistrationOpen === true && (!spotStart || new Date() >= spotStart);
+    const spotDateText = event.spotRegistrationDate ? event.spotRegistrationDate : "TBA";
+    const spotTimeText = event.spotRegistrationTime || "09:00";
+
+    if (!spotReady) {
+      return (
+        <div className="w-full rounded-2xl p-4 bg-amber-950/30 border border-amber-500/30 text-amber-200 text-center font-semibold">
+          <div>Spot Registration Starts</div>
+          <div className="text-sm mt-1 text-amber-100/80">{spotDateText} · {spotTimeText}</div>
+          <div className="text-xs mt-1 text-amber-100/60">{event.spotRegistrationDesk || "Registration Desk"}</div>
+        </div>
+      );
+    }
+
+    if (checking) {
+      return <button disabled className="btn-gold w-full rounded-full p-4 opacity-60">Checking registration...</button>;
+    }
+
+    if (registered) {
+      return <button disabled className="w-full rounded-full p-4 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold">✓ Registered</button>;
+    }
+
+    if (!user) {
+      return (
+        <button onClick={() => { toastError("Please login to register for this event."); router.push("/login"); }} className="btn-gold group relative flex items-center justify-center gap-3 w-full rounded-full p-4">
+          <span className="text-lg font-bold text-[#0B0B0E]">Login to Register</span><FaArrowRight className="text-[#0B0B0E]" />
+        </button>
+      );
+    }
+
     return (
-      <div className="w-full rounded-2xl p-4 bg-amber-950/30 border border-amber-500/30 text-amber-200 text-center font-semibold">
-        Spot Registration Available at the Venue
-      </div>
+      <Link href={`/events/${event.id}/register`} className="btn-gold group relative flex items-center justify-center gap-3 w-full rounded-full p-4">
+        <span className="text-lg font-bold text-[#0B0B0E]">Register at Spot</span><FaArrowRight className="text-[#0B0B0E]" />
+      </Link>
     );
   }
 

@@ -209,18 +209,30 @@ service cloud.firestore {
             &&
 
             (
-              !(
-                'registrationOpen'
-                in get(
-                  /databases/$(database)/documents/events/$(request.resource.data.eventId)
-                ).data
+              (
+                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationMode == 'spot'
+                &&
+                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.spotRegistrationOpen == true
+                &&
+                (
+                  !('spotRegistrationStartsAt' in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data)
+                  ||
+                  get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.spotRegistrationStartsAt <= request.time
+                )
               )
-
               ||
-
-              get(
-                /databases/$(database)/documents/events/$(request.resource.data.eventId)
-              ).data.registrationOpen == true
+              (
+                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationMode != 'spot'
+                &&
+                (
+                  !(
+                    'registrationOpen'
+                    in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data
+                  )
+                  ||
+                  get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationOpen == true
+                )
+              )
             )
           )
         )

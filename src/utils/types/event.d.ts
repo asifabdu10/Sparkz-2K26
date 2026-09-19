@@ -42,6 +42,14 @@ export type Event = {
     /** Online registration, on-site/spot registration, or Expo/informational event only. */
     registrationMode?: "online" | "spot" | "none";
     registrationOpen?: boolean;
+    /** Super Admin-controlled spot registration switch. */
+    spotRegistrationOpen?: boolean;
+    /** Date/time when spot registration should become visible on the public event page. */
+    spotRegistrationDate?: string;
+    spotRegistrationTime?: string;
+    spotRegistrationStartsAt?: unknown;
+    /** Optional desk label shown to attendees. */
+    spotRegistrationDesk?: string;
     /** Controls whether participation/member information is shown on the public event page. */
     showParticipation?: boolean;
     /** Optional total prize pool amount, e.g. "₹ 5000". */

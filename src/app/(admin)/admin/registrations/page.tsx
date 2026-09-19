@@ -264,6 +264,8 @@ export default function RegistrationsManagement() {
           "Registration Status": String(reg.status || ""),
           "Payment Status": String(reg.paymentStatus || ""),
           "Registration Method": String(reg.registrationMethod || "online"),
+          "Ticket Number": String(reg.ticketNumber || ""),
+          "Ticket Email Status": String(reg.ticketEmailStatus || ""),
           "Registered By": String(reg.registeredBy || ""),
           Name: getRegistrationName(reg),
           Email: getRegistrationEmail(reg),
@@ -522,6 +524,37 @@ export default function RegistrationsManagement() {
           Export Excel Report
         </button>
       </div>
+
+      {events.some((event) => event.registrationMode === "spot" && event.spotRegistrationOpen === true) && (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-950/20 p-5 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Registration Desk</p>
+              <h2 className="text-xl font-bold mt-1">Spot Registration Status</h2>
+              <p className="text-sm text-gray-500 mt-1">Use this live summary at the on-site registration desk.</p>
+            </div>
+            <div className="text-sm text-amber-200">{new Date().toLocaleString()}</div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {events.filter((event) => event.registrationMode === "spot" && event.spotRegistrationOpen === true).map((event) => {
+              const eventRegs = registrations.filter((registration) => registration.eventId === event.id);
+              const members = eventRegs.reduce((total, registration) => total + getMemberCount(registration), 0);
+              const start = event.spotRegistrationDate ? `${event.spotRegistrationDate}${event.spotRegistrationTime ? ` · ${event.spotRegistrationTime}` : ""}` : "Time not set";
+              return (
+                <div key={event.id} className="rounded-xl border border-amber-500/20 bg-black/20 p-4">
+                  <p className="font-semibold text-white">{event.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">{event.spotRegistrationDesk || "Registration Desk"}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <div><p className="text-[10px] uppercase text-gray-500">Registrations</p><p className="text-xl font-bold text-amber-200">{eventRegs.length}</p></div>
+                    <div><p className="text-[10px] uppercase text-gray-500">Members</p><p className="text-xl font-bold text-amber-200">{members}</p></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">Spot start: {start}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
