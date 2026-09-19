@@ -315,6 +315,80 @@ export default function EventsManagement() {
         }
     };
 
+    const switchEventBackToOnline = async (event: Event) => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can switch event registration mode.");
+            return;
+        }
+
+        if (!confirm(`Switch "${event.title}" back to Online Registration?\n\nOnline registration will be opened and Spot Registration will be disabled.`)) {
+            return;
+        }
+
+        try {
+            await updateDoc(doc(db, "events", event.id), {
+                registrationMode: "online",
+                registrationOpen: true,
+                spotRegistrationOpen: false,
+            });
+            setEvents(prev => prev.map(e => e.id === event.id ? {
+                ...e,
+                registrationMode: "online",
+                registrationOpen: true,
+                spotRegistrationOpen: false,
+            } : e));
+            toastSuccess(`${event.title}: switched back to Online Registration`);
+        } catch (error) {
+            console.error("Switch back to online failed:", error);
+            toastError("Failed to switch event back to Online Registration.");
+        }
+    };
+
+    const switchAllBackToOnlineRegistration = async () => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can switch all events back to online registration.");
+            return;
+        }
+
+        const spotEvents = events.filter(
+            event => (event.registrationMode || "online") === "spot"
+        );
+
+        if (spotEvents.length === 0) {
+            toastError("No events are currently in Spot Registration mode.");
+            return;
+        }
+
+        if (!confirm(
+            `Switch ${spotEvents.length} spot event(s) back to Online Registration?\n\n` +
+            `Online registration will be opened and Spot Registration will be disabled.`
+        )) {
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            spotEvents.forEach(event => {
+                batch.update(doc(db, "events", event.id), {
+                    registrationMode: "online",
+                    registrationOpen: true,
+                    spotRegistrationOpen: false,
+                });
+            });
+            await batch.commit();
+
+            setEvents(prev => prev.map(event =>
+                (event.registrationMode || "online") === "spot"
+                    ? { ...event, registrationMode: "online", registrationOpen: true, spotRegistrationOpen: false }
+                    : event
+            ));
+            toastSuccess(`All ${spotEvents.length} spot event(s) switched back to Online Registration.`);
+        } catch (error) {
+            console.error("Bulk switch back to online failed:", error);
+            toastError("Failed to switch events back to Online Registration.");
+        }
+    };
+
     const closeAllSpotRegistrations = async () => {
         if (!isSuperAdmin) {
             toastError("Only Super Admin can close spot registrations.");
@@ -625,6 +699,15 @@ export default function EventsManagement() {
             return toastError("Registration Fee is required");
         }
 
+        if (registrationMode === "spot") {
+            if (!formData.spotRegistrationDate) {
+                return toastError("Spot Registration Date is required");
+            }
+            if (!formData.spotRegistrationTime) {
+                return toastError("Spot Registration Time is required");
+            }
+        }
+
         if (!formData.coordinators || formData.coordinators.length === 0 || !formData.coordinators[0].name || !formData.coordinators[0].phone) {
             return toastError("At least one Coordinator is required");
         }
@@ -766,6 +849,13 @@ export default function EventsManagement() {
                                 className="w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <FiPower size={18} /> Close All Spot
+                            </button>
+                            <button
+                                onClick={switchAllBackToOnlineRegistration}
+                                disabled={events.filter(e => (e.registrationMode || "online") === "spot").length === 0}
+                                className="w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors bg-emerald-600/20 text-emerald-200 border border-emerald-500/30 hover:bg-emerald-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <FiPower size={18} /> Back All to Online
                             </button>
                             <button
                                 onClick={() => startEdit()}
@@ -1047,11 +1137,11 @@ export default function EventsManagement() {
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Date</label>
+                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Date <span className="text-red-500">*</span></label>
                                                 <input type="date" value={formData.spotRegistrationDate ? formData.spotRegistrationDate.split('-').reverse().join('-') : ''} onChange={(e) => setFormData({ ...formData, spotRegistrationDate: e.target.value ? e.target.value.split('-').reverse().join('-') : '' })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none date-picker-invert" />
                                             </div>
                                             <div>
-                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Time</label>
+                                                <label className="block text-sm text-gray-400 mb-1">Spot Registration Time <span className="text-red-500">*</span></label>
                                                 <input type="time" value={formData.spotRegistrationTime || '09:00'} onChange={(e) => setFormData({ ...formData, spotRegistrationTime: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none" />
                                             </div>
                                         </div>
@@ -1531,6 +1621,14 @@ export default function EventsManagement() {
                                             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${event.registrationOpen === false ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-red-300 border-red-500/30 hover:bg-red-600/10"}`}
                                         >
                                             {event.registrationOpen === false ? "Open" : "Close"}
+                                        </button>
+                                    )}
+                                    {isSuperAdmin && (event.registrationMode || "online") === "spot" && (
+                                        <button
+                                            onClick={() => switchEventBackToOnline(event)}
+                                            className="text-xs px-3 py-1.5 rounded-lg border text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10 transition-colors"
+                                        >
+                                            Back to Online
                                         </button>
                                     )}
                                 </div>
