@@ -19,9 +19,11 @@ import {
   FiUsers,
   FiUserX,
   FiX,
+  FiPlus,
+  FiTrash2,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
-import { Event } from "@/utils/types/event";
+import { Event, RegistrationField } from "@/utils/types/event";
 
 interface UserRegistration {
   id: string;
@@ -45,6 +47,38 @@ const getMemberCount = (registration: UserRegistration) => {
   }
 
   return 1;
+};
+
+const baseMemberFields: RegistrationField[] = [
+  { name: "Phone Number", type: "tel", required: true },
+  { name: "School / College", type: "text", required: true },
+  { name: "Department / Class", type: "text", required: true },
+  { name: "Year", type: "text", required: true },
+];
+
+const memberInputType = (type: RegistrationField["type"]) => {
+  if (type === "email") return "email";
+  if (type === "number") return "number";
+  if (type === "date") return "date";
+  if (type === "tel") return "tel";
+  return "text";
+};
+
+const getMemberFields = (event: Event): RegistrationField[] => {
+  if (event.eveType !== "team") return [];
+  if (event.department === "Football") return [{ name: "Phone Number", type: "tel", required: true }];
+  const custom = event.teamMemberFields || [];
+  const customNames = new Set(custom.map((field) => field.name.toLowerCase().trim()));
+  return [
+    ...baseMemberFields.filter((field) => !customNames.has(field.name.toLowerCase().trim())),
+    ...custom,
+  ].filter((field) => event.showMemberYear !== false || field.name.toLowerCase().trim() !== "year");
+};
+
+const emptyTeamMember = (fields: RegistrationField[]): Record<string, string> => {
+  const member: Record<string, string> = { name: "" };
+  fields.forEach((field) => { member[field.name] = ""; });
+  return member;
 };
 
 const getDepartment = (event: Event) => event.department || "Other";
@@ -109,6 +143,9 @@ export default function RegistrationsManagement() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedRegistration, setSelectedRegistration] =
     useState<UserRegistration | null>(null);
+  const [editingTeamMembers, setEditingTeamMembers] =
+    useState<Record<string, string>[]>([]);
+  const [savingTeamMembers, setSavingTeamMembers] = useState(false);
 
   const isSuperAdmin = userData?.role === "superAdmin";
 
@@ -312,6 +349,110 @@ export default function RegistrationsManagement() {
       workbook,
       `${summary.event.title.replace(/[^a-z0-9_-]/gi, "_")}_Registrations.xlsx`
     );
+  };
+
+  const openRegistrationDetails = (registration: UserRegistration) => {
+    setSelectedRegistration(registration);
+    setEditingTeamMembers(
+      Array.isArray(registration.teamMembers)
+        ? registration.teamMembers.map((member: Record<string, unknown>) =>
+            Object.fromEntries(Object.entries(member).map(([key, value]) => [key, String(value ?? "")]))
+          )
+        : []
+    );
+  };
+
+  const selectedRegistrationEvent = selectedRegistration
+    ? events.find((event) => event.id === selectedRegistration.eventId) || null
+    : null;
+
+  const selectedMemberFields = selectedRegistrationEvent
+    ? getMemberFields(selectedRegistrationEvent)
+    : [];
+
+  const selectedMinMembers = selectedRegistrationEvent?.eveType === "team"
+    ? selectedRegistrationEvent.department === "Football"
+      ? 1
+      : Math.max(1, Number(selectedRegistrationEvent.memberMinCount) || 1)
+    : 1;
+  const selectedMaxMembers = selectedRegistrationEvent?.eveType === "team"
+    ? selectedRegistrationEvent.department === "Football"
+      ? Infinity
+      : Math.max(selectedMinMembers, Number(selectedRegistrationEvent.memberMaxCount) || selectedMinMembers)
+    : 1;
+
+  const addTeamMember = () => {
+    if (!isSuperAdmin || !selectedRegistrationEvent || selectedRegistrationEvent.eveType !== "team") return;
+    const currentTeamSize = editingTeamMembers.length + 1;
+    if (selectedRegistrationEvent.department !== "Football" && currentTeamSize >= selectedMaxMembers) {
+      toastError(`Maximum team size is ${selectedMaxMembers} members.`);
+      return;
+    }
+    setEditingTeamMembers((current) => [...current, emptyTeamMember(selectedMemberFields)]);
+  };
+
+  const removeTeamMember = (index: number) => {
+    if (!isSuperAdmin) return;
+    if (editingTeamMembers.length <= selectedMinMembers - 1) {
+      toastError(`Minimum team size is ${selectedMinMembers} members including the leader.`);
+      return;
+    }
+    setEditingTeamMembers((current) => current.filter((_, i) => i !== index));
+  };
+
+  const saveTeamMembers = async () => {
+    if (!isSuperAdmin || !selectedRegistration || !selectedRegistrationEvent) return;
+    if (selectedRegistrationEvent.eveType !== "team") {
+      toastError("This is not a team event.");
+      return;
+    }
+    const teamSize = editingTeamMembers.length + 1;
+    if (teamSize < selectedMinMembers || teamSize > selectedMaxMembers) {
+      toastError(`Team size must be between ${selectedMinMembers} and ${selectedMaxMembers} members.`);
+      return;
+    }
+    for (let index = 0; index < editingTeamMembers.length; index += 1) {
+      const member = editingTeamMembers[index];
+      if (!String(member.name || "").trim()) {
+        toastError(`Member ${index + 2} name is required.`);
+        return;
+      }
+      for (const field of selectedMemberFields) {
+        if (field.required && !String(member[field.name] || "").trim()) {
+          toastError(`Member ${index + 2}: ${field.name} is required.`);
+          return;
+        }
+      }
+    }
+    const cleanedMembers = editingTeamMembers.map((member) => {
+      if (selectedRegistrationEvent.showMemberYear === false) {
+        const { Year, ...rest } = member;
+        void Year;
+        return rest;
+      }
+      return member;
+    });
+    try {
+      setSavingTeamMembers(true);
+      await updateDoc(doc(db, "registrations", selectedRegistration.id), {
+        teamMembers: cleanedMembers,
+        teamSize,
+        updatedAt: new Date(),
+      });
+      setRegistrations((current) => current.map((registration) =>
+        registration.id === selectedRegistration.id
+          ? { ...registration, teamMembers: cleanedMembers, teamSize }
+          : registration
+      ));
+      setSelectedRegistration((current) => current ? { ...current, teamMembers: cleanedMembers, teamSize } : current);
+      setEditingTeamMembers(cleanedMembers);
+      toastSuccess("Team members updated successfully");
+    } catch (error) {
+      console.error("Error updating team members:", error);
+      toastError("Failed to update team members");
+    } finally {
+      setSavingTeamMembers(false);
+    }
   };
 
   const deregisterUser = async (registration: UserRegistration) => {
@@ -638,7 +779,7 @@ export default function RegistrationsManagement() {
                         </td>
                         <td className="px-5 py-4">
                           <button
-                            onClick={() => setSelectedRegistration(registration)}
+                            onClick={() => openRegistrationDetails(registration)}
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm"
                           >
                             <FiEye /> View
@@ -703,24 +844,42 @@ export default function RegistrationsManagement() {
                 ))}
               </div>
 
-              {Array.isArray(selectedRegistration.teamMembers) && selectedRegistration.teamMembers.length > 0 && (
+              {selectedRegistrationEvent?.eveType === "team" && (
                 <div>
-                  <h4 className="font-semibold mb-3">Team Members</h4>
-                  <div className="space-y-2">
-                    {selectedRegistration.teamMembers.map((member: Record<string, unknown>, index: number) => (
-                      <div key={index} className="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
-                        <p className="font-medium mb-2">Member {index + 2}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Object.entries(member).map(([key, value]) => (
-                            <div key={key} className="text-sm">
-                              <span className="text-gray-500">{key}: </span>
-                              <span className="text-gray-200">{formatValue(value)}</span>
-                            </div>
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <h4 className="font-semibold">Team Members</h4>
+                      <p className="text-xs text-gray-500 mt-1">Current team size: {editingTeamMembers.length + 1} / {selectedRegistrationEvent.department === "Football" ? "Unlimited" : `${selectedMinMembers}-${selectedMaxMembers}`}</p>
+                    </div>
+                    {isSuperAdmin && (
+                      <button type="button" onClick={addTeamMember} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium">
+                        <FiPlus /> Add Team Member
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {editingTeamMembers.map((member, index) => (
+                      <div key={index} className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 relative">
+                        {isSuperAdmin && (
+                          <button type="button" onClick={() => removeTeamMember(index)} className="absolute right-3 top-3 text-gray-500 hover:text-red-400" title="Remove member"><FiTrash2 /></button>
+                        )}
+                        <p className="font-medium mb-3 text-indigo-300">Member {index + 2}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pr-6">
+                          <label className="block"><span className="text-xs text-gray-500">Name *</span><input disabled={!isSuperAdmin} value={member.name || ""} onChange={(e) => setEditingTeamMembers((current) => current.map((m, i) => i === index ? { ...m, name: e.target.value } : m))} className="mt-1 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm disabled:opacity-70" /></label>
+                          {selectedMemberFields.map((field) => (
+                            <label key={field.name} className="block"><span className="text-xs text-gray-500">{field.name} {field.required && "*"}</span><input disabled={!isSuperAdmin} type={memberInputType(field.type)} value={member[field.name] || ""} onChange={(e) => setEditingTeamMembers((current) => current.map((m, i) => i === index ? { ...m, [field.name]: e.target.value } : m))} className="mt-1 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm disabled:opacity-70" /></label>
                           ))}
                         </div>
                       </div>
                     ))}
                   </div>
+                  {isSuperAdmin && (
+                    <div className="flex justify-end mt-4">
+                      <button type="button" onClick={() => void saveTeamMembers()} disabled={savingTeamMembers} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 font-semibold text-sm">
+                        {savingTeamMembers ? "Saving..." : "Save Team Members"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

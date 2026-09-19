@@ -289,9 +289,15 @@ service cloud.firestore {
 
           ||
 
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin'
+          (
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role == 'admin'
+            &&
+            request.resource.data.teamMembers == resource.data.teamMembers
+            &&
+            request.resource.data.teamSize == resource.data.teamSize
+          )
         );
 
 

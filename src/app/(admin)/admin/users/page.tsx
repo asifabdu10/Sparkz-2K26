@@ -20,10 +20,35 @@ import {
     FiX,
     FiUserPlus,
     FiMusic,
+    FiPlus,
+    FiTrash2,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments } from "@/utils/constants/Constants";
-import { Event } from "@/utils/types/event";
+import { Event, RegistrationField } from "@/utils/types/event";
+
+type MemberData = Record<string, string>;
+
+const baseMemberFields: RegistrationField[] = [
+    { name: "Phone Number", type: "tel", required: true },
+    { name: "School / College", type: "text", required: true },
+    { name: "Department / Class", type: "text", required: true },
+    { name: "Year", type: "text", required: true },
+];
+
+function emptyMember(fields: RegistrationField[]): MemberData {
+    const member: MemberData = { name: "" };
+    fields.forEach((field) => { member[field.name] = ""; });
+    return member;
+}
+
+function inputType(type: RegistrationField["type"]): string {
+    if (type === "email") return "email";
+    if (type === "number") return "number";
+    if (type === "date") return "date";
+    if (type === "tel") return "tel";
+    return "text";
+}
 
 interface UserData {
     id: string;
@@ -52,6 +77,13 @@ export default function UsersManagement() {
     const [registeringUser, setRegisteringUser] = useState<UserData | null>(null);
     const [selectedEventId, setSelectedEventId] = useState("");
     const [registering, setRegistering] = useState(false);
+    const [manualForm, setManualForm] = useState({
+        leaderMobile: "",
+        leaderDepartment: "",
+        leaderYear: "",
+        extraData: {} as Record<string, string>,
+        teamMembers: [] as MemberData[],
+    });
 
     const [abheriUser, setAbheriUser] = useState<UserData | null>(null);
     const [abheriRegistering, setAbheriRegistering] = useState(false);
@@ -189,10 +221,87 @@ export default function UsersManagement() {
         setSelectedEventId("");
     };
 
+    const selectedManualEvent = useMemo(
+        () => events.find((item) => item.id === selectedEventId) || null,
+        [events, selectedEventId]
+    );
+
+    const manualMemberFields = useMemo<RegistrationField[]>(() => {
+        if (!selectedManualEvent || selectedManualEvent.eveType !== "team") return [];
+        if (selectedManualEvent.department === "Football") {
+            return [{ name: "Phone Number", type: "tel", required: true }];
+        }
+        const custom = selectedManualEvent.teamMemberFields || [];
+        const collectYear = selectedManualEvent.showMemberYear !== false;
+        const customNames = new Set(custom.map((field) => field.name.toLowerCase().trim()));
+        return [
+            ...baseMemberFields.filter((field) => !customNames.has(field.name.toLowerCase().trim())),
+            ...custom,
+        ].filter((field) => collectYear || field.name.toLowerCase().trim() !== "year");
+    }, [selectedManualEvent]);
+
+    const manualMinMembers = selectedManualEvent?.eveType === "team"
+        ? selectedManualEvent.department === "Football"
+            ? 1
+            : Math.max(1, Number(selectedManualEvent.memberMinCount) || 1)
+        : 1;
+    const manualMaxMembers = selectedManualEvent?.eveType === "team"
+        ? selectedManualEvent.department === "Football"
+            ? Infinity
+            : Math.max(manualMinMembers, Number(selectedManualEvent.memberMaxCount) || manualMinMembers)
+        : 1;
+
     const closeRegisterModal = () => {
         if (registering) return;
         setRegisteringUser(null);
         setSelectedEventId("");
+        setManualForm({ leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
+    };
+
+    const handleManualEventChange = (eventId: string) => {
+        setSelectedEventId(eventId);
+        const nextEvent = events.find((item) => item.id === eventId);
+        if (!nextEvent) {
+            setManualForm({ leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
+            return;
+        }
+        const min = nextEvent.eveType === "team"
+            ? nextEvent.department === "Football" ? 1 : Math.max(1, Number(nextEvent.memberMinCount) || 1)
+            : 1;
+        const custom = nextEvent.department === "Football"
+            ? [{ name: "Phone Number", type: "tel", required: true } as RegistrationField]
+            : (() => {
+                const fields = nextEvent.teamMemberFields || [];
+                const names = new Set(fields.map((field) => field.name.toLowerCase().trim()));
+                return [...baseMemberFields.filter((field) => !names.has(field.name.toLowerCase().trim())), ...fields]
+                    .filter((field) => nextEvent.showMemberYear !== false || field.name.toLowerCase().trim() !== "year");
+            })();
+        setManualForm({
+            leaderMobile: "",
+            leaderDepartment: "",
+            leaderYear: "",
+            extraData: {},
+            teamMembers: nextEvent.eveType === "team"
+                ? Array.from({ length: Math.max(0, min - 1) }, () => emptyMember(custom))
+                : [],
+        });
+    };
+
+    const addManualMember = () => {
+        if (!selectedManualEvent || selectedManualEvent.eveType !== "team") return;
+        if (selectedManualEvent.department !== "Football" && manualForm.teamMembers.length + 1 >= manualMaxMembers) {
+            toastError(`Maximum team size is ${manualMaxMembers} members.`);
+            return;
+        }
+        setManualForm((current) => ({ ...current, teamMembers: [...current.teamMembers, emptyMember(manualMemberFields)] }));
+    };
+
+    const removeManualMember = (index: number) => {
+        if (manualForm.teamMembers.length <= manualMinMembers - 1) {
+            toastError(`Minimum team size is ${manualMinMembers} members including the leader.`);
+            return;
+        }
+        setManualForm((current) => ({ ...current, teamMembers: current.teamMembers.filter((_, i) => i !== index) }));
     };
 
     const registerUserForEvent = async () => {
@@ -213,13 +322,8 @@ export default function UsersManagement() {
             return;
         }
 
-        if ((event.registrationMode || "online") !== "online") {
-            toastError("This event does not accept online registration.");
-            return;
-        }
-
-        if (event.registrationOpen === false) {
-            toastError("Registration for this event is closed.");
+        if ((event.registrationMode || "online") === "none") {
+            toastError("Expo events cannot be registered online.");
             return;
         }
 
@@ -250,6 +354,44 @@ export default function UsersManagement() {
                 collection(db, "registrations")
             );
 
+            const teamSize = event.eveType === "team" ? 1 + manualForm.teamMembers.length : 1;
+            const minMembers = event.eveType === "team" ? (event.department === "Football" ? 1 : Math.max(1, Number(event.memberMinCount) || 1)) : 1;
+            const maxMembers = event.eveType === "team" ? (event.department === "Football" ? Infinity : Math.max(minMembers, Number(event.memberMaxCount) || minMembers)) : 1;
+            if (event.eveType === "team" && (teamSize < minMembers || teamSize > maxMembers)) {
+                toastError(`Team size must be between ${minMembers} and ${maxMembers} members.`);
+                return;
+            }
+            if (event.eveType === "team") {
+                for (let index = 0; index < manualForm.teamMembers.length; index += 1) {
+                    const member = manualForm.teamMembers[index];
+                    if (!String(member.name || "").trim()) {
+                        toastError(`Member ${index + 2} name is required.`);
+                        return;
+                    }
+                    for (const field of manualMemberFields) {
+                        if (field.required && !String(member[field.name] || "").trim()) {
+                            toastError(`Member ${index + 2}: ${field.name} is required.`);
+                            return;
+                        }
+                    }
+                }
+            }
+            for (const field of event.extraFields || []) {
+                if (field.required && !String(manualForm.extraData[field.name] || "").trim()) {
+                    toastError(`${field.name} is required.`);
+                    return;
+                }
+            }
+
+            const cleanedMembers = manualForm.teamMembers.map((member) => {
+                if (event.showMemberYear === false) {
+                    const { Year, ...rest } = member;
+                    void Year;
+                    return rest;
+                }
+                return member;
+            });
+
             batch.set(registrationRef, {
                 eventId: event.id,
                 eventTitle: event.title,
@@ -260,15 +402,20 @@ export default function UsersManagement() {
                 email: registeringUser.email || "",
                 leaderName: registeringUser.name || "",
                 leaderEmail: registeringUser.email || "",
+                leaderMobile: manualForm.leaderMobile || "",
                 leaderCollege: registeringUser.college || "",
+                leaderDepartment: manualForm.leaderDepartment || "",
+                leaderYear: manualForm.leaderYear || "",
                 college: registeringUser.college || "",
+                department: event.department || "",
+                extraData: manualForm.extraData,
                 status: "registered",
                 paymentStatus: "admin",
                 registrationFee: 0,
                 registrationMethod: "superAdmin",
                 registeredBy: userData?.email || "",
-                teamSize: 1,
-                teamMembers: [],
+                teamSize,
+                teamMembers: cleanedMembers,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -739,7 +886,7 @@ export default function UsersManagement() {
             {/* Register User Modal */}
             {registeringUser && (
                 <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="w-full max-w-lg bg-[#0b0d14] border border-gray-800 rounded-2xl shadow-2xl p-6">
+                    <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-[#0b0d14] border border-gray-800 rounded-2xl shadow-2xl p-6">
                         <div className="flex items-start justify-between gap-4 mb-6">
                             <div>
                                 <h2 className="text-xl font-bold text-white">
@@ -765,7 +912,7 @@ export default function UsersManagement() {
 
                         <select
                             value={selectedEventId}
-                            onChange={(e) => setSelectedEventId(e.target.value)}
+                            onChange={(e) => handleManualEventChange(e.target.value)}
                             disabled={eventsLoading || registering}
                             className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                         >
@@ -792,6 +939,69 @@ export default function UsersManagement() {
                             <p className="text-sm text-amber-400 mt-2">
                                 No registrable events found.
                             </p>
+                        )}
+
+                        {selectedManualEvent && (
+                            <div className="mt-6 space-y-6">
+                                <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+                                    <h3 className="font-semibold text-white mb-4">Participant / Leader Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <label className="block">
+                                            <span className="block text-sm text-gray-400 mb-2">Phone Number *</span>
+                                            <input value={manualForm.leaderMobile} onChange={(e) => setManualForm((c) => ({ ...c, leaderMobile: e.target.value }))} className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm" />
+                                        </label>
+                                        {selectedManualEvent.department !== "Football" && (
+                                            <>
+                                                <label className="block">
+                                                    <span className="block text-sm text-gray-400 mb-2">Department / Class *</span>
+                                                    <input value={manualForm.leaderDepartment} onChange={(e) => setManualForm((c) => ({ ...c, leaderDepartment: e.target.value }))} className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm" />
+                                                </label>
+                                                {selectedManualEvent.showMemberYear !== false && (
+                                                    <label className="block">
+                                                        <span className="block text-sm text-gray-400 mb-2">Year *</span>
+                                                        <input value={manualForm.leaderYear} onChange={(e) => setManualForm((c) => ({ ...c, leaderYear: e.target.value }))} className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm" />
+                                                    </label>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </section>
+
+                                {selectedManualEvent.eveType === "team" && (
+                                    <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4 space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <h3 className="font-semibold text-white">Team Members</h3>
+                                                <p className="text-xs text-gray-500 mt-1">Current team size: {1 + manualForm.teamMembers.length} / {selectedManualEvent.department === "Football" ? "Unlimited" : `${manualMinMembers}-${manualMaxMembers}`}</p>
+                                            </div>
+                                            <button type="button" onClick={addManualMember} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium"><FiPlus /> Add Member</button>
+                                        </div>
+                                        {manualForm.teamMembers.map((member, index) => (
+                                            <div key={index} className="rounded-xl border border-gray-800 bg-gray-950/60 p-4 space-y-4 relative">
+                                                <button type="button" onClick={() => removeManualMember(index)} className="absolute right-3 top-3 text-gray-500 hover:text-red-400"><FiTrash2 /></button>
+                                                <h4 className="font-medium text-indigo-300">Member {index + 2}</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-6">
+                                                    <label className="block"><span className="block text-sm text-gray-400 mb-2">Name *</span><input value={member.name || ""} onChange={(e) => setManualForm((c) => ({ ...c, teamMembers: c.teamMembers.map((m, i) => i === index ? { ...m, name: e.target.value } : m) }))} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm" /></label>
+                                                    {manualMemberFields.map((field) => (
+                                                        <label key={field.name} className="block"><span className="block text-sm text-gray-400 mb-2">{field.name} {field.required && "*"}</span><input type={inputType(field.type)} value={member[field.name] || ""} onChange={(e) => setManualForm((c) => ({ ...c, teamMembers: c.teamMembers.map((m, i) => i === index ? { ...m, [field.name]: e.target.value } : m) }))} className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm" /></label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </section>
+                                )}
+
+                                {selectedManualEvent.extraFields && selectedManualEvent.extraFields.length > 0 && (
+                                    <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+                                        <h3 className="font-semibold text-white mb-4">Additional Event Details</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {selectedManualEvent.extraFields.map((field) => (
+                                                <label key={field.name} className="block"><span className="block text-sm text-gray-400 mb-2">{field.name} {field.required && "*"}</span><input type={inputType(field.type)} value={manualForm.extraData[field.name] || ""} onChange={(e) => setManualForm((c) => ({ ...c, extraData: { ...c.extraData, [field.name]: e.target.value } }))} className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm" /></label>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+                            </div>
                         )}
 
                         {selectedEventId && (
