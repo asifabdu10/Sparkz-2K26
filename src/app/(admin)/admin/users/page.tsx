@@ -77,13 +77,18 @@ export default function UsersManagement() {
     const [registeringUser, setRegisteringUser] = useState<UserData | null>(null);
     const [selectedEventId, setSelectedEventId] = useState("");
     const [registering, setRegistering] = useState(false);
-    const [manualForm, setManualForm] = useState({
+    const createEmptyManualForm = () => ({
+        leaderName: "",
+        leaderEmail: "",
         leaderMobile: "",
+        leaderCollege: "",
         leaderDepartment: "",
         leaderYear: "",
         extraData: {} as Record<string, string>,
         teamMembers: [] as MemberData[],
     });
+
+    const [manualForm, setManualForm] = useState(createEmptyManualForm());
 
     const [abheriUser, setAbheriUser] = useState<UserData | null>(null);
     const [abheriRegistering, setAbheriRegistering] = useState(false);
@@ -255,14 +260,14 @@ export default function UsersManagement() {
         if (registering) return;
         setRegisteringUser(null);
         setSelectedEventId("");
-        setManualForm({ leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
+        setManualForm(createEmptyManualForm());
     };
 
     const handleManualEventChange = (eventId: string) => {
         setSelectedEventId(eventId);
         const nextEvent = events.find((item) => item.id === eventId);
         if (!nextEvent) {
-            setManualForm({ leaderMobile: "", leaderDepartment: "", leaderYear: "", extraData: {}, teamMembers: [] });
+            setManualForm(createEmptyManualForm());
             return;
         }
         const min = nextEvent.eveType === "team"
@@ -277,10 +282,7 @@ export default function UsersManagement() {
                     .filter((field) => nextEvent.showMemberYear !== false || field.name.toLowerCase().trim() !== "year");
             })();
         setManualForm({
-            leaderMobile: "",
-            leaderDepartment: "",
-            leaderYear: "",
-            extraData: {},
+            ...createEmptyManualForm(),
             teamMembers: nextEvent.eveType === "team"
                 ? Array.from({ length: Math.max(0, min - 1) }, () => emptyMember(custom))
                 : [],
