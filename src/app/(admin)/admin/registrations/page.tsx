@@ -131,13 +131,6 @@ export default function RegistrationsManagement() {
         ...item.data(),
       })) as Event[];
 
-      // Normal admins should only see their department's events.
-      if (userData?.role === "admin" && userData.department) {
-        eventList = eventList.filter(
-          (event) => event.department === userData.department
-        );
-      }
-
       const registrationList = registrationsSnapshot.docs.map((item) => ({
         id: item.id,
         ...item.data(),

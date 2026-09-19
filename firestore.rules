@@ -142,95 +142,18 @@ service cloud.firestore {
 
     match /events/{eventId} {
 
-      // -------------------------------------------------------
-      // READ
-      // -------------------------------------------------------
-      //
       // Anyone can view events.
-      //
-
       allow read: if true;
 
+      // Event creation is restricted to Super Admin.
+      allow create: if isSuperAdmin();
 
-      // -------------------------------------------------------
-      // CREATE
-      // -------------------------------------------------------
-      //
-      // Super Admin can create any event.
-      //
-      // Normal Admin can create events only for their
-      // own department.
-      //
+      // Event editing, including opening/closing registration,
+      // is restricted to Super Admin.
+      allow update: if isSuperAdmin();
 
-      allow create: if
-        isSuperAdmin()
-        ||
-        (
-          isAuthenticated()
-          &&
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin'
-          &&
-          request.resource.data.department ==
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.department
-        );
-
-
-      // -------------------------------------------------------
-      // UPDATE
-      // -------------------------------------------------------
-      //
-      // Super Admin can update any event.
-      //
-      // Normal Admin can update events only for their
-      // own department.
-      //
-
-      allow update: if
-        isSuperAdmin()
-        ||
-        (
-          isAuthenticated()
-          &&
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin'
-          &&
-          request.resource.data.department ==
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.department
-        );
-
-
-      // -------------------------------------------------------
-      // DELETE
-      // -------------------------------------------------------
-      //
-      // Super Admin can delete any event.
-      //
-      // Normal Admin can delete events only from their
-      // own department.
-      //
-
-      allow delete: if
-        isSuperAdmin()
-        ||
-        (
-          isAuthenticated()
-          &&
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin'
-          &&
-          resource.data.department ==
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.department
-        );
+      // Event deletion is restricted to Super Admin.
+      allow delete: if isSuperAdmin();
     }
 
 
@@ -403,17 +326,22 @@ service cloud.firestore {
       //
 
       allow create: if
-        isAuthenticated()
+        isSuperAdmin()
 
-        &&
+        ||
 
-        regId ==
-          request.auth.uid
+        (
+          isAuthenticated()
 
-        &&
+          &&
 
-        request.resource.data.userId ==
-          request.auth.uid
+          regId ==
+            request.auth.uid
+
+          &&
+
+          request.resource.data.userId ==
+            request.auth.uid
 
         &&
 
@@ -429,6 +357,7 @@ service cloud.firestore {
           ||
 
           isAbheriRegistrationOpen()
+        )
         );
 
 

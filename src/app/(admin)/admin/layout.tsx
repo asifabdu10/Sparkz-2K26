@@ -86,7 +86,7 @@ export default function AdminLayout({
       name: "Abheri",
       href: "/admin/abheri",
       icon: FiMusic,
-      roles: ["superAdmin", "admin", "abheriAdmin"],
+      roles: ["superAdmin", "abheriAdmin"],
     },
   ];
 

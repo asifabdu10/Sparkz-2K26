@@ -203,6 +203,10 @@ export default function EventsManagement() {
 
 
     const toggleEventRegistration = async (event: Event) => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can open or close event registration.");
+            return;
+        }
         if ((event.registrationMode || "online") !== "online") {
             toastError("Only online-registration events can be opened or closed here.");
             return;
@@ -222,6 +226,10 @@ export default function EventsManagement() {
     };
 
     const toggleAllRegistrations = async () => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can open or close event registrations.");
+            return;
+        }
         const onlineEvents = events.filter(e => (e.registrationMode || "online") === "online");
         if (onlineEvents.length === 0) return;
         const shouldOpen = !onlineEvents.every(e => e.registrationOpen !== false);
@@ -247,6 +255,10 @@ export default function EventsManagement() {
 
 
     const handleDelete = async (id: string) => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can delete events.");
+            return;
+        }
         const event = events.find((e) => e.id === id);
 
         if (!event) {
@@ -380,6 +392,10 @@ export default function EventsManagement() {
     };
 
     const startEdit = (event?: Event) => {
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can create or edit events.");
+            return;
+        }
         if (event) {
             setFormData({
                 ...event,
@@ -469,6 +485,11 @@ export default function EventsManagement() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can create or edit events.");
+            return;
+        }
 
 
         // Strict Validation
@@ -605,20 +626,24 @@ export default function EventsManagement() {
                     <p className="text-gray-400 text-sm mt-1">Manage and organize all college events</p>
                 </div>
                 <div className="flex gap-3 w-full md:w-auto">
-                    <button
-                        onClick={toggleAllRegistrations}
-                        disabled={events.filter(e => (e.registrationMode || "online") === "online").length === 0}
-                        className={`w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30" : "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"}`}
-                    >
-                        <FiPower size={18} />
-                        {events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "Close All Online Registrations" : "Open All Online Registrations"}
-                    </button>
-                    <button
-                        onClick={() => startEdit()}
-                        className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors shadow-lg shadow-indigo-500/20"
-                    >
-                        <FiPlus size={20} /> Create New Event
-                    </button>
+                    {isSuperAdmin && (
+                        <>
+                            <button
+                                onClick={toggleAllRegistrations}
+                                disabled={events.filter(e => (e.registrationMode || "online") === "online").length === 0}
+                                className={`w-full md:w-auto px-5 py-2.5 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30" : "bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30"}`}
+                            >
+                                <FiPower size={18} />
+                                {events.filter(e => (e.registrationMode || "online") === "online").length > 0 && events.filter(e => (e.registrationMode || "online") === "online").every(e => e.registrationOpen !== false) ? "Close All Online Registrations" : "Open All Online Registrations"}
+                            </button>
+                            <button
+                                onClick={() => startEdit()}
+                                className="w-full md:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex justify-center items-center gap-2 font-medium transition-colors shadow-lg shadow-indigo-500/20"
+                            >
+                                <FiPlus size={20} /> Create New Event
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -1342,7 +1367,7 @@ export default function EventsManagement() {
                                                 ? "Spot Registration"
                                                 : event.registrationOpen === false ? "Registration Closed" : "Registration Open"}
                                     </span>
-                                    {(event.registrationMode || "online") === "online" && (
+                                    {isSuperAdmin && (event.registrationMode || "online") === "online" && (
                                         <button
                                             onClick={() => toggleEventRegistration(event)}
                                             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${event.registrationOpen === false ? "text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10" : "text-red-300 border-red-500/30 hover:bg-red-600/10"}`}
@@ -1351,20 +1376,22 @@ export default function EventsManagement() {
                                         </button>
                                     )}
                                 </div>
-                                <div className="flex gap-2 mt-4">
-                                    <button
-                                        onClick={() => startEdit(event)}
-                                        className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <FiEdit2 /> Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(event.id)}
-                                        className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                                    >
-                                        <FiTrash2 />
-                                    </button>
-                                </div>
+                                {isSuperAdmin && (
+                                    <div className="flex gap-2 mt-4">
+                                        <button
+                                            onClick={() => startEdit(event)}
+                                            className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <FiEdit2 /> Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(event.id)}
+                                            className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                        >
+                                            <FiTrash2 />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

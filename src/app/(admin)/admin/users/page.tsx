@@ -19,6 +19,7 @@ import {
     FiSearch,
     FiX,
     FiUserPlus,
+    FiMusic,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments } from "@/utils/constants/Constants";
@@ -51,6 +52,20 @@ export default function UsersManagement() {
     const [registeringUser, setRegisteringUser] = useState<UserData | null>(null);
     const [selectedEventId, setSelectedEventId] = useState("");
     const [registering, setRegistering] = useState(false);
+
+    const [abheriUser, setAbheriUser] = useState<UserData | null>(null);
+    const [abheriRegistering, setAbheriRegistering] = useState(false);
+    const [abheriForm, setAbheriForm] = useState({
+        bandName: "",
+        managerName: "",
+        managerMobile: "",
+        leaderName: "",
+        leaderMobile: "",
+        musiciansCount: "",
+        vocalistCount: "",
+        instrumentalistCount: "",
+        instruments: "",
+    });
 
     const isSuperAdmin =
         userData?.role === "superAdmin" ||
@@ -299,6 +314,138 @@ export default function UsersManagement() {
         }
     };
 
+
+    const openAbheriModal = (selectedUser: UserData) => {
+        setAbheriUser(selectedUser);
+        setAbheriForm({
+            bandName: "",
+            managerName: selectedUser.name || "",
+            managerMobile: "",
+            leaderName: selectedUser.name || "",
+            leaderMobile: "",
+            musiciansCount: "",
+            vocalistCount: "",
+            instrumentalistCount: "",
+            instruments: "",
+        });
+    };
+
+    const closeAbheriModal = () => {
+        if (abheriRegistering) return;
+        setAbheriUser(null);
+    };
+
+    const registerUserForAbheri = async () => {
+        if (!abheriUser) return;
+
+        if (!isSuperAdmin) {
+            toastError("Only Super Admin can add an Abheri registration.");
+            return;
+        }
+
+        const bandName = abheriForm.bandName.trim();
+        const managerName = abheriForm.managerName.trim();
+        const managerMobile = abheriForm.managerMobile.trim();
+        const leaderName = abheriForm.leaderName.trim();
+        const leaderMobile = abheriForm.leaderMobile.trim();
+        const musiciansCount = Number(abheriForm.musiciansCount);
+        const vocalistCount = Number(abheriForm.vocalistCount);
+        const instrumentalistCount = Number(abheriForm.instrumentalistCount);
+        const instruments = abheriForm.instruments
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (!bandName || !managerName || !managerMobile || !leaderName || !leaderMobile) {
+            toastError("Please fill all band, manager and leader details.");
+            return;
+        }
+
+        if (!Number.isInteger(musiciansCount) || musiciansCount < 5 || musiciansCount > 10) {
+            toastError("Musicians count must be between 5 and 10.");
+            return;
+        }
+
+        if (!Number.isInteger(vocalistCount) || vocalistCount < 2) {
+            toastError("At least 2 vocalists are required.");
+            return;
+        }
+
+        if (!Number.isInteger(instrumentalistCount) || instrumentalistCount < 3) {
+            toastError("At least 3 instrumentalists are required.");
+            return;
+        }
+
+        if (vocalistCount + instrumentalistCount > musiciansCount) {
+            toastError("Vocalists + instrumentalists cannot exceed total musicians.");
+            return;
+        }
+
+        try {
+            setAbheriRegistering(true);
+
+            const registrationRef = doc(db, "abheri_registrations", abheriUser.id);
+            const registrationData = {
+                bandName,
+                collegeName: abheriUser.college || "",
+                managerName,
+                managerMobile,
+                leaderName,
+                leaderMobile,
+                musiciansCount: String(musiciansCount),
+                vocalistCount: String(vocalistCount),
+                instrumentalistCount: String(instrumentalistCount),
+                transactionId: "ADMIN_REGISTRATION",
+                instruments,
+                screenshotUrl: "",
+                screenshotFileId: "",
+                userId: abheriUser.id,
+                userEmail: abheriUser.email || "",
+                registrationMethod: "superAdmin",
+                paymentStatus: "admin",
+                paymentAmount: 0,
+                paymentRequired: false,
+                registeredBy: userData?.email || "",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+
+            const batch = writeBatch(db);
+            batch.set(registrationRef, registrationData);
+            batch.update(doc(db, "users", abheriUser.id), {
+                registeredEvents: arrayUnion("Abheri Battle of Bands"),
+            });
+
+            await batch.commit();
+
+            setUsers((current) =>
+                current.map((u) =>
+                    u.id === abheriUser.id
+                        ? {
+                              ...u,
+                              registeredEvents: Array.from(
+                                  new Set([
+                                      ...(u.registeredEvents || []),
+                                      "Abheri Battle of Bands",
+                                  ])
+                              ),
+                          }
+                        : u
+                )
+            );
+
+            toastSuccess(`${abheriUser.name || "User"} added to Abheri without payment.`);
+            setAbheriUser(null);
+        } catch (error) {
+            console.error("Error adding Abheri registration:", error);
+            toastError(
+                "Failed to add Abheri registration. The user may already have an Abheri registration."
+            );
+        } finally {
+            setAbheriRegistering(false);
+        }
+    };
+
     if (!isSuperAdmin) {
         return <div className="text-red-500">Access Denied</div>;
     }
@@ -452,6 +599,14 @@ export default function UsersManagement() {
                                                 Register Event
                                             </button>
                                             <button
+                                                onClick={() => openAbheriModal(user)}
+                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors text-sm font-medium"
+                                                title="Add this user to Abheri without payment"
+                                            >
+                                                <FiMusic size={15} />
+                                                Abheri
+                                            </button>
+                                            <button
                                                 onClick={() => startEdit(user)}
                                                 className="p-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
                                                 title="Edit"
@@ -472,6 +627,114 @@ export default function UsersManagement() {
                     </div>
                 )}
             </div>
+
+            {/* Super Admin: Manual Abheri Registration Modal */}
+            {abheriUser && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="w-full max-w-2xl bg-[#0b0d14] border border-gray-800 rounded-2xl shadow-2xl p-6 my-8">
+                        <div className="flex items-start justify-between gap-4 mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-white">
+                                    Add Abheri Registration
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    {abheriUser.name || "Unnamed user"} • {abheriUser.email}
+                                </p>
+                                <p className="text-xs text-amber-400 mt-2">
+                                    Super Admin manual registration — no payment or screenshot required.
+                                </p>
+                            </div>
+                            <button
+                                onClick={closeAbheriModal}
+                                disabled={abheriRegistering}
+                                className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white disabled:opacity-50"
+                            >
+                                <FiX size={20} />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                ["bandName", "Band Name", "text"],
+                                ["managerName", "Manager Name", "text"],
+                                ["managerMobile", "Manager Mobile", "tel"],
+                                ["leaderName", "Leader Name", "text"],
+                                ["leaderMobile", "Leader Mobile", "tel"],
+                                ["musiciansCount", "Total Musicians (5–10)", "number"],
+                                ["vocalistCount", "Vocalists (minimum 2)", "number"],
+                                ["instrumentalistCount", "Instrumentalists (minimum 3)", "number"],
+                            ].map(([name, label, type]) => (
+                                <label key={name} className="block">
+                                    <span className="block text-sm font-medium text-gray-300 mb-2">
+                                        {label}
+                                    </span>
+                                    <input
+                                        type={type}
+                                        value={abheriForm[name as keyof typeof abheriForm]}
+                                        onChange={(e) =>
+                                            setAbheriForm((current) => ({
+                                                ...current,
+                                                [name]: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                                    />
+                                </label>
+                            ))}
+
+                            <label className="block md:col-span-2">
+                                <span className="block text-sm font-medium text-gray-300 mb-2">
+                                    Instruments
+                                </span>
+                                <input
+                                    type="text"
+                                    value={abheriForm.instruments}
+                                    onChange={(e) =>
+                                        setAbheriForm((current) => ({
+                                            ...current,
+                                            instruments: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="Keyboard, Guitar, Drums..."
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                                />
+                                <span className="text-xs text-gray-600 mt-1 block">
+                                    Separate multiple instruments with commas.
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="mt-5 rounded-xl bg-amber-500/5 border border-amber-500/20 p-4 text-sm text-gray-400">
+                            <p>
+                                College is taken from the selected user's profile:{" "}
+                                <span className="text-gray-200">{abheriUser.college || "Not provided"}</span>
+                            </p>
+                            <p className="mt-2">
+                                Payment status will be recorded as{" "}
+                                <span className="text-amber-300">Admin / No Payment</span>.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={closeAbheriModal}
+                                disabled={abheriRegistering}
+                                className="px-4 py-2 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={registerUserForAbheri}
+                                disabled={abheriRegistering}
+                                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <FiMusic />
+                                {abheriRegistering ? "Adding..." : "Add Abheri Registration"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Register User Modal */}
             {registeringUser && (
