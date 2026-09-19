@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import nodemailer from "nodemailer";
 
 export const runtime = "nodejs";
 
@@ -196,16 +197,20 @@ export async function POST(request: NextRequest) {
     const base64 = Buffer.from(pdfBytes).toString("base64");
 
     const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.error("Missing RESEND_API_KEY environment variable.");
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (!apiKey && !smtpPass) {
+      console.error("Missing email configuration: neither RESEND_API_KEY nor SMTP_PASS is configured.");
       return NextResponse.json(
-        { error: "Email service is not configured (missing RESEND_API_KEY). Registration was saved, but ticket email is unavailable." },
+        { error: "Email service is not configured (missing RESEND_API_KEY and SMTP_PASS). Registration was saved, but ticket email is unavailable." },
         { status: 500 }
       );
     }
 
-    const from = cleanFromEmail(process.env.EVENT_EMAIL_FROM || process.env.ABHERI_EMAIL_FROM);
     const teamNames = [attendee, ...members.map((m: Record<string, unknown>) => cleanPdfText(m?.name || ""))].filter(Boolean);
+    const emailSubject = `SPARKZ '26 Spot Registration — ${cleanPdfText(event.title) || "Ticket"}`;
+    const attachmentFilename = `${String(event.title || "SPARKZ_Ticket").replace(/[^a-zA-Z0-9_-]/g, "_")}_Ticket.pdf`;
+
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;background:#0b0c10;color:#fff;padding:30px">
         <h1 style="color:#ff4500">SPARKZ '26 — Spot Registration Confirmed</h1>
@@ -221,25 +226,63 @@ export async function POST(request: NextRequest) {
         <p>The event ticket PDF is attached to this email. Please keep it available at the venue.</p>
       </div>`;
 
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject: `SPARKZ '26 Spot Registration — ${cleanPdfText(event.title) || "Ticket"}`,
-        html: emailHtml,
-        attachments: [{ filename: `${String(event.title || "SPARKZ_Ticket").replace(/[^a-zA-Z0-9_-]/g, "_")}_Ticket.pdf`, content: base64 }],
-      }),
-    });
+    if (apiKey) {
+      // Send via Resend API
+      const from = cleanFromEmail(process.env.EVENT_EMAIL_FROM || process.env.ABHERI_EMAIL_FROM);
+      const emailResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          from,
+          to: [email],
+          subject: emailSubject,
+          html: emailHtml,
+          attachments: [{ filename: attachmentFilename, content: base64 }],
+        }),
+      });
 
-    if (!emailResponse.ok) {
-      const text = await emailResponse.text();
-      console.error("Resend delivery failed:", emailResponse.status, text);
-      return NextResponse.json({
-        error: "Ticket generated, but email delivery failed.",
-        details: text,
-      }, { status: 502 });
+      if (!emailResponse.ok) {
+        const text = await emailResponse.text();
+        console.error("Resend delivery failed:", emailResponse.status, text);
+        return NextResponse.json({
+          error: "Ticket generated, but email delivery failed.",
+          details: text,
+        }, { status: 502 });
+      }
+    } else {
+      // Send via SMTP (using the same verified credentials as Abheri)
+      const smtpHost = process.env.SMTP_HOST || "mail.carmelcet.in";
+      const smtpPort = Number(process.env.SMTP_PORT || 465);
+      const smtpUser = process.env.SMTP_USER || "sparkz@carmelcet.in";
+      const fromEmail =
+        process.env.EVENT_EMAIL_FROM ||
+        process.env.ABHERI_EMAIL_FROM ||
+        process.env.SMTP_FROM ||
+        `"Sparkz 2K26" <sparkz@carmelcet.in>`;
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: fromEmail,
+        to: email,
+        subject: emailSubject,
+        html: emailHtml,
+        attachments: [
+          {
+            filename: attachmentFilename,
+            content: Buffer.from(pdfBytes),
+            contentType: "application/pdf",
+          },
+        ],
+      });
     }
 
     return NextResponse.json({ success: true, ticketNumber });
