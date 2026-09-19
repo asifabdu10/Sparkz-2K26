@@ -3,721 +3,751 @@
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
 import {
+  arrayRemove,
   collection,
-  getDocs,
-  query,
-  where,
   deleteDoc,
   doc,
+  getDocs,
   updateDoc,
-  arrayRemove,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { FiDownload, FiUserX } from "react-icons/fi";
-import { toastError } from "@/utils/common/Toast";
+import {
+  FiDownload,
+  FiEye,
+  FiSearch,
+  FiUsers,
+  FiUserX,
+  FiX,
+} from "react-icons/fi";
+import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { Event } from "@/utils/types/event";
 
 interface UserRegistration {
   id: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
+
+interface EventSummary {
+  event: Event;
+  registrations: UserRegistration[];
+  registrationCount: number;
+  memberCount: number;
+}
+
+const getMemberCount = (registration: UserRegistration) => {
+  if (typeof registration.teamSize === "number" && registration.teamSize > 0) {
+    return registration.teamSize;
+  }
+
+  if (Array.isArray(registration.teamMembers)) {
+    return registration.teamMembers.length + 1;
+  }
+
+  return 1;
+};
+
+const getDepartment = (event: Event) => event.department || "Other";
+
+const getRegistrationName = (registration: UserRegistration) =>
+  String(
+    registration.userName ||
+      registration.name ||
+      registration.leaderName ||
+      registration.captainName ||
+      "N/A"
+  );
+
+const getRegistrationEmail = (registration: UserRegistration) =>
+  String(
+    registration.userEmail ||
+      registration.email ||
+      registration.leaderEmail ||
+      registration.captainEmail ||
+      "N/A"
+  );
+
+const getRegistrationPhone = (registration: UserRegistration) =>
+  String(
+    registration.leaderMobile ||
+      registration.phone ||
+      registration.captainPhone ||
+      registration.mobile ||
+      "N/A"
+  );
+
+const getRegistrationCollege = (registration: UserRegistration) =>
+  String(
+    registration.leaderCollege ||
+      registration.college ||
+      registration.captainCollege ||
+      "N/A"
+  );
+
+const formatValue = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "N/A";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+};
 
 export default function RegistrationsManagement() {
   const { userData } = useAuth();
 
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState("");
   const [registrations, setRegistrations] = useState<UserRegistration[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [deregisteringId, setDeregisteringId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [eventFilter, setEventFilter] = useState("All");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedRegistration, setSelectedRegistration] =
+    useState<UserRegistration | null>(null);
+
+  const isSuperAdmin = userData?.role === "superAdmin";
 
   useEffect(() => {
-    if (userData) {
-      fetchEvents();
-    }
+    if (!userData) return;
+    void loadData();
   }, [userData]);
 
-  useEffect(() => {
-    if (selectedEventId) {
-      fetchRegistrations(selectedEventId);
-    } else {
-      setRegistrations([]);
-    }
-  }, [selectedEventId]);
-
-  const fetchEvents = async () => {
+  const loadData = async () => {
     try {
-      setEventsLoading(true);
+      setLoading(true);
 
-      let q;
+      const [eventsSnapshot, registrationsSnapshot] = await Promise.all([
+        getDocs(collection(db, "events")),
+        getDocs(collection(db, "registrations")),
+      ]);
 
-      if (userData?.role === "superAdmin") {
-        q = query(collection(db, "events"));
-      } else if (
-        userData?.role === "admin" &&
-        userData.department
-      ) {
-        q = query(
-          collection(db, "events"),
-          where("department", "==", userData.department)
+      let eventList = eventsSnapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      })) as Event[];
+
+      // Normal admins should only see their department's events.
+      if (userData?.role === "admin" && userData.department) {
+        eventList = eventList.filter(
+          (event) => event.department === userData.department
         );
-      } else {
-        setEvents([]);
-        return;
       }
 
-      const snapshot = await getDocs(q);
+      const registrationList = registrationsSnapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      })) as UserRegistration[];
 
-      setEvents(
-        snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        })) as Event[]
+      const allowedEventIds = new Set(eventList.map((event) => event.id));
+      const visibleRegistrations = registrationList.filter((registration) =>
+        allowedEventIds.has(String(registration.eventId || ""))
       );
+
+      setEvents(eventList);
+      setRegistrations(visibleRegistrations);
     } catch (error) {
-      console.error("Error fetching events:", error);
-      toastError("Failed to fetch events");
-    } finally {
-      setEventsLoading(false);
-    }
-  };
-
-  const fetchRegistrations = async (eventId: string) => {
-    setLoading(true);
-
-    try {
-      const q = query(
-        collection(db, "registrations"),
-        where("eventId", "==", eventId)
-      );
-
-      const snapshot = await getDocs(q);
-
-      setRegistrations(
-        snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        })) as UserRegistration[]
-      );
-    } catch (error) {
-      console.error("Error fetching registrations:", error);
-      toastError("Failed to fetch registrations from Firebase");
+      console.error("Error loading registration management:", error);
+      toastError("Failed to load events and registrations");
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------------------------------------------------------
-  // SUPER ADMIN - DEREGISTER USER
-  // ---------------------------------------------------------
+  const summaries = useMemo<EventSummary[]>(() => {
+    return events
+      .map((event) => {
+        const eventRegistrations = registrations.filter(
+          (registration) => registration.eventId === event.id
+        );
+
+        return {
+          event,
+          registrations: eventRegistrations,
+          registrationCount: eventRegistrations.length,
+          memberCount: eventRegistrations.reduce(
+            (total, registration) => total + getMemberCount(registration),
+            0
+          ),
+        };
+      })
+      .sort((a, b) => a.event.title.localeCompare(b.event.title));
+  }, [events, registrations]);
+
+  const departments = useMemo(() => {
+    return Array.from(
+      new Set(summaries.map((summary) => getDepartment(summary.event)))
+    ).sort((a, b) => a.localeCompare(b));
+  }, [summaries]);
+
+  const filteredSummaries = useMemo(() => {
+    const lower = searchTerm.trim().toLowerCase();
+
+    return summaries.filter((summary) => {
+      const departmentMatches =
+        departmentFilter === "All" ||
+        getDepartment(summary.event) === departmentFilter;
+
+      const eventMatches =
+        eventFilter === "All" || summary.event.id === eventFilter;
+
+      const searchMatches =
+        !lower ||
+        summary.event.title.toLowerCase().includes(lower) ||
+        getDepartment(summary.event).toLowerCase().includes(lower);
+
+      return departmentMatches && eventMatches && searchMatches;
+    });
+  }, [summaries, departmentFilter, eventFilter, searchTerm]);
+
+  const visibleRegistrationCount = filteredSummaries.reduce(
+    (total, summary) => total + summary.registrationCount,
+    0
+  );
+
+  const visibleMemberCount = filteredSummaries.reduce(
+    (total, summary) => total + summary.memberCount,
+    0
+  );
+
+  const selectedSummary = selectedEventId
+    ? summaries.find((summary) => summary.event.id === selectedEventId) || null
+    : null;
+
+  const selectedEventRegistrations = selectedSummary?.registrations || [];
+
+  const exportRows = (sourceSummaries: EventSummary[]) => {
+    const rows: Record<string, string | number>[] = [];
+
+    sourceSummaries.forEach((summary) => {
+      summary.registrations.forEach((reg, registrationIndex) => {
+        const event = summary.event;
+        const row: Record<string, string | number> = {
+          Department: getDepartment(event),
+          Event: event.title,
+          "Registration #": registrationIndex + 1,
+          "Registration ID": reg.id,
+          "Registration Status": String(reg.status || ""),
+          "Payment Status": String(reg.paymentStatus || ""),
+          "Registration Method": String(reg.registrationMethod || "online"),
+          "Registered By": String(reg.registeredBy || ""),
+          Name: getRegistrationName(reg),
+          Email: getRegistrationEmail(reg),
+          Phone: getRegistrationPhone(reg),
+          "School / College": getRegistrationCollege(reg),
+          "Department / Class": String(
+            reg.leaderDepartment || reg.department || ""
+          ),
+          Year: String(reg.leaderYear || reg.year || ""),
+          "Team Size": getMemberCount(reg),
+          "Registration Fee": String(reg.registrationFee || "0"),
+          "Razorpay Payment ID": String(reg.razorpayPaymentId || ""),
+          "Razorpay Order ID": String(reg.razorpayOrderId || ""),
+        };
+
+        if (Array.isArray(reg.teamMembers)) {
+          reg.teamMembers.forEach((member: Record<string, unknown>, index: number) => {
+            const memberNo = index + 2;
+            Object.entries(member || {}).forEach(([key, value]) => {
+              if (
+                key.toLowerCase() === "year" &&
+                event.showMemberYear === false
+              ) {
+                return;
+              }
+
+              const label = key
+                .replace(/([A-Z])/g, " $1")
+                .replace(/^./, (char) => char.toUpperCase());
+
+              row[`Member ${memberNo} ${label}`] = formatValue(value);
+            });
+          });
+        }
+
+        if (reg.extraData && typeof reg.extraData === "object") {
+          Object.entries(reg.extraData).forEach(([key, value]) => {
+            row[key] = formatValue(value);
+          });
+        }
+
+        rows.push(row);
+      });
+    });
+
+    return rows;
+  };
+
+  const exportSummary = () => {
+    if (!filteredSummaries.length) return;
+
+    const summaryRows = filteredSummaries.map((summary) => ({
+      Department: getDepartment(summary.event),
+      Event: summary.event.title,
+      "Registration Mode": summary.event.registrationMode || "online",
+      "Event Start": summary.event.startDate || summary.event.date || "",
+      "Event End": summary.event.endDate || summary.event.startDate || "",
+      "Registered Teams / Entries": summary.registrationCount,
+      "Total Members": summary.memberCount,
+      "Registration Fee": summary.event.registrationFee || "0",
+      Venue: summary.event.venue || "",
+    }));
+
+    const detailRows = exportRows(filteredSummaries);
+
+    const workbook = XLSX.utils.book_new();
+    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
+    const detailSheet = XLSX.utils.json_to_sheet(detailRows);
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Event Summary");
+    XLSX.utils.book_append_sheet(workbook, detailSheet, "Registrations");
+
+    XLSX.writeFile(workbook, "Sparkz_Registration_Report.xlsx");
+    toastSuccess("Excel report generated successfully");
+  };
+
+  const exportSingleEvent = (summary: EventSummary) => {
+    const workbook = XLSX.utils.book_new();
+    const detailRows = exportRows([summary]);
+    const detailSheet = XLSX.utils.json_to_sheet(detailRows);
+    XLSX.utils.book_append_sheet(workbook, detailSheet, "Registrations");
+    XLSX.writeFile(
+      workbook,
+      `${summary.event.title.replace(/[^a-z0-9_-]/gi, "_")}_Registrations.xlsx`
+    );
+  };
 
   const deregisterUser = async (registration: UserRegistration) => {
-    // Only Super Admin is allowed to deregister users.
-    if (userData?.role !== "superAdmin") {
+    if (!isSuperAdmin) {
       toastError("Only Super Admin can deregister users.");
       return;
     }
 
-    const registrationId = registration.id;
-
     const userId = String(registration.userId || "");
+    const event = events.find((item) => item.id === registration.eventId);
+    const eventTitle = String(registration.eventTitle || event?.title || "");
+    const userName = getRegistrationName(registration);
 
-    const eventTitle =
-      String(
-        registration.eventTitle ||
-        events.find((event) => event.id === selectedEventId)?.title ||
-        ""
-      );
-
-    const userName = String(
-      registration.userName ||
-      registration.name ||
-      registration.leaderName ||
-      "this user"
-    );
-
-    // Make sure we have a Firebase user ID.
-    if (!userId) {
-      toastError(
-        "User ID is missing from this registration. Cannot deregister."
-      );
+    if (!userId || !eventTitle) {
+      toastError("Registration is missing user or event information.");
       return;
     }
 
-    // Make sure we know the event.
-    if (!eventTitle) {
-      toastError(
-        "Event information is missing. Cannot deregister."
-      );
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to deregister ${userName} from "${eventTitle}"?`
-    );
-
-    if (!confirmed) {
+    if (!window.confirm(`Deregister ${userName} from "${eventTitle}"?`)) {
       return;
     }
 
     try {
-      setDeregisteringId(registrationId);
-
-      // ---------------------------------------------------
-      // 1. Delete the registration document
-      // ---------------------------------------------------
-
-      await deleteDoc(
-        doc(db, "registrations", registrationId)
-      );
-
-      // ---------------------------------------------------
-      // 2. Remove the event from the user's registeredEvents
-      // ---------------------------------------------------
-
+      setDeregisteringId(registration.id);
+      await deleteDoc(doc(db, "registrations", registration.id));
       await updateDoc(doc(db, "users", userId), {
         registeredEvents: arrayRemove(eventTitle),
       });
 
-      // ---------------------------------------------------
-      // 3. Remove the registration from the current table
-      // ---------------------------------------------------
-
-      setRegistrations((currentRegistrations) =>
-        currentRegistrations.filter(
-          (item) => item.id !== registrationId
-        )
+      setRegistrations((current) =>
+        current.filter((item) => item.id !== registration.id)
       );
-
+      setSelectedRegistration(null);
+      toastSuccess("User deregistered successfully");
     } catch (error) {
-      console.error(
-        "Error deregistering user:",
-        error
-      );
-
-      toastError(
-        "Failed to deregister user. Please check Firebase permissions."
-      );
-
-      // Refresh the registrations in case the database changed
-      // before an error occurred.
-      if (selectedEventId) {
-        await fetchRegistrations(selectedEventId);
-      }
+      console.error("Error deregistering user:", error);
+      toastError("Failed to deregister user");
     } finally {
       setDeregisteringId(null);
     }
   };
 
-  // ---------------------------------------------------------
-  // EXPORT EXCEL
-  // ---------------------------------------------------------
-
-  const exportToExcel = () => {
-    if (!registrations.length) return;
-
-    const event = events.find(
-      (e) => e.id === selectedEventId
-    );
-
-    const eventName = event?.title || "Event";
-
-    const rows: Record<string, string | number>[] =
-      registrations.map((reg) => {
-        const row: Record<string, string | number> = {
-          "Registration ID": reg.id,
-
-          Status: String(
-            reg.status || ""
-          ),
-
-          "Payment Status": String(
-            reg.paymentStatus || ""
-          ),
-
-          Event: String(
-            reg.eventTitle || eventName
-          ),
-
-          "Registration Fee": Number(
-            reg.registrationFee || 0
-          ),
-
-          Name: String(
-            reg.leaderName ||
-            reg.userName ||
-            reg.name ||
-            ""
-          ),
-
-          Email: String(
-            reg.leaderEmail ||
-            reg.userEmail ||
-            reg.email ||
-            ""
-          ),
-
-          Phone: String(
-            reg.leaderMobile ||
-            reg.phone ||
-            ""
-          ),
-
-          "School / College": String(
-            reg.leaderCollege ||
-            reg.college ||
-            ""
-          ),
-
-          "Department / Class": String(
-            reg.leaderDepartment ||
-            ""
-          ),
-
-          ...(event?.showMemberYear !== false
-            ? {
-              Year: String(
-                reg.leaderYear || ""
-              ),
-            }
-            : {}),
-
-          "Team Size": Number(
-            reg.teamSize ||
-            (Array.isArray(reg.teamMembers)
-              ? reg.teamMembers.length + 1
-              : 1)
-          ),
-
-          "Razorpay Payment ID": String(
-            reg.razorpayPaymentId || ""
-          ),
-
-          "Razorpay Order ID": String(
-            reg.razorpayOrderId || ""
-          ),
-        };
-
-        // ---------------------------------------------------
-        // TEAM MEMBERS
-        // ---------------------------------------------------
-
-        if (Array.isArray(reg.teamMembers)) {
-          reg.teamMembers.forEach(
-            (member, index) => {
-              const memberNo = index + 2;
-
-              row[`Member ${memberNo} Name`] =
-                String(member?.name || "");
-
-              Object.entries(member || {}).forEach(
-                ([key, value]) => {
-                  if (key === "name") {
-                    return;
-                  }
-
-                  // Do not export Year if admin disabled
-                  // Year collection for this event.
-                  if (
-                    key.toLowerCase() === "year" &&
-                    event?.showMemberYear === false
-                  ) {
-                    return;
-                  }
-
-                  const label = key
-                    .replace(
-                      /([A-Z])/g,
-                      " $1"
-                    )
-                    .replace(
-                      /^./,
-                      (char) =>
-                        char.toUpperCase()
-                    );
-
-                  row[
-                    `Member ${memberNo} ${label}`
-                  ] =
-                    value == null
-                      ? ""
-                      : String(value);
-                }
-              );
-            }
-          );
-        }
-
-        // ---------------------------------------------------
-        // CUSTOM EVENT FIELDS
-        // ---------------------------------------------------
-
-        if (
-          reg.extraData &&
-          typeof reg.extraData === "object"
-        ) {
-          Object.entries(
-            reg.extraData
-          ).forEach(([key, value]) => {
-            row[key] =
-              value == null
-                ? ""
-                : String(value);
-          });
-        }
-
-        return row;
-      });
-
-    const workbook =
-      XLSX.utils.book_new();
-
-    const worksheet =
-      XLSX.utils.json_to_sheet(rows);
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      "Registrations"
-    );
-
-    XLSX.writeFile(
-      workbook,
-      `${eventName.replace(
-        /[^a-z0-9_-]/gi,
-        "_"
-      )}_Registrations.xlsx`
-    );
-  };
-
-  // ---------------------------------------------------------
-  // PAGE
-  // ---------------------------------------------------------
-
-  if (!userData) {
-    return null;
-  }
+  if (!userData) return null;
 
   return (
-    <div className="text-white max-w-7xl mx-auto">
+    <div className="max-w-[1500px] mx-auto text-white">
+      <div className="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+        <div>
+          <p className="text-sm uppercase tracking-[0.2em] text-indigo-400 font-semibold">
+            Registration Management
+          </p>
+          <h1 className="text-3xl md:text-4xl font-bold mt-2">
+            Event Registrations
+          </h1>
+          <p className="text-gray-500 mt-2 max-w-2xl">
+            View registrations department-wise, see participant totals for every
+            event, open complete registration details, and export Excel reports.
+          </p>
+        </div>
 
-      <h1 className="text-3xl font-bold mb-8">
-        Registrations
-      </h1>
+        <button
+          onClick={exportSummary}
+          disabled={loading || !filteredSummaries.length}
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold transition-colors"
+        >
+          <FiDownload />
+          Export Excel Report
+        </button>
+      </div>
 
-      {/* ---------------------------------------------------
-          EVENT SELECTOR
-      --------------------------------------------------- */}
-
-      <div className="mb-8">
-
-        <label className="block text-sm text-gray-400 mb-2">
-          Select Event
-        </label>
-
-        <div className="relative max-w-xl">
-
-          <select
-            value={selectedEventId}
-            onChange={(e) =>
-              setSelectedEventId(
-                e.target.value
-              )
-            }
-            className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 appearance-none focus:outline-none focus:border-indigo-500"
-            disabled={eventsLoading}
-          >
-
-            <option value="">
-              -- Choose an Event --
-            </option>
-
-            {events.map((event) => (
-              <option
-                key={event.id}
-                value={event.id}
-              >
-                {event.title} (
-                {event.department})
-              </option>
-            ))}
-
-          </select>
-
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-            ▼
-          </div>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
+          <p className="text-xs uppercase tracking-wider text-gray-500">Events</p>
+          <p className="text-3xl font-bold mt-2">{filteredSummaries.length}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
+          <p className="text-xs uppercase tracking-wider text-gray-500">Registrations</p>
+          <p className="text-3xl font-bold mt-2">{visibleRegistrationCount}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
+          <p className="text-xs uppercase tracking-wider text-gray-500">Members</p>
+          <p className="text-3xl font-bold mt-2">{visibleMemberCount}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
+          <p className="text-xs uppercase tracking-wider text-gray-500">Departments</p>
+          <p className="text-3xl font-bold mt-2">
+            {departmentFilter === "All" ? departments.length : 1}
+          </p>
         </div>
       </div>
 
-      {/* ---------------------------------------------------
-          REGISTRATIONS
-      --------------------------------------------------- */}
-
-      {selectedEventId && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
-
-          {/* HEADER */}
-
-          <div className="p-6 border-b border-gray-800 flex justify-between items-center flex-wrap gap-4">
-
-            <div>
-
-              <h2 className="text-xl font-semibold">
-                {
-                  events.find(
-                    (e) =>
-                      e.id ===
-                      selectedEventId
-                  )?.title
-                }
-              </h2>
-
-              <p className="text-sm text-gray-500 mt-1">
-                {registrations.length} Total
-                Registrations
-              </p>
-
-            </div>
-
-            <button
-              onClick={exportToExcel}
-              disabled={
-                !registrations.length ||
-                loading
-              }
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-            >
-              <FiDownload />
-              Export Excel
-            </button>
-
+      <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search event or department..."
+              className="w-full bg-gray-950 border border-gray-800 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-indigo-500"
+            />
           </div>
 
-          {/* TABLE */}
+          <select
+            value={departmentFilter}
+            onChange={(e) => {
+              setDepartmentFilter(e.target.value);
+              setEventFilter("All");
+            }}
+            className="bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500"
+          >
+            <option value="All">All Departments</option>
+            {departments.map((department) => (
+              <option key={department} value={department}>
+                {department}
+              </option>
+            ))}
+          </select>
 
-          <div className="overflow-x-auto">
+          <select
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
+            className="bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500"
+          >
+            <option value="All">All Events</option>
+            {summaries
+              .filter(
+                (summary) =>
+                  departmentFilter === "All" ||
+                  getDepartment(summary.event) === departmentFilter
+              )
+              .map((summary) => (
+                <option key={summary.event.id} value={summary.event.id}>
+                  {summary.event.title}
+                </option>
+              ))}
+          </select>
+        </div>
+      </div>
 
-            <table className="w-full text-left border-collapse">
+      {loading ? (
+        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-gray-500">
+          Loading events and registrations...
+        </div>
+      ) : filteredSummaries.length === 0 ? (
+        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-12 text-center text-gray-500">
+          No matching events or registrations found.
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {Array.from(
+            new Set(filteredSummaries.map((summary) => getDepartment(summary.event)))
+          ).map((department) => {
+            const departmentSummaries = filteredSummaries.filter(
+              (summary) => getDepartment(summary.event) === department
+            );
 
-              <thead>
+            const departmentRegistrations = departmentSummaries.reduce(
+              (total, summary) => total + summary.registrationCount,
+              0
+            );
+            const departmentMembers = departmentSummaries.reduce(
+              (total, summary) => total + summary.memberCount,
+              0
+            );
 
-                <tr className="bg-gray-800/50">
+            return (
+              <section key={department}>
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-3">
+                  <div>
+                    <h2 className="text-xl font-bold">{department}</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {departmentSummaries.length} events · {departmentRegistrations} registrations · {departmentMembers} members
+                    </p>
+                  </div>
+                </div>
 
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    Name
-                  </th>
-
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    Email
-                  </th>
-
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    Phone
-                  </th>
-
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    College
-                  </th>
-
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    Team
-                  </th>
-
-                  <th className="p-4 font-semibold text-gray-400 text-sm">
-                    Status
-                  </th>
-
-                  {/* Only Super Admin gets Action column */}
-
-                  {userData?.role ===
-                    "superAdmin" && (
-                      <th className="p-4 font-semibold text-gray-400 text-sm">
-                        Action
-                      </th>
-                    )}
-
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-gray-800">
-
-                {/* LOADING */}
-
-                {loading ? (
-                  <tr>
-
-                    <td
-                      colSpan={
-                        userData?.role ===
-                          "superAdmin"
-                          ? 7
-                          : 6
-                      }
-                      className="p-8 text-center text-gray-500"
-                    >
-                      Loading registrations...
-                    </td>
-
-                  </tr>
-
-                ) : registrations.length ? (
-
-                  registrations.map(
-                    (reg) => (
-                      <tr
-                        key={reg.id}
-                        className="hover:bg-gray-800/30"
-                      >
-
-                        {/* NAME */}
-
-                        <td className="p-4 font-medium">
-                          {String(
-                            reg.userName ||
-                            reg.name ||
-                            reg.leaderName ||
-                            "N/A"
-                          )}
-                        </td>
-
-                        {/* EMAIL */}
-
-                        <td className="p-4 text-gray-400">
-                          {String(
-                            reg.userEmail ||
-                            reg.email ||
-                            reg.leaderEmail ||
-                            "N/A"
-                          )}
-                        </td>
-
-                        {/* PHONE */}
-
-                        <td className="p-4 text-gray-400">
-                          {String(
-                            reg.leaderMobile ||
-                            reg.phone ||
-                            "N/A"
-                          )}
-                        </td>
-
-                        {/* COLLEGE */}
-
-                        <td className="p-4 text-gray-400">
-                          {String(
-                            reg.leaderCollege ||
-                            reg.college ||
-                            "N/A"
-                          )}
-                        </td>
-
-                        {/* TEAM */}
-
-                        <td className="p-4 text-gray-400">
-
-                          {reg.teamSize
-                            ? `${String(
-                              reg.teamSize
-                            )} members`
-                            : Array.isArray(
-                              reg.teamMembers
-                            )
-                              ? `${reg.teamMembers
-                                .length +
-                              1
-                              } members`
-                              : "Individual"}
-
-                        </td>
-
-                        {/* STATUS */}
-
-                        <td className="p-4">
-
-                          <span className="text-xs px-3 py-1 rounded-full bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
-
-                            {String(
-                              reg.status ||
-                              "registered"
-                            )}
-
-                          </span>
-
-                        </td>
-
-                        {/* DEREGISTER */}
-
-                        {userData?.role ===
-                          "superAdmin" && (
-                            <td className="p-4">
-
-                              <button
-                                onClick={() =>
-                                  deregisterUser(
-                                    reg
-                                  )
-                                }
-                                disabled={
-                                  deregisteringId ===
-                                  reg.id ||
-                                  loading
-                                }
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-
-                                <FiUserX />
-
-                                {deregisteringId ===
-                                  reg.id
-                                  ? "Removing..."
-                                  : "Deregister"}
-
-                              </button>
-
+                <div className="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[900px]">
+                      <thead className="bg-gray-800/60">
+                        <tr>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Event</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Type</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Mode</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Registrations</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Members</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Date</th>
+                          <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-400">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {departmentSummaries.map((summary) => (
+                          <tr key={summary.event.id} className="hover:bg-gray-800/30">
+                            <td className="px-5 py-4">
+                              <p className="font-semibold">{summary.event.title}</p>
+                              <p className="text-xs text-gray-500 mt-1">{summary.event.venue || "Venue not set"}</p>
                             </td>
-                          )}
-
-                      </tr>
-                    )
-                  )
-
-                ) : (
-
-                  /* NO REGISTRATIONS */
-
-                  <tr>
-
-                    <td
-                      colSpan={
-                        userData?.role ===
-                          "superAdmin"
-                          ? 7
-                          : 6
-                      }
-                      className="p-8 text-center text-gray-500"
-                    >
-                      No registrations found
-                      for this event.
-                    </td>
-
-                  </tr>
-
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
+                            <td className="px-5 py-4 text-sm text-gray-400">
+                              {summary.event.type || "—"}
+                            </td>
+                            <td className="px-5 py-4 text-sm text-gray-400">
+                              {summary.event.registrationMode === "none"
+                                ? "Expo"
+                                : summary.event.registrationMode === "spot"
+                                ? "Spot"
+                                : "Online"}
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="inline-flex items-center gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-indigo-300 font-semibold">
+                                <FiUsers size={14} />
+                                {summary.registrationCount}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 font-semibold text-emerald-300">
+                              {summary.memberCount}
+                            </td>
+                            <td className="px-5 py-4 text-sm text-gray-400">
+                              {summary.event.startDate || summary.event.date || "—"}
+                              {summary.event.endDate && summary.event.endDate !== summary.event.startDate
+                                ? ` → ${summary.event.endDate}`
+                                : ""}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setSelectedEventId(summary.event.id)}
+                                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 text-sm font-medium"
+                                >
+                                  <FiEye /> View
+                                </button>
+                                <button
+                                  onClick={() => exportSingleEvent(summary)}
+                                  disabled={!summary.registrationCount}
+                                  className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-30"
+                                  title="Export this event"
+                                >
+                                  <FiDownload />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
+      {selectedSummary && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 md:p-6">
+          <div className="w-full max-w-7xl max-h-[92vh] bg-[#080a11] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-5 md:p-6 border-b border-gray-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-indigo-400 font-semibold">
+                  {getDepartment(selectedSummary.event)}
+                </p>
+                <h2 className="text-2xl font-bold mt-1">{selectedSummary.event.title}</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedSummary.registrationCount} registrations · {selectedSummary.memberCount} members
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportSingleEvent(selectedSummary)}
+                  disabled={!selectedSummary.registrationCount}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 font-medium"
+                >
+                  <FiDownload /> Export Event
+                </button>
+                <button
+                  onClick={() => setSelectedEventId(null)}
+                  className="p-2 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700"
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-auto flex-1">
+              {selectedEventRegistrations.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  No registrations for this event yet.
+                </div>
+              ) : (
+                <table className="w-full text-left min-w-[1050px]">
+                  <thead className="sticky top-0 bg-gray-900 z-10">
+                    <tr className="border-b border-gray-800">
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">#</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Participant / Captain</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Contact</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">College</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Team</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Payment</th>
+                      <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Details</th>
+                      {isSuperAdmin && (
+                        <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Action</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {selectedEventRegistrations.map((registration, index) => (
+                      <tr key={registration.id} className="hover:bg-gray-800/30">
+                        <td className="px-5 py-4 text-gray-500">{index + 1}</td>
+                        <td className="px-5 py-4">
+                          <p className="font-medium">{getRegistrationName(registration)}</p>
+                          <p className="text-xs text-gray-500 mt-1">{getRegistrationEmail(registration)}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-400">
+                          {getRegistrationPhone(registration)}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-400">
+                          {getRegistrationCollege(registration)}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="font-semibold text-emerald-300">{getMemberCount(registration)}</span>
+                        </td>
+                        <td className="px-5 py-4 text-sm">
+                          <span className="text-gray-300">{String(registration.paymentStatus || "—")}</span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <button
+                            onClick={() => setSelectedRegistration(registration)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm"
+                          >
+                            <FiEye /> View
+                          </button>
+                        </td>
+                        {isSuperAdmin && (
+                          <td className="px-5 py-4">
+                            <button
+                              onClick={() => void deregisterUser(registration)}
+                              disabled={deregisteringId === registration.id}
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 disabled:opacity-40 text-sm"
+                            >
+                              <FiUserX />
+                              {deregisteringId === registration.id ? "Removing..." : "Deregister"}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedRegistration && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl max-h-[90vh] bg-[#0a0c13] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-indigo-400">Registration Details</p>
+                <h3 className="text-xl font-bold mt-1">{getRegistrationName(selectedRegistration)}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700"
+              >
+                <FiX />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  ["Email", getRegistrationEmail(selectedRegistration)],
+                  ["Phone", getRegistrationPhone(selectedRegistration)],
+                  ["College", getRegistrationCollege(selectedRegistration)],
+                  ["Department / Class", selectedRegistration.leaderDepartment || selectedRegistration.department],
+                  ["Year", selectedRegistration.leaderYear || selectedRegistration.year],
+                  ["Team Size", getMemberCount(selectedRegistration)],
+                  ["Payment Status", selectedRegistration.paymentStatus],
+                  ["Registration Status", selectedRegistration.status],
+                  ["Payment ID", selectedRegistration.razorpayPaymentId],
+                  ["Registration ID", selectedRegistration.id],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-xl border border-gray-800 bg-gray-900/70 p-4">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+                    <p className="text-sm text-gray-200 mt-1 break-words">{formatValue(value)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {Array.isArray(selectedRegistration.teamMembers) && selectedRegistration.teamMembers.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Team Members</h4>
+                  <div className="space-y-2">
+                    {selectedRegistration.teamMembers.map((member: Record<string, unknown>, index: number) => (
+                      <div key={index} className="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+                        <p className="font-medium mb-2">Member {index + 2}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(member).map(([key, value]) => (
+                            <div key={key} className="text-sm">
+                              <span className="text-gray-500">{key}: </span>
+                              <span className="text-gray-200">{formatValue(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedRegistration.extraData && typeof selectedRegistration.extraData === "object" && (
+                <div>
+                  <h4 className="font-semibold mb-3">Additional Event Details</h4>
+                  <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Object.entries(selectedRegistration.extraData).map(([key, value]) => (
+                      <div key={key} className="text-sm">
+                        <span className="text-gray-500">{key}: </span>
+                        <span className="text-gray-200">{formatValue(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
