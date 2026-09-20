@@ -111,7 +111,7 @@ export default function RegisterButtonSection({ event }: Props) {
         <div className="w-full rounded-2xl p-4 bg-amber-950/30 border border-amber-500/30 text-amber-200 text-center font-semibold">
           <div>Spot Registration Starts</div>
           <div className="text-sm mt-1 text-amber-100/80">{spotDateText} · {spotTimeText}</div>
-          <div className="text-xs mt-1 text-amber-100/60">{event.spotRegistrationDesk || "Registration Desk"}</div>
+          <div className="text-xs mt-1 text-amber-100/60">{event.spotRegistrationDesk || "Registration"}</div>
         </div>
       );
     }

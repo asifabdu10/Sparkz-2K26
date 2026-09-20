@@ -86,36 +86,36 @@ const getDepartment = (event: Event) => event.department || "Other";
 const getRegistrationName = (registration: UserRegistration) =>
   String(
     registration.userName ||
-      registration.name ||
-      registration.leaderName ||
-      registration.captainName ||
-      "N/A"
+    registration.name ||
+    registration.leaderName ||
+    registration.captainName ||
+    "N/A"
   );
 
 const getRegistrationEmail = (registration: UserRegistration) =>
   String(
     registration.userEmail ||
-      registration.email ||
-      registration.leaderEmail ||
-      registration.captainEmail ||
-      "N/A"
+    registration.email ||
+    registration.leaderEmail ||
+    registration.captainEmail ||
+    "N/A"
   );
 
 const getRegistrationPhone = (registration: UserRegistration) =>
   String(
     registration.leaderMobile ||
-      registration.phone ||
-      registration.captainPhone ||
-      registration.mobile ||
-      "N/A"
+    registration.phone ||
+    registration.captainPhone ||
+    registration.mobile ||
+    "N/A"
   );
 
 const getRegistrationCollege = (registration: UserRegistration) =>
   String(
     registration.leaderCollege ||
-      registration.college ||
-      registration.captainCollege ||
-      "N/A"
+    registration.college ||
+    registration.captainCollege ||
+    "N/A"
   );
 
 const formatValue = (value: unknown) => {
@@ -358,8 +358,8 @@ export default function RegistrationsManagement() {
     setEditingTeamMembers(
       Array.isArray(registration.teamMembers)
         ? registration.teamMembers.map((member: Record<string, unknown>) =>
-            Object.fromEntries(Object.entries(member).map(([key, value]) => [key, String(value ?? "")]))
-          )
+          Object.fromEntries(Object.entries(member).map(([key, value]) => [key, String(value ?? "")]))
+        )
         : []
     );
   };
@@ -529,9 +529,9 @@ export default function RegistrationsManagement() {
         <div className="rounded-2xl border border-amber-500/20 bg-amber-950/20 p-5 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Registration Desk</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300 font-semibold">Registration</p>
               <h2 className="text-xl font-bold mt-1">Spot Registration Status</h2>
-              <p className="text-sm text-gray-500 mt-1">Use this live summary at the on-site registration desk.</p>
+              <p className="text-sm text-gray-500 mt-1">Use this live summary at the on-site Registration.</p>
             </div>
             <div className="text-sm text-amber-200">{new Date().toLocaleString()}</div>
           </div>
@@ -543,7 +543,7 @@ export default function RegistrationsManagement() {
               return (
                 <div key={event.id} className="rounded-xl border border-amber-500/20 bg-black/20 p-4">
                   <p className="font-semibold text-white">{event.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">{event.spotRegistrationDesk || "Registration Desk"}</p>
+                  <p className="text-xs text-gray-500 mt-1">{event.spotRegistrationDesk || "Registration"}</p>
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <div><p className="text-[10px] uppercase text-gray-500">Registrations</p><p className="text-xl font-bold text-amber-200">{eventRegs.length}</p></div>
                     <div><p className="text-[10px] uppercase text-gray-500">Members</p><p className="text-xl font-bold text-amber-200">{members}</p></div>
@@ -691,8 +691,8 @@ export default function RegistrationsManagement() {
                               {summary.event.registrationMode === "none"
                                 ? "Expo"
                                 : summary.event.registrationMode === "spot"
-                                ? "Spot"
-                                : "Online"}
+                                  ? "Spot"
+                                  : "Online"}
                             </td>
                             <td className="px-5 py-4">
                               <span className="inline-flex items-center gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-indigo-300 font-semibold">

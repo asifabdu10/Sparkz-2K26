@@ -50,7 +50,7 @@ export default function EventsManagement() {
         spotRegistrationOpen: false,
         spotRegistrationDate: "",
         spotRegistrationTime: "09:00",
-        spotRegistrationDesk: "Registration Desk",
+        spotRegistrationDesk: "Registration",
         showParticipation: true,
         showMemberYear: true,
         firstPrize: "",
@@ -299,11 +299,11 @@ export default function EventsManagement() {
                 prev.map((event) =>
                     (event.registrationMode || "online") !== "none"
                         ? {
-                              ...event,
-                              registrationMode: "spot",
-                              registrationOpen: false,
-                              spotRegistrationOpen: false,
-                          }
+                            ...event,
+                            registrationMode: "spot",
+                            registrationOpen: false,
+                            spotRegistrationOpen: false,
+                        }
                         : event
                 )
             );
@@ -581,7 +581,7 @@ export default function EventsManagement() {
                 spotRegistrationOpen: event.spotRegistrationOpen === true,
                 spotRegistrationDate: event.spotRegistrationDate || event.startDate || event.date || "",
                 spotRegistrationTime: event.spotRegistrationTime || "09:00",
-                spotRegistrationDesk: event.spotRegistrationDesk || "Registration Desk",
+                spotRegistrationDesk: event.spotRegistrationDesk || "Registration",
                 spotRegistrationStartsAt: event.spotRegistrationStartsAt || null,
                 showParticipation: event.showParticipation !== false,
                 showPrizePool: event.showPrizePool === true,
@@ -777,7 +777,7 @@ export default function EventsManagement() {
                 spotRegistrationOpen: finalRegistrationMode === "spot" ? formData.spotRegistrationOpen === true : false,
                 spotRegistrationDate: formData.spotRegistrationDate || formData.startDate || formData.date || "",
                 spotRegistrationTime: formData.spotRegistrationTime || "09:00",
-                spotRegistrationDesk: formData.spotRegistrationDesk || "Registration Desk",
+                spotRegistrationDesk: formData.spotRegistrationDesk || "Registration",
                 spotRegistrationStartsAt: (() => {
                     const value = formData.spotRegistrationDate || formData.startDate || formData.date || "";
                     if (!value) return null;
@@ -1146,8 +1146,8 @@ export default function EventsManagement() {
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm text-gray-400 mb-1">Registration Desk</label>
-                                            <input type="text" value={formData.spotRegistrationDesk || 'Registration Desk'} onChange={(e) => setFormData({ ...formData, spotRegistrationDesk: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none" />
+                                            <label className="block text-sm text-gray-400 mb-1">Registration</label>
+                                            <input type="text" value={formData.spotRegistrationDesk || 'Registration'} onChange={(e) => setFormData({ ...formData, spotRegistrationDesk: e.target.value })} className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-2 outline-none" />
                                         </div>
                                         <label className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-black/30 px-4 py-3 cursor-pointer">
                                             <input type="checkbox" checked={formData.spotRegistrationOpen === true} onChange={(e) => setFormData({ ...formData, spotRegistrationOpen: e.target.checked, registrationOpen: false })} className="h-4 w-4 accent-amber-500" />
@@ -1600,15 +1600,14 @@ export default function EventsManagement() {
                                     <span>{event.startDate || event.date}{event.endDate && (event.endDate !== (event.startDate || event.date)) ? ` – ${event.endDate}` : ""}</span>
                                 </div>
                                 <div className="flex items-center justify-between mt-4 mb-3">
-                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
-                                        (event.registrationMode || "online") === "none"
+                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${(event.registrationMode || "online") === "none"
                                             ? "text-sky-300 bg-sky-950/40 border-sky-500/30"
                                             : (event.registrationMode || "online") === "spot"
                                                 ? "text-amber-300 bg-amber-950/40 border-amber-500/30"
                                                 : event.registrationOpen === false
                                                     ? "text-red-300 bg-red-950/40 border-red-500/30"
                                                     : "text-emerald-300 bg-emerald-950/40 border-emerald-500/30"
-                                    }`}>
+                                        }`}>
                                         {(event.registrationMode || "online") === "none"
                                             ? "Expo"
                                             : (event.registrationMode || "online") === "spot"

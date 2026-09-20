@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
         <table cellpadding="8" style="border-collapse:collapse">
           <tr><td><b>Date</b></td><td>${escapeHtml(event.startDate || event.date || "TBA")}${event.endDate && event.endDate !== (event.startDate || event.date) ? ` – ${escapeHtml(event.endDate)}` : ""}</td></tr>
           <tr><td><b>Venue</b></td><td>${escapeHtml(event.venue || "TBA")}</td></tr>
-          <tr><td><b>Registration Desk</b></td><td>${escapeHtml(event.spotRegistrationDesk || "Registration Desk")}</td></tr>
+          <tr><td><b>Registration</b></td><td>${escapeHtml(event.spotRegistrationDesk || "Registration")}</td></tr>
           <tr><td><b>Ticket</b></td><td>${escapeHtml(ticketNumber)}</td></tr>
         </table>
         <h3>Team Members</h3>
