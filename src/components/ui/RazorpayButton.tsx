@@ -30,6 +30,16 @@ interface RazorpayButtonProps {
   userPhone?: string;
   /** Called after payment is successfully verified on the server */
   onSuccess?: (paymentId: string, orderId: string) => void | Promise<void>;
+  /**
+   * Called the moment the Razorpay checkout modal opens.
+   * Use this to pause any cleanup timers while the user is actively paying.
+   */
+  onPaymentStart?: () => void;
+  /**
+   * Called when the Razorpay modal is dismissed without payment OR when the
+   * payment explicitly fails. Use this to resume cleanup timers.
+   */
+  onPaymentFail?: () => void;
   /** Additional metadata to store alongside the payment in Firestore */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
@@ -48,6 +58,8 @@ export default function RazorpayButton({
   userEmail,
   userPhone,
   onSuccess,
+  onPaymentStart,
+  onPaymentFail,
   metadata,
   className,
   label = "Pay & Register",
@@ -150,7 +162,9 @@ export default function RazorpayButton({
         },
         modal: {
           ondismiss() {
+            // User closed the modal without completing payment.
             toastError("Payment cancelled.");
+            onPaymentFail?.();
             setLoading(false);
           },
         },
@@ -203,9 +217,12 @@ export default function RazorpayButton({
 
       rzp.on("payment.failed", (res: { error: { description: string } }) => {
         toastError(res.error.description || "Payment failed. Please retry.");
+        onPaymentFail?.();
         setLoading(false);
       });
 
+      // Notify the parent that the checkout modal is now open.
+      onPaymentStart?.();
       rzp.open();
     } catch (err: any) {
       toastError(err?.message || "Something went wrong. Please try again.");
@@ -221,6 +238,8 @@ export default function RazorpayButton({
     userEmail,
     userPhone,
     onSuccess,
+    onPaymentStart,
+    onPaymentFail,
     metadata,
   ]);
 

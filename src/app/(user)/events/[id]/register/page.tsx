@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   arrayUnion,
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -92,6 +93,19 @@ export default function Register() {
   const [registrationClosed, setRegistrationClosed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [spotEmailSending, setSpotEmailSending] = useState(false);
+
+  // ── Pending-registration expiry ────────────────────────────────────────────
+  // 10 minutes in milliseconds. When a pending doc is created and the user
+  // does not complete payment within this window, the doc is auto-deleted.
+  const PENDING_EXPIRY_MS = 10 * 60 * 1000;
+
+  // Seconds remaining on the countdown. null = timer not active.
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  // True while the Razorpay checkout modal is open.
+  // When the user is actively in the payment flow we must NOT delete the
+  // pending registration even if the 10-minute window expires.
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
 
   const [formData, setFormData] = useState<RegistrationData>({
     leaderName: "",
@@ -230,7 +244,49 @@ export default function Register() {
           }));
 
           if (data.status === "pending") {
+            // ── Stale pending check ────────────────────────────────────────
+            // If the pending doc is older than 10 minutes the user never paid.
+            // Delete it immediately and show a fresh form.
+            const createdAt: Date | null = data.createdAt?.toDate
+              ? data.createdAt.toDate()
+              : data.createdAt instanceof Date
+              ? data.createdAt
+              : null;
+
+            const ageMs = createdAt ? Date.now() - createdAt.getTime() : 0;
+
+            if (ageMs > PENDING_EXPIRY_MS) {
+              // Silently remove the stale doc; the user will see a clean form.
+              try {
+                await deleteDoc(doc(db, "registrations", registration.id));
+              } catch (deleteErr) {
+                console.warn("Could not remove stale pending registration:", deleteErr);
+              }
+              // Reset to a blank form state — do not set registrationId.
+              setRegistrationId(null);
+              setFormData({
+                leaderName: "",
+                leaderEmail: "",
+                leaderMobile: "",
+                leaderCollege: "",
+                leaderDepartment: "",
+                leaderYear: "",
+                extraData: {},
+                teamMembers: [],
+              });
+              toastInfo("Your previous session expired. Please fill in your details again.");
+              return;
+            }
+
+            // ── Active pending doc ─────────────────────────────────────────
+            // The user had started payment; resume the countdown from the
+            // remaining time.
+            const secondsRemaining = Math.max(
+              0,
+              Math.floor((PENDING_EXPIRY_MS - ageMs) / 1000)
+            );
             setPaymentReady(true);
+            setTimeLeft(secondsRemaining);
             toastInfo("Your details are saved. Complete payment to finish registration.");
           }
         } else {
@@ -251,6 +307,61 @@ export default function Register() {
 
     loadRegistration();
   }, [event, user, authLoading, STORAGE_KEY]);
+
+  // ── Countdown timer ────────────────────────────────────────────────────────
+  // Starts when paymentReady becomes true and the user must pay within 10 min.
+  // When it reaches 0 AND the user is NOT in the middle of a payment attempt,
+  // the pending registration is deleted client-side.
+  useEffect(() => {
+    if (!paymentReady || !registrationId || !user) return;
+
+    // Initialise the countdown only if it hasn't been set yet (e.g. on first
+    // transition to paymentReady). If it was already set by the stale-check
+    // above we keep that value.
+    setTimeLeft((prev) => (prev === null ? PENDING_EXPIRY_MS / 1000 : prev));
+
+    const interval = window.setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null) return null;
+
+        if (prev <= 1) {
+          window.clearInterval(interval);
+
+          // ── Guard: Razorpay modal is open ──────────────────────────────
+          // The user clicked "Pay" and the modal is still open (or they are
+          // in the middle of a UPI / netbanking redirect). Do NOT delete the
+          // pending doc — leave it intact so payment can still succeed.
+          // paymentInProgress is read from the ref snapshot inside the closure.
+          setPaymentInProgress((isInProgress) => {
+            if (!isInProgress) {
+              // Safe to clean up — user is not actively paying.
+              deleteDoc(doc(db, "registrations", registrationId)).catch((err) =>
+                console.warn("Auto-cleanup of pending registration failed:", err)
+              );
+              setPaymentReady(false);
+              setRegistrationId(null);
+              setTimeLeft(null);
+              toastError(
+                "Payment time expired. Your slot has been released. Please register again."
+              );
+            }
+            // Keep paymentInProgress unchanged (return the current value).
+            return isInProgress;
+          });
+
+          return null;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+    // We intentionally depend only on `paymentReady` so the timer is only
+    // created/destroyed when the payment-ready state changes, not on every
+    // re-render caused by `timeLeft` ticking down.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentReady, registrationId, user]);
 
   useEffect(() => {
     if (!event || !user || registered || paymentReady) return;
@@ -467,6 +578,7 @@ export default function Register() {
         // online registrations. The pending document is only a saved draft;
         // it is not marked as paid/registered until Razorpay verification
         // succeeds.
+        setTimeLeft(PENDING_EXPIRY_MS / 1000); // start the 10-min countdown
         setPaymentReady(true);
         toastSuccess(
           isSpotRegistration
@@ -551,6 +663,7 @@ export default function Register() {
     await refetchUserProfile();
     setRegistered(true);
     setPaymentReady(false);
+    setTimeLeft(null); // stop the countdown on successful payment
 
     if (isSpotRegistration) {
       await sendSpotTicket(registrationId);
@@ -730,6 +843,36 @@ export default function Register() {
                       <p className="text-[#FDE6B0] font-semibold">Your team details are saved.</p>
                       <p className="text-sm text-[#A1A1AA] mt-1">{isSpotRegistration ? "Complete the payment below to confirm your spot registration. Your ticket will be emailed after successful payment." : "Complete the payment below to finish registration."}</p>
                     </div>
+
+                    {/* ── Countdown timer banner ── */}
+                    {timeLeft !== null && (
+                      <div
+                        className={`flex items-center justify-between gap-3 rounded-2xl border px-5 py-3 ${
+                          timeLeft <= 60
+                            ? "border-red-500/40 bg-red-950/30 text-red-300"
+                            : timeLeft <= 180
+                            ? "border-amber-500/40 bg-amber-950/30 text-amber-300"
+                            : "border-[#D4A359]/30 bg-[#3A270D]/40 text-[#FDE6B0]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <span className="text-lg">⏱</span>
+                          <span>
+                            Complete payment within{" "}
+                            <strong>
+                              {String(Math.floor(timeLeft / 60)).padStart(2, "0")}:
+                              {String(timeLeft % 60).padStart(2, "0")}
+                            </strong>
+                            {" "}or your slot will be released.
+                          </span>
+                        </div>
+                        {timeLeft <= 60 && (
+                          <span className="text-xs font-bold uppercase tracking-widest animate-pulse">
+                            Hurry!
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <RazorpayButton
                       amountRupees={feeNumber}
                       eventTitle={event.title}
@@ -739,6 +882,8 @@ export default function Register() {
                       userEmail={formData.leaderEmail}
                       userPhone={formData.leaderMobile}
                       metadata={{ registrationId }}
+                      onPaymentStart={() => setPaymentInProgress(true)}
+                      onPaymentFail={() => setPaymentInProgress(false)}
                       onSuccess={completePaidRegistration}
                       label="Pay & Complete Registration"
                     />

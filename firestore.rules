@@ -317,10 +317,30 @@ service cloud.firestore {
       // DELETE
       // -------------------------------------------------------
       //
-      // Only Super Admin can manually deregister users.
+      // Super Admin can manually deregister any user.
+      //
+      // A normal user can delete their OWN registration ONLY
+      // when it is still in "pending" status (i.e. payment was
+      // never completed). This is used by the client-side
+      // 10-minute auto-cleanup timer.
       //
 
-      allow delete: if isSuperAdmin();
+      allow delete: if
+        isSuperAdmin()
+
+        ||
+
+        (
+          isAuthenticated()
+
+          &&
+
+          resource.data.userId == request.auth.uid
+
+          &&
+
+          resource.data.status == "pending"
+        );
     }
 
 
