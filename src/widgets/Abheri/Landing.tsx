@@ -181,6 +181,12 @@ export default function AbheriPage() {
                   Unleash your band&apos;s energy at Sparkz 2K26 – Prize pool up to{" "}
                   <span className="text-[#F3C87A] font-bold">₹60,000</span> | Teams of 5-10 | Reg:{" "}
                   <span className="text-[#F3C87A] font-bold">₹1,200</span>
+
+                </p>
+              </div>
+              <div className="max-w-md mx-auto rounded-2xl border border-[rgba(212,163,89,0.3)] bg-[#131318]/90 p-5 sm:p-6 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.7)]">
+                <p className="text-lg sm:text-xl text-[#FDE6B0] font-medium leading-relaxed">
+                  Last Date : <span className="text-[#F3C87A] font-bold">30th Sept 2026</span>
                 </p>
               </div>
               {abheriRegistered ? (
