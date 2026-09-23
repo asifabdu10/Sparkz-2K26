@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
+import { updateRegistrationPaymentServerSide } from "@/utils/server/firestoreRest";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,10 +10,11 @@ export async function POST(request: NextRequest) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      eventId,
-      userId,
       metadata,
+      registrationId: bodyRegistrationId,
     } = body;
+
+    const registrationId = String(bodyRegistrationId || metadata?.registrationId || "");
 
     // Validate required fields
     if (
@@ -44,8 +46,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Signature is valid. The client now completes the event registration
-    // in Firestore using the authenticated Firebase user.
+    // Signature is valid. Persist the paid state on the server before
+    // responding to the browser. This prevents a successful payment from
+    // remaining "pending" if the browser closes or loses connection.
+    if (registrationId) {
+      if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        return Response.json({ error: "Payment verified, but server payment reconciliation is not configured. Please contact the administrator." }, { status: 503 });
+      }
+      await updateRegistrationPaymentServerSide({
+        registrationId,
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+      });
+    }
 
     return Response.json({
       success: true,

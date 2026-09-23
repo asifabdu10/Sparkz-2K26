@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Script from "next/script";
 import { toastSuccess, toastError } from "@/utils/common/Toast";
+import { auth } from "@/utils/firebase";
 
 // ─── Razorpay window type ──────────────────────────────────────────────────
 declare global {
@@ -121,7 +122,8 @@ export default function RazorpayButton({
         body: JSON.stringify({
           amount: amountRupees,
           receipt: `evt_${eventId}_${Date.now()}`,
-          notes: { eventId, userId },
+          notes: { eventId, userId, registrationId: metadata?.registrationId || "" },
+          registrationId: metadata?.registrationId || "",
         }),
       });
 
@@ -161,6 +163,7 @@ export default function RazorpayButton({
         }) => {
           // ── Step 3: verify signature on our backend ─────────────────
           try {
+            const firebaseIdToken = await auth.currentUser?.getIdToken();
             const verifyRes = await fetch("/api/razorpay/verify-payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -171,6 +174,8 @@ export default function RazorpayButton({
                 eventId,
                 userId,
                 metadata,
+                registrationId: metadata?.registrationId || "",
+                firebaseIdToken: firebaseIdToken || "",
               }),
             });
 

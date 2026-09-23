@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
+import { findRegistrationIdByOrderId, updateRegistrationPaymentServerSide } from "@/utils/server/firestoreRest";
 
 export async function POST(request: NextRequest) {
     try {
@@ -151,12 +152,24 @@ export async function POST(request: NextRequest) {
                 }
             );
 
-            /*
-             * You can add your Firestore update here.
-             *
-             * We will connect this to your registration
-             * collection after confirming the webhook works.
-             */
+            const orderId = payment?.order_id || order?.id;
+            const paymentId = payment?.id;
+
+            if (orderId && paymentId && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+                const registrationId = await findRegistrationIdByOrderId(orderId);
+                if (registrationId) {
+                    await updateRegistrationPaymentServerSide({
+                        registrationId,
+                        paymentId,
+                        orderId,
+                    });
+                    console.log("Razorpay webhook: registration marked paid", { registrationId, orderId, paymentId });
+                } else {
+                    console.warn("Razorpay webhook: no registration found for order", orderId);
+                }
+            } else if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+                console.error("Razorpay webhook: FIREBASE_SERVICE_ACCOUNT_JSON is not configured; payment cannot be reconciled automatically.");
+            }
         }
 
         /*
