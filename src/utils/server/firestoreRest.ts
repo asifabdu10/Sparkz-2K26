@@ -3,7 +3,13 @@ import crypto from "crypto";
 const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-function getServiceAccount() {
+type ServiceAccount = {
+  client_email: string;
+  private_key: string;
+  project_id: string;
+};
+
+function getServiceAccount(): ServiceAccount {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not configured");
   const parsed = JSON.parse(raw) as {
@@ -14,7 +20,11 @@ function getServiceAccount() {
   if (!parsed.client_email || !parsed.private_key || !parsed.project_id) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is incomplete");
   }
-  return parsed;
+  return {
+    client_email: parsed.client_email,
+    private_key: parsed.private_key,
+    project_id: parsed.project_id,
+  };
 }
 
 function base64Url(value: string) {
