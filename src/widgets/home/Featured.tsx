@@ -204,6 +204,7 @@ export default function FeaturedEvents() {
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         priority={idx < 3}
                         fill
+                        unoptimized
                         className="object-contain transition-transform duration-700"
                       />
                     </div>

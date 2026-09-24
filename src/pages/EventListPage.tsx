@@ -73,7 +73,7 @@ function EventCard({
               src={event.imageUrl}
               alt={event.title || "Event poster"}
               fill
-              quality={50}
+              unoptimized
               priority={idx < 4}
               sizes="
                 (max-width: 640px) 100vw,
@@ -97,6 +97,15 @@ function EventCard({
             />
           )}
 
+        </div>
+
+        {/* ================================================
+            EVENT TITLE
+        ================================================ */}
+        <div className="px-3 py-2.5">
+          <p className="truncate text-sm font-semibold text-[#F3C87A] group-hover:text-white transition-colors duration-200">
+            {event.title}
+          </p>
         </div>
       </Link>
     </motion.div>

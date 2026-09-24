@@ -65,52 +65,59 @@ export const toBase64 = (str: string) =>
         ? Buffer.from(str).toString('base64')
         : window.btoa(str);
 
-export const compressImage = async (file: File, quality: number = 0.8, maxWidth: number = 1920): Promise<File> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+/**
+ * Compresses and resizes an image in the browser before upload.
+ *
+ * Targets:
+ *   - Max dimension : 1600 px (preserves aspect ratio, no distortion)
+ *   - Max file size : ~0.8 MB
+ *   - Quality       : high enough for event posters (initialQuality 0.85)
+ *
+ * Uses the `browser-image-compression` library which handles EXIF rotation,
+ * format selection, and progressive degradation automatically.
+ * If compression fails for any reason the original file is returned unchanged
+ * so the upload flow is never broken.
+ *
+ * The optional `quality` and `maxWidth` parameters are kept for backward
+ * compatibility but are no longer the primary drivers — the library options
+ * below take precedence.
+ */
+export const compressImage = async (
+  file: File,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _quality: number = 0.85,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _maxWidth: number = 1600,
+): Promise<File> => {
+  try {
+    // Dynamically import so this never affects server-side bundles.
+    const imageCompression = (await import('browser-image-compression')).default;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-                type: 'image/webp',
-                lastModified: Date.now(),
-              });
-              resolve(newFile);
-            } else {
-              reject(new Error('Canvas is empty'));
-            }
-          },
-          'image/webp',
-          quality
-        );
-      };
-      img.onerror = (error) => reject(error);
+    const options = {
+      maxSizeMB: 0.8,          // Target ≤ 0.8 MB
+      maxWidthOrHeight: 1600,   // Longest edge ≤ 1600 px; aspect ratio preserved
+      useWebWorker: true,       // Non-blocking compression
+      initialQuality: 0.85,     // High quality — avoids text becoming illegible
+      alwaysKeepResolution: false,
+      // Preserve original file type when it already compresses well (PNG→PNG,
+      // JPEG→JPEG).  The library will output the same mime unless it helps.
+      fileType: file.type,
     };
-    reader.onerror = (error) => reject(error);
-  });
+
+    const compressed = await imageCompression(file, options);
+
+    // imageCompression may return a Blob; wrap in File to keep the name.
+    const resultFile = new File(
+      [compressed],
+      file.name,
+      { type: compressed.type, lastModified: Date.now() }
+    );
+
+    return resultFile;
+  } catch (err) {
+    // If compression fails for any reason, fall back to the original file
+    // so the upload can still proceed.
+    console.warn('[compressImage] Compression failed – uploading original file:', err);
+    return file;
+  }
 };

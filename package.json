@@ -12,6 +12,7 @@
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "@vercel/analytics": "^1.6.1",
+    "browser-image-compression": "^2.0.2",
     "firebase": "^12.7.0",
     "framer-motion": "^12.23.26",
     "googleapis": "^178.0.0",
