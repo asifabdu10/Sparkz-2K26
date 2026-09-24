@@ -8,6 +8,8 @@ import { useInView } from "framer-motion";
 import { db } from "@/utils/firebase";
 import { collection, getDocs, query, where, limit } from "firebase/firestore";
 import { Event } from "@/utils/types/event";
+import { convertDriveUrl } from "@/utils/imageUtils";
+
 
 const SWIPE_THRESHOLD = 30;
 
@@ -199,7 +201,7 @@ export default function FeaturedEvents() {
                          transition-all duration-500`}
                     >
                       <Image
-                        src={event.imageUrl || "/event.png"}
+                        src={event.imageUrl ? convertDriveUrl(event.imageUrl) : "/event.png"}
                         alt={event.title}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         priority={idx < 3}
