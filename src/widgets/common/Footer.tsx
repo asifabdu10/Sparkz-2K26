@@ -71,6 +71,7 @@ export default function Footer() {
               {[
                 ["Home", "/"],
                 ["Events", "/events"],
+                ["Exhibitions", "/#exhibitions"],
                 ["ABHERI", "/abheri"],
                 ["Contact", "/contact"],
               ].map(([label, href]) => (

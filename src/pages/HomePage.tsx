@@ -6,11 +6,7 @@ import Hero from "@/widgets/home/Hero";
 import Featured from "@/widgets/home/Featured";
 
 import BandCompetition from "@/widgets/home/BandCompetition";
-import KSEBExhibition from "@/widgets/home/KSEBExhibition";
-import DroneExhibition from "@/widgets/home/DroneExhibition";
-import KalliyathTMTExhibition from "@/widgets/home/KalliyathTMTExhibition";
-import FireSafetyExhibition from "@/widgets/home/FireSafetyExhibition";
-import PoliceForceSecurityExhibition from "@/widgets/home/PoliceForceSecurityExhibition";
+import ExhibitionsSection from "@/widgets/home/ExhibitionsSection";
 import Preloader from "@/widgets/home/Preloader";
 
 export default function HomePage() {
@@ -32,11 +28,7 @@ export default function HomePage() {
       <Hero />
       <Featured />
       <About />
-      <KSEBExhibition />
-      <DroneExhibition />
-      <FireSafetyExhibition />
-      <KalliyathTMTExhibition />
-      <PoliceForceSecurityExhibition />
+      <ExhibitionsSection />
       <BandCompetition />
     </div>
   );
