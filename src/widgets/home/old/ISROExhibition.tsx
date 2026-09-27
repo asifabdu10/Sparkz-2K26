@@ -83,6 +83,7 @@ export default function ISROExhibition() {
                   alt="ISRO Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -141,6 +142,7 @@ export default function ISROExhibition() {
                   src="/isro_img.jpeg"
                   alt="ISRO Exhibition"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
                 {/* Gradient Overlay */}

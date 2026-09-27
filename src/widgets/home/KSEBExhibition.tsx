@@ -89,6 +89,7 @@ export default function KSEBExhibition() {
                   alt="KSEB Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -154,6 +155,7 @@ export default function KSEBExhibition() {
                   src="/Kseb_expo.jpeg"
                   alt="KSEB Expo"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
 

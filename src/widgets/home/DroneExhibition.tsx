@@ -86,6 +86,7 @@ export default function DroneExhibition() {
                   alt="Drone Expo Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -150,6 +151,7 @@ export default function DroneExhibition() {
                   src="/drone_expo.jpeg"
                   alt="Drone Expo"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
 

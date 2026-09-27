@@ -86,6 +86,7 @@ export default function FireSafetyExhibition() {
                   alt="Fire and Safety Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -150,6 +151,7 @@ export default function FireSafetyExhibition() {
                   src="/fire_safety_expo.jpeg"
                   alt="Fire and Safety Expo"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
 

@@ -152,6 +152,7 @@ export default async function ExhibitionDetailPage({ params }: Props) {
                         alt={item.title}
                         width={48}
                         height={48}
+                        unoptimized
                         className="object-contain h-full w-full"
                       />
                     </div>

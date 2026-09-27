@@ -76,6 +76,7 @@ export default function Loader() {
               alt="Sparkz 2K26"
               width={180}
               height={180}
+              unoptimized
               className="object-contain drop-shadow-[0_0_35px_rgba(212,163,89,0.5)]"
             />
           </motion.div>

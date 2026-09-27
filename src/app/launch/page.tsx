@@ -82,6 +82,7 @@ export default function LaunchPage() {
                 src="/sparkz.svg"
                 alt="Sparkz Logo"
                 fill
+                unoptimized
                 className="object-contain drop-shadow-[0_0_15px_rgba(223,255,26,0.5)]"
                 priority
               />

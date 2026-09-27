@@ -228,6 +228,7 @@ export default function AbheriPage() {
                       src={chiefGuestImage}
                       alt="Ouseppachan"
                       fill
+                      unoptimized
                       className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E] via-transparent to-transparent opacity-80" />
@@ -283,6 +284,7 @@ export default function AbheriPage() {
                       src="/roshan_nc.png"
                       alt="Roshan NC"
                       fill
+                      unoptimized
                       className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0E] via-transparent to-transparent opacity-80" />

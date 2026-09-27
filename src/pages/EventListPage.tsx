@@ -87,6 +87,7 @@ function EventCard({
               src="/event.png"
               alt={event.title || "Event poster"}
               fill
+              unoptimized
               priority={idx < 4}
               sizes="
                 (max-width: 640px) 100vw,

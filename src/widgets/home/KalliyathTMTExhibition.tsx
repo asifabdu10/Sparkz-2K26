@@ -86,6 +86,7 @@ export default function KalliyathTMTExhibition() {
                   alt="Kalliyath TMT Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -150,6 +151,7 @@ export default function KalliyathTMTExhibition() {
                   src="/kalliyath_tmt.jpeg"
                   alt="Kalliyath TMT Expo"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
 

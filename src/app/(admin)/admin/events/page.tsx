@@ -959,7 +959,7 @@ export default function EventsManagement() {
                                         />
                                         {posterPreview ? (
                                             <div className="relative w-full h-full">
-                                                <Image src={posterPreview} alt="Poster Preview" fill className="object-contain" />
+                                                <Image src={posterPreview} alt="Poster Preview" fill unoptimized className="object-contain" />
                                             </div>
                                         ) : (
                                             <>
@@ -983,7 +983,7 @@ export default function EventsManagement() {
                                         />
                                         {bgPreview ? (
                                             <div className="relative w-full h-full">
-                                                <Image src={bgPreview} alt="Bg Preview" fill className="object-cover opacity-50" />
+                                                <Image src={bgPreview} alt="Bg Preview" fill unoptimized className="object-cover opacity-50" />
                                                 <span className="absolute inset-0 flex items-center justify-center text-xs font-medium z-20">Click to Change</span>
                                             </div>
                                         ) : (
@@ -1587,7 +1587,7 @@ export default function EventsManagement() {
                         <div key={event.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden group hover:border-indigo-500/30 transition-all">
                             <div className="h-40 bg-black relative">
                                 {event.imageUrl && (
-                                    <Image src={event.imageUrl} alt={event.title} fill className="object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                                    <Image src={event.imageUrl} alt={event.title} fill unoptimized className="object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                                 )}
                                 <div className="absolute top-2 right-2 bg-black/50 backdrop-blur px-2 py-1 rounded text-xs font-semibold uppercase border border-white/10">
                                     {event.department}

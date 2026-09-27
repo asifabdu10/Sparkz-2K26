@@ -86,6 +86,7 @@ export default function ITBPExhibition() {
                   alt="ITBP Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-fill h-full w-full"
                 />
               </div>
@@ -146,6 +147,7 @@ export default function ITBPExhibition() {
                   src="/itbp_img.jpeg"
                   alt="ITBP Exhibition in action"
                   fill
+                  unoptimized
                   className="object-cover object-center"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />

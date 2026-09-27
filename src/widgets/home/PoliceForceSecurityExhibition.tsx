@@ -87,6 +87,7 @@ export default function PoliceSecurityExhibition() {
                   alt="Police Force Logo"
                   width={80}
                   height={80}
+                  unoptimized
                   className="object-contain h-full w-full"
                 />
               </div>
@@ -151,6 +152,7 @@ export default function PoliceSecurityExhibition() {
                   src="/policeexpo.jpeg"
                   alt="Police Force and Security Expo"
                   fill
+                  unoptimized
                   className="object-cover"
                 />
 
