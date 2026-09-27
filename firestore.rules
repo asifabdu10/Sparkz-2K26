@@ -95,6 +95,30 @@ service cloud.firestore {
 
 
     // =========================================================
+    // ADMIN
+    // =========================================================
+
+    function isAdmin() {
+      return isAuthenticated()
+        && (
+          isSuperAdmin()
+          ||
+          (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            &&
+            'role' in get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role == 'admin'
+          )
+        );
+    }
+
+
+    // =========================================================
     // USERS
     // =========================================================
 
@@ -116,7 +140,7 @@ service cloud.firestore {
       //
       // A user can create/update their own profile.
       //
-      // Super Admin can create/update any user profile.
+      // Super Admin can create/update user profile.
       //
 
       allow create, update: if
@@ -298,18 +322,6 @@ service cloud.firestore {
           ||
 
           isSuperAdmin()
-
-          ||
-
-          (
-            get(
-              /databases/$(database)/documents/users/$(request.auth.uid)
-            ).data.role == 'admin'
-            &&
-            request.resource.data.teamMembers == resource.data.teamMembers
-            &&
-            request.resource.data.teamSize == resource.data.teamSize
-          )
         );
 
 
