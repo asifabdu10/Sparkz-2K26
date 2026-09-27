@@ -40,6 +40,7 @@ export default function Footer() {
                   src="/sparkz.svg"
                   alt="Sparkz logo"
                   fill
+                  unoptimized
                   className="object-contain drop-shadow-[0_0_15px_rgba(212,163,89,0.4)]"
                   priority
                 />

@@ -95,6 +95,7 @@ export default function Header() {
                 alt="Sparkz Logo"
                 width={120}
                 height={40}
+                unoptimized
                 className="h-8 w-auto sm:h-10 object-contain drop-shadow-[0_0_16px_rgba(212,163,89,0.4)]"
                 priority
               />

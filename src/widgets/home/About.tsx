@@ -89,6 +89,7 @@ export default function About() {
                 src="/sparkz.svg"
                 alt="Sparkz Logo"
                 fill
+                unoptimized
                 className="object-contain drop-shadow-[0_0_35px_rgba(212,163,89,0.45)]"
                 priority
               />
@@ -197,6 +198,7 @@ export default function About() {
                 src="/carmel.png"
                 alt="CCET Logo"
                 fill
+                unoptimized
                 className="object-contain drop-shadow-[0_0_35px_rgba(212,163,89,0.35)]"
                 priority
               />

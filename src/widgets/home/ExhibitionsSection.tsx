@@ -99,6 +99,7 @@ export default function ExhibitionsSection() {
                     alt={`${expo.title} Logo`}
                     width={96}
                     height={96}
+                    unoptimized
                     className="object-contain max-h-full max-w-full group-hover:scale-110 transition-transform duration-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
                   />
                   {/* Subtle hover pulse */}

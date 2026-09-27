@@ -162,6 +162,7 @@ export default function BandCompetition() {
                         src={guest.image}
                         alt={guest.name}
                         fill
+                        unoptimized
                         className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                       />
                       {/* Stronger gradient overlay to create space for text */}
