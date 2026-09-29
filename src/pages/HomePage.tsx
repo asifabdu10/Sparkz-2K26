@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import About from "@/widgets/home/About";
+import EventGuidelines from "@/widgets/home/EventGuidelines";
 import Hero from "@/widgets/home/Hero";
 import Featured from "@/widgets/home/Featured";
 
@@ -28,6 +29,7 @@ export default function HomePage() {
       <Hero />
       <Featured />
       <About />
+      <EventGuidelines />
       <ExhibitionsSection />
       <BandCompetition />
     </div>
