@@ -10,6 +10,10 @@ import {
   doc,
   getDocs,
   updateDoc,
+  setDoc,
+  writeBatch,
+  query,
+  where,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -19,6 +23,7 @@ import {
   FiSearch,
   FiUsers,
   FiUserX,
+  FiUserPlus,
   FiX,
   FiPlus,
   FiTrash2,
@@ -33,6 +38,7 @@ import {
   FiZap,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
+import { isBasicScienceDepartment } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
 
 interface UserRegistration {
@@ -214,6 +220,22 @@ export default function RegistrationsManagement() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const isSuperAdmin = userData?.role === "superAdmin";
+  const isBasicScienceAdmin = userData?.role === "basicScienceAdmin";
+
+  // State for registering new participant without Google login
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [addingNewUser, setAddingNewUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    selectedEventId: "",
+    name: "",
+    email: "",
+    mobile: "",
+    college: "",
+    department: "",
+    year: "",
+    extraData: {} as Record<string, string>,
+    teamMembers: [] as Record<string, string>[],
+  });
 
   useEffect(() => {
     if (!userData) return;
@@ -261,8 +283,23 @@ export default function RegistrationsManagement() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const availableEvents = useMemo(() => {
+    return events.filter((event) => {
+      const isRegistrable = (event.registrationMode || "online") !== "none";
+      if (!isRegistrable) return false;
+      if (isBasicScienceAdmin && !isSuperAdmin) {
+        return isBasicScienceDepartment(event.department);
+      }
+      return true;
+    });
+  }, [events, isBasicScienceAdmin, isSuperAdmin]);
+
   const summaries = useMemo<EventSummary[]>(() => {
-    return events
+    const relevantEvents = isBasicScienceAdmin && !isSuperAdmin
+      ? events.filter(e => isBasicScienceDepartment(e.department))
+      : events;
+
+    return relevantEvents
       .map((event) => {
         const eventRegistrations = registrations.filter(
           (registration) => registration.eventId === event.id
@@ -282,7 +319,7 @@ export default function RegistrationsManagement() {
         };
       })
       .sort((a, b) => a.event.title.localeCompare(b.event.title));
-  }, [events, registrations]);
+  }, [events, registrations, isBasicScienceAdmin, isSuperAdmin]);
 
   const departments = useMemo(() => {
     return Array.from(
@@ -544,14 +581,18 @@ export default function RegistrationsManagement() {
       )
     : 1;
 
+  const canManageSelected = isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(selectedRegistrationEvent?.department));
+
   // Confirm pending registration & mark as paid
   const confirmAndRegisterEvent = async (
     registration: UserRegistration,
     paymentIdToUse: string,
     orderIdToUse?: string
   ) => {
-    if (!isSuperAdmin) {
-      toastError("Only Super Admin has permission to confirm and register events.");
+    const event = events.find((item) => item.id === registration.eventId);
+    const canManage = isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(event?.department));
+    if (!canManage) {
+      toastError("You do not have permission to confirm registrations for this event.");
       return;
     }
 
@@ -561,7 +602,6 @@ export default function RegistrationsManagement() {
       return;
     }
 
-    const event = events.find((item) => item.id === registration.eventId);
     const eventTitle = String(registration.eventTitle || event?.title || "");
     const userId = String(
       registration.userId ||
@@ -621,14 +661,15 @@ export default function RegistrationsManagement() {
 
   // Full edit & save registration details
   const saveAllRegistrationDetails = async () => {
-    if (!isSuperAdmin) {
-      toastError("Only Super Admin has permission to edit registration details.");
-      return;
-    }
-
     if (!selectedRegistration) return;
 
     const event = events.find((item) => item.id === selectedRegistration.eventId);
+    const canManage = isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(event?.department));
+    if (!canManage) {
+      toastError("You do not have permission to edit registration details for this event.");
+      return;
+    }
+
     const eventTitle = String(selectedRegistration.eventTitle || event?.title || "");
     const userId = String(
       selectedRegistration.userId ||
@@ -727,7 +768,7 @@ export default function RegistrationsManagement() {
   };
 
   const addTeamMember = () => {
-    if (!isSuperAdmin || !selectedRegistrationEvent || selectedRegistrationEvent.eveType !== "team") return;
+    if (!canManageSelected || !selectedRegistrationEvent || selectedRegistrationEvent.eveType !== "team") return;
     const currentTeamSize = editingTeamMembers.length + 1;
     if (selectedRegistrationEvent.department !== "Football" && currentTeamSize >= selectedMaxMembers) {
       toastError(`Maximum team size is ${selectedMaxMembers} members.`);
@@ -737,7 +778,7 @@ export default function RegistrationsManagement() {
   };
 
   const removeTeamMember = (index: number) => {
-    if (!isSuperAdmin) return;
+    if (!canManageSelected) return;
     if (editingTeamMembers.length <= selectedMinMembers - 1) {
       toastError(`Minimum team size is ${selectedMinMembers} members including the leader.`);
       return;
@@ -746,7 +787,7 @@ export default function RegistrationsManagement() {
   };
 
   const saveTeamMembers = async () => {
-    if (!isSuperAdmin || !selectedRegistration || !selectedRegistrationEvent) return;
+    if (!canManageSelected || !selectedRegistration || !selectedRegistrationEvent) return;
     if (selectedRegistrationEvent.eveType !== "team") {
       toastError("This is not a team event.");
       return;
@@ -805,8 +846,10 @@ export default function RegistrationsManagement() {
   };
 
   const deregisterUser = async (registration: UserRegistration) => {
-    if (!isSuperAdmin) {
-      toastError("Only Super Admin can deregister users.");
+    const event = events.find((item) => item.id === registration.eventId);
+    const canManage = isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(event?.department));
+    if (!canManage) {
+      toastError("You do not have permission to deregister users from this event.");
       return;
     }
 
@@ -814,7 +857,6 @@ export default function RegistrationsManagement() {
       registration.userId ||
       (registration.id.includes("_") ? registration.id.split("_")[0] : "")
     );
-    const event = events.find((item) => item.id === registration.eventId);
     const eventTitle = String(registration.eventTitle || event?.title || "");
     const userName = getRegistrationName(registration);
 
@@ -844,6 +886,316 @@ export default function RegistrationsManagement() {
       toastError("Failed to deregister user");
     } finally {
       setDeregisteringId(null);
+    }
+  };
+
+  // Direct registration helpers for adding participants without Google login
+  const selectedNewUserEvent = useMemo(
+    () => events.find((item) => item.id === newUserForm.selectedEventId) || null,
+    [events, newUserForm.selectedEventId]
+  );
+
+  const newUserMemberFields = useMemo<RegistrationField[]>(() => {
+    if (!selectedNewUserEvent || selectedNewUserEvent.eveType !== "team") return [];
+    if (selectedNewUserEvent.department === "Football") {
+      return [{ name: "Phone Number", type: "tel", required: true }];
+    }
+    const custom = selectedNewUserEvent.teamMemberFields || [];
+    const collectYear = selectedNewUserEvent.showMemberYear !== false;
+    const customNames = new Set(custom.map((field) => field.name.toLowerCase().trim()));
+    return [
+      ...baseMemberFields.filter((field) => !customNames.has(field.name.toLowerCase().trim())),
+      ...custom,
+    ].filter((field) => collectYear || field.name.toLowerCase().trim() !== "year");
+  }, [selectedNewUserEvent]);
+
+  const newUserMinMembers = selectedNewUserEvent?.eveType === "team"
+    ? selectedNewUserEvent.department === "Football"
+      ? 1
+      : Math.max(1, Number(selectedNewUserEvent.memberMinCount) || 1)
+    : 1;
+
+  const newUserMaxMembers = selectedNewUserEvent?.eveType === "team"
+    ? selectedNewUserEvent.department === "Football"
+      ? Infinity
+      : Math.max(newUserMinMembers, Number(selectedNewUserEvent.memberMaxCount) || newUserMinMembers)
+    : 1;
+
+  const handleNewUserEventChange = (eventId: string) => {
+    const nextEvent = events.find((item) => item.id === eventId);
+    if (!nextEvent) {
+      setNewUserForm((prev) => ({
+        ...prev,
+        selectedEventId: "",
+        extraData: {},
+        teamMembers: [],
+      }));
+      return;
+    }
+    const min = nextEvent.eveType === "team"
+      ? nextEvent.department === "Football" ? 1 : Math.max(1, Number(nextEvent.memberMinCount) || 1)
+      : 1;
+    const custom = nextEvent.department === "Football"
+      ? [{ name: "Phone Number", type: "tel", required: true } as RegistrationField]
+      : (() => {
+        const fields = nextEvent.teamMemberFields || [];
+        const names = new Set(fields.map((field) => field.name.toLowerCase().trim()));
+        return [...baseMemberFields.filter((field) => !names.has(field.name.toLowerCase().trim())), ...fields]
+          .filter((field) => nextEvent.showMemberYear !== false || field.name.toLowerCase().trim() !== "year");
+      })();
+
+    setNewUserForm((prev) => ({
+      ...prev,
+      selectedEventId: eventId,
+      extraData: {},
+      teamMembers: nextEvent.eveType === "team"
+        ? Array.from({ length: Math.max(0, min - 1) }, () => emptyTeamMember(custom))
+        : [],
+    }));
+  };
+
+  const addNewUserMember = () => {
+    if (!selectedNewUserEvent || selectedNewUserEvent.eveType !== "team") return;
+    if (selectedNewUserEvent.department !== "Football" && newUserForm.teamMembers.length + 1 >= newUserMaxMembers) {
+      toastError(`Maximum team size is ${newUserMaxMembers} members.`);
+      return;
+    }
+    setNewUserForm((current) => ({
+      ...current,
+      teamMembers: [...current.teamMembers, emptyTeamMember(newUserMemberFields)],
+    }));
+  };
+
+  const removeNewUserMember = (index: number) => {
+    if (newUserForm.teamMembers.length <= newUserMinMembers - 1) {
+      toastError(`Minimum team size is ${newUserMinMembers} members including the leader.`);
+      return;
+    }
+    setNewUserForm((current) => ({
+      ...current,
+      teamMembers: current.teamMembers.filter((_, i) => i !== index),
+    }));
+  };
+
+  const registerNewUserWithoutLogin = async () => {
+    if (!newUserForm.selectedEventId) {
+      toastError("Please select an event.");
+      return;
+    }
+    if (!newUserForm.name.trim()) {
+      toastError("Participant Name is required.");
+      return;
+    }
+    if (!newUserForm.email.trim() || !newUserForm.email.includes("@")) {
+      toastError("A valid Email Address is required.");
+      return;
+    }
+    if (!newUserForm.mobile.trim()) {
+      toastError("Mobile Number is required.");
+      return;
+    }
+    if (!newUserForm.college.trim()) {
+      toastError("College name is required.");
+      return;
+    }
+
+    const event = events.find((e) => e.id === newUserForm.selectedEventId);
+    if (!event) {
+      toastError("Selected event not found.");
+      return;
+    }
+
+    if (!isSuperAdmin && (!isBasicScienceAdmin || !isBasicScienceDepartment(event.department))) {
+      toastError("You can only register participants for Basic Science department events.");
+      return;
+    }
+
+    const teamSize = event.eveType === "team" ? 1 + newUserForm.teamMembers.length : 1;
+    if (event.eveType === "team" && (teamSize < newUserMinMembers || teamSize > newUserMaxMembers)) {
+      toastError(`Team size must be between ${newUserMinMembers} and ${newUserMaxMembers} members.`);
+      return;
+    }
+
+    if (event.eveType === "team") {
+      for (let index = 0; index < newUserForm.teamMembers.length; index += 1) {
+        const member = newUserForm.teamMembers[index];
+        if (!String(member.name || "").trim()) {
+          toastError(`Member ${index + 2} name is required.`);
+          return;
+        }
+        for (const field of newUserMemberFields) {
+          if (field.required && !String(member[field.name] || "").trim()) {
+            toastError(`Member ${index + 2}: ${field.name} is required.`);
+            return;
+          }
+        }
+      }
+    }
+
+    for (const field of event.extraFields || []) {
+      if (field.required && !String(newUserForm.extraData[field.name] || "").trim()) {
+        toastError(`${field.name} is required.`);
+        return;
+      }
+    }
+
+    const cleanedMembers = newUserForm.teamMembers.map((member) => {
+      if (event.showMemberYear === false) {
+        const { Year, ...rest } = member;
+        void Year;
+        return rest;
+      }
+      return member;
+    });
+
+    try {
+      setAddingNewUser(true);
+      const normEmail = newUserForm.email.trim().toLowerCase();
+
+      const existingUserQuery = query(
+        collection(db, "users"),
+        where("email", "==", normEmail)
+      );
+      const existingSnapshot = await getDocs(existingUserQuery);
+
+      let targetUserId = "";
+      let userDocExists = false;
+
+      if (!existingSnapshot.empty) {
+        targetUserId = existingSnapshot.docs[0].id;
+        userDocExists = true;
+      } else {
+        const newUserDocRef = doc(collection(db, "users"));
+        targetUserId = newUserDocRef.id;
+      }
+
+      const regCheckQuery = query(
+        collection(db, "registrations"),
+        where("eventId", "==", event.id),
+        where("userId", "==", targetUserId)
+      );
+      const regCheckSnapshot = await getDocs(regCheckQuery);
+      if (!regCheckSnapshot.empty) {
+        toastError("This user is already registered for this event.");
+        return;
+      }
+
+      const batch = writeBatch(db);
+      const registrationRef = doc(collection(db, "registrations"));
+
+      if (!userDocExists) {
+        const userDocRef = doc(db, "users", targetUserId);
+        batch.set(userDocRef, {
+          name: newUserForm.name.trim(),
+          email: normEmail,
+          college: newUserForm.college.trim(),
+          department: newUserForm.department.trim(),
+          isProfileComplete: true,
+          registeredEvents: [event.title],
+          role: "user",
+          isManualUser: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else {
+        const userDocRef = doc(db, "users", targetUserId);
+        batch.update(userDocRef, {
+          registeredEvents: arrayUnion(event.title),
+        });
+      }
+
+      const newRegistrationData: UserRegistration = {
+        id: registrationRef.id,
+        eventId: event.id,
+        eventTitle: event.title,
+        userId: targetUserId,
+        userName: newUserForm.name.trim(),
+        userEmail: normEmail,
+        name: newUserForm.name.trim(),
+        email: normEmail,
+        leaderName: newUserForm.name.trim(),
+        leaderEmail: normEmail,
+        leaderMobile: newUserForm.mobile.trim(),
+        leaderCollege: newUserForm.college.trim(),
+        leaderDepartment: newUserForm.department.trim(),
+        leaderYear: newUserForm.year.trim(),
+        college: newUserForm.college.trim(),
+        department: event.department || "",
+        extraData: newUserForm.extraData,
+        status: "registered",
+        paymentStatus: "admin",
+        registrationFee: 0,
+        registrationMethod: isBasicScienceAdmin ? "basicScienceAdmin" : "superAdmin",
+        registeredBy: userData?.email || "",
+        teamSize,
+        teamMembers: cleanedMembers,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      batch.set(registrationRef, newRegistrationData);
+      await batch.commit();
+
+      if (event.registrationMode === "spot") {
+        try {
+          const ticketResponse = await fetch("/api/events/send-spot-ticket", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              registrationId: registrationRef.id,
+              event,
+              registration: {
+                userId: targetUserId,
+                userName: newUserForm.name.trim(),
+                userEmail: normEmail,
+                leaderName: newUserForm.name.trim(),
+                leaderEmail: normEmail,
+                leaderMobile: newUserForm.mobile.trim(),
+                leaderCollege: newUserForm.college.trim(),
+                leaderDepartment: newUserForm.department.trim(),
+                leaderYear: newUserForm.year.trim(),
+                teamSize,
+                teamMembers: cleanedMembers,
+              },
+            }),
+          });
+          const ticketResult = await ticketResponse.json().catch(() => ({}));
+          if (ticketResult.ticketNumber) {
+            await updateDoc(registrationRef, {
+              ticketNumber: ticketResult.ticketNumber,
+              ticketEmailStatus: "sent",
+              ticketEmailedAt: new Date(),
+            });
+            newRegistrationData.ticketNumber = ticketResult.ticketNumber;
+          }
+        } catch (ticketError) {
+          console.error("Spot ticket email failed:", ticketError);
+        }
+      }
+
+      setRegistrations((prev) => [newRegistrationData, ...prev]);
+
+      toastSuccess(
+        `${newUserForm.name.trim()} successfully registered for ${event.title}!`
+      );
+
+      setIsAddUserModalOpen(false);
+      setNewUserForm({
+        selectedEventId: "",
+        name: "",
+        email: "",
+        mobile: "",
+        college: "",
+        department: "",
+        year: "",
+        extraData: {},
+        teamMembers: [],
+      });
+    } catch (error) {
+      console.error("Error adding new user and registration:", error);
+      toastError("Failed to register participant. Please check permissions and try again.");
+    } finally {
+      setAddingNewUser(false);
     }
   };
 
@@ -890,14 +1242,39 @@ export default function RegistrationsManagement() {
           </p>
         </div>
 
-        <button
-          onClick={exportSummary}
-          disabled={loading || !filteredSummaries.length}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold transition-colors shadow-lg shadow-emerald-950"
-        >
-          <FiDownload />
-          Export Excel Report
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setNewUserForm({
+                selectedEventId: availableEvents[0]?.id || "",
+                name: "",
+                email: "",
+                mobile: "",
+                college: "",
+                department: "",
+                year: "",
+                extraData: {},
+                teamMembers: [],
+              });
+              if (availableEvents[0]?.id) {
+                handleNewUserEventChange(availableEvents[0].id);
+              }
+              setIsAddUserModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold transition-colors shadow-lg shadow-indigo-950 text-white"
+          >
+            <FiUserPlus size={18} />
+            Register Participant (No Login Required)
+          </button>
+          <button
+            onClick={exportSummary}
+            disabled={loading || !filteredSummaries.length}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold transition-colors shadow-lg shadow-emerald-950"
+          >
+            <FiDownload />
+            Export Excel Report
+          </button>
+        </div>
       </div>
 
       {/* Spot Registration Live Status */}
@@ -1376,24 +1753,29 @@ export default function RegistrationsManagement() {
                             {registration.razorpayPaymentId || "—"}
                           </td>
                           <td className="px-5 py-4">
-                            <div className="flex items-center gap-2">
-                              {isSuperAdmin && isPending && (
-                                <button
-                                  onClick={() => openRegistrationDetails(registration)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition-all shadow-sm"
-                                  title="Enter Payment ID & complete registration"
-                                >
-                                  <FiZap size={13} /> Resolve
-                                </button>
-                              )}
-                              <button
-                                onClick={() => openRegistrationDetails(registration)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium transition-colors"
-                              >
-                                {isSuperAdmin ? <FiEdit2 size={12} /> : <FiEye size={12} />}
-                                {isSuperAdmin ? "Edit / View" : "View"}
-                              </button>
-                            </div>
+                            {(() => {
+                              const canManage = isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(selectedSummary?.event.department));
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {canManage && isPending && (
+                                    <button
+                                      onClick={() => openRegistrationDetails(registration)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25 text-amber-300 text-xs font-bold transition-all shadow-sm"
+                                      title="Enter Payment ID & complete registration"
+                                    >
+                                      <FiZap size={13} /> Resolve
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openRegistrationDetails(registration)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium transition-colors"
+                                  >
+                                    {canManage ? <FiEdit2 size={12} /> : <FiEye size={12} />}
+                                    {canManage ? "Edit / View" : "View"}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </td>
                           {isSuperAdmin && (
                             <td className="px-5 py-4">
@@ -1446,7 +1828,7 @@ export default function RegistrationsManagement() {
               </div>
 
               <div className="flex items-center gap-2">
-                {isSuperAdmin && (
+                {canManageSelected && (
                   <button
                     type="button"
                     onClick={() => setIsEditingDetails((prev) => !prev)}
@@ -1472,8 +1854,8 @@ export default function RegistrationsManagement() {
 
             {/* Modal Scrollable Body */}
             <div className="p-5 overflow-y-auto space-y-6">
-              {/* Quick Resolve / Register Banner (Shown in view mode when pending to Super Admin only) */}
-              {isSuperAdmin && !isEditingDetails && isPendingRegistration(selectedRegistration) && (
+              {/* Quick Resolve / Register Banner (Shown in view mode when pending to Admin only) */}
+              {canManageSelected && !isEditingDetails && isPendingRegistration(selectedRegistration) && (
                 <div className="rounded-xl border border-amber-500/40 bg-amber-950/25 p-4 shadow-lg">
                   <div className="flex items-start gap-3">
                     <FiAlertCircle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
@@ -1534,18 +1916,18 @@ export default function RegistrationsManagement() {
                 </div>
               )}
 
-              {/* Notice for non-super admin when registration is pending */}
-              {!isSuperAdmin && isPendingRegistration(selectedRegistration) && (
+              {/* Notice for unauthorized admin when registration is pending */}
+              {!canManageSelected && isPendingRegistration(selectedRegistration) && (
                 <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 p-3.5 flex items-center gap-2.5 text-xs text-amber-300/80">
                   <FiClock size={16} className="text-amber-400 shrink-0" />
                   <span>
-                    This registration is pending payment verification. Only Super Admin has permission to modify or resolve it.
+                    This registration is pending payment verification. Only authorized administrators have permission to modify or resolve it.
                   </span>
                 </div>
               )}
 
               {/* View Mode: Readonly Detail Cards */}
-              {(!isSuperAdmin || !isEditingDetails) && (
+              {(!canManageSelected || !isEditingDetails) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     {
@@ -1670,8 +2052,8 @@ export default function RegistrationsManagement() {
                 </div>
               )}
 
-              {/* Edit Mode: Full Details Form (Super Admin only) */}
-              {isSuperAdmin && isEditingDetails && (
+              {/* Edit Mode: Full Details Form */}
+              {canManageSelected && isEditingDetails && (
                 <div className="space-y-6">
                   {/* Payment & Status Settings Section */}
                   <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/15 p-4 space-y-4">
@@ -2069,7 +2451,7 @@ export default function RegistrationsManagement() {
                     ))}
                   </div>
 
-                  {isSuperAdmin && (
+                  {canManageSelected && (
                     <div className="flex justify-end mt-4">
                       <button
                         type="button"
@@ -2103,6 +2485,244 @@ export default function RegistrationsManagement() {
                     </div>
                   </div>
                 )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Register New User / Participant without Google Login */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-[#0b0d14] border border-gray-800 rounded-2xl shadow-2xl p-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <FiUserPlus className="text-indigo-400" />
+                  Register Participant (No Login Required)
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  Add participant and event members directly without requiring Google sign-in or login on the website.
+                </p>
+              </div>
+
+              <button
+                onClick={() => !addingNewUser && setIsAddUserModalOpen(false)}
+                disabled={addingNewUser}
+                className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white disabled:opacity-50"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            {/* Event Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select Event * {isBasicScienceAdmin && !isSuperAdmin && "(Basic Science & Humanities)"}
+              </label>
+              <select
+                value={newUserForm.selectedEventId}
+                onChange={(e) => handleNewUserEventChange(e.target.value)}
+                disabled={addingNewUser}
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              >
+                <option value="">-- Select an event to register for --</option>
+                {availableEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.title} ({event.department || "General"})
+                    {event.isFree
+                      ? " — Free"
+                      : event.registrationFee
+                      ? ` — ${String(event.registrationFee).trim().startsWith("₹") ? event.registrationFee : `₹ ${event.registrationFee}`}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Leader / Participant Details */}
+            <div className="space-y-6">
+              <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+                <h3 className="font-semibold text-white mb-4">
+                  {selectedNewUserEvent?.eveType === "team" ? "Team Leader / Main Contact Details" : "Participant Details"}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">Full Name *</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={newUserForm.name}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, name: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">Email Address *</span>
+                    <input
+                      type="email"
+                      placeholder="e.g. rahul@example.com (no login needed)"
+                      value={newUserForm.email}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, email: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">Mobile / WhatsApp Number *</span>
+                    <input
+                      type="tel"
+                      placeholder="e.g. 9876543210"
+                      value={newUserForm.mobile}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, mobile: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">School / College *</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Carmel College of Engineering"
+                      value={newUserForm.college}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, college: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">Department / Class</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Physics / S1 CSE"
+                      value={newUserForm.department}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, department: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm text-gray-400 mb-2">Year</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1st Year / 2nd Year"
+                      value={newUserForm.year}
+                      onChange={(e) => setNewUserForm(c => ({ ...c, year: e.target.value }))}
+                      className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              {/* Team Members if selected event is team */}
+              {selectedNewUserEvent && selectedNewUserEvent.eveType === "team" && (
+                <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-white">Team Members</h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Team size: {1 + newUserForm.teamMembers.length} / {selectedNewUserEvent.department === "Football" ? "Unlimited" : `${newUserMinMembers}-${newUserMaxMembers}`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addNewUserMember}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium"
+                    >
+                      <FiPlus /> Add Member
+                    </button>
+                  </div>
+
+                  {newUserForm.teamMembers.map((member, index) => (
+                    <div key={index} className="rounded-xl border border-gray-800 bg-gray-950/60 p-4 space-y-4 relative">
+                      <button
+                        type="button"
+                        onClick={() => removeNewUserMember(index)}
+                        className="absolute right-3 top-3 text-gray-500 hover:text-red-400"
+                      >
+                        <FiTrash2 />
+                      </button>
+                      <h4 className="font-medium text-indigo-300">Member {index + 2}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-6">
+                        <label className="block">
+                          <span className="block text-sm text-gray-400 mb-2">Name *</span>
+                          <input
+                            value={member.name || ""}
+                            onChange={(e) => setNewUserForm(c => ({
+                              ...c,
+                              teamMembers: c.teamMembers.map((m, i) => i === index ? { ...m, name: e.target.value } : m)
+                            }))}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                          />
+                        </label>
+                        {newUserMemberFields.map((field) => (
+                          <label key={field.name} className="block">
+                            <span className="block text-sm text-gray-400 mb-2">{field.name} {field.required && "*"}</span>
+                            <input
+                              type={memberInputType(field.type)}
+                              value={member[field.name] || ""}
+                              onChange={(e) => setNewUserForm(c => ({
+                                ...c,
+                                teamMembers: c.teamMembers.map((m, i) => i === index ? { ...m, [field.name]: e.target.value } : m)
+                              }))}
+                              className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+
+              {/* Extra event fields */}
+              {selectedNewUserEvent && selectedNewUserEvent.extraFields && selectedNewUserEvent.extraFields.length > 0 && (
+                <section className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+                  <h3 className="font-semibold text-white mb-4">Additional Event Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedNewUserEvent.extraFields.map((field) => (
+                      <label key={field.name} className="block">
+                        <span className="block text-sm text-gray-400 mb-2">{field.name} {field.required && "*"}</span>
+                        <input
+                          type={memberInputType(field.type)}
+                          value={newUserForm.extraData[field.name] || ""}
+                          onChange={(e) => setNewUserForm(c => ({
+                            ...c,
+                            extraData: { ...c.extraData, [field.name]: e.target.value }
+                          }))}
+                          className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/20 p-4 mt-6 text-sm text-gray-400">
+              <p className="text-indigo-300 font-medium">Offline Direct Registration</p>
+              <p className="mt-1">
+                This will create an event registration record immediately without requiring the user to login with Google. If the user later signs into the site using this email, their registrations will automatically link to their account.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsAddUserModalOpen(false)}
+                disabled={addingNewUser}
+                className="px-4 py-2 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={registerNewUserWithoutLogin}
+                disabled={addingNewUser || !newUserForm.selectedEventId}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/30"
+              >
+                <FiUserPlus />
+                {addingNewUser ? "Registering Participant..." : "Register Participant"}
+              </button>
             </div>
           </div>
         </div>

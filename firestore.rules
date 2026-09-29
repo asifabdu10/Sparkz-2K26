@@ -95,6 +95,42 @@ service cloud.firestore {
 
 
     // =========================================================
+    // BASIC SCIENCE ADMIN
+    // =========================================================
+
+    function isBasicScienceAdmin() {
+      return isAuthenticated()
+        && (
+          isSuperAdmin()
+          ||
+          (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            &&
+            'role' in get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data
+            &&
+            (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'basicScienceAdmin'
+              ||
+              (
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                &&
+                'department' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+                &&
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department in [
+                  'Basic Science & Humanities',
+                  'Basic Science',
+                  'BSH'
+                ]
+              )
+            )
+          )
+        );
+    }
+
+
+    // =========================================================
     // ADMIN
     // =========================================================
 
@@ -102,6 +138,8 @@ service cloud.firestore {
       return isAuthenticated()
         && (
           isSuperAdmin()
+          ||
+          isBasicScienceAdmin()
           ||
           (
             exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -140,13 +178,15 @@ service cloud.firestore {
       //
       // A user can create/update their own profile.
       //
-      // Super Admin can create/update user profile.
+      // Super Admin and Basic Science Admin can create/update user profile.
       //
 
       allow create, update: if
         isOwner(userId)
         ||
-        isSuperAdmin();
+        isSuperAdmin()
+        ||
+        isBasicScienceAdmin();
 
 
       // -------------------------------------------------------
@@ -211,9 +251,13 @@ service cloud.firestore {
         &&
         (
           // ---------------------------------------------------
-          // SUPER ADMIN REGISTRATION
+          // SUPER ADMIN OR BASIC SCIENCE ADMIN REGISTRATION
           // ---------------------------------------------------
           isSuperAdmin()
+
+          ||
+
+          isBasicScienceAdmin()
 
           ||
 
@@ -277,9 +321,7 @@ service cloud.firestore {
       //
       // User can read their own registrations.
       //
-      // Super Admin can read all registrations.
-      //
-      // Admin can read registrations.
+      // Super Admin and Admins (including Basic Science Admin) can read registrations.
       //
 
       allow read: if
@@ -295,9 +337,7 @@ service cloud.firestore {
 
           ||
 
-          get(
-            /databases/$(database)/documents/users/$(request.auth.uid)
-          ).data.role == 'admin'
+          isAdmin()
         );
 
 
@@ -307,9 +347,7 @@ service cloud.firestore {
       //
       // User can update their own registration.
       //
-      // Super Admin can update any registration.
-      //
-      // Admin can update registrations.
+      // Super Admin and Basic Science Admin can update any registration.
       //
 
       allow update: if
@@ -322,6 +360,10 @@ service cloud.firestore {
           ||
 
           isSuperAdmin()
+
+          ||
+
+          isBasicScienceAdmin()
         );
 
 

@@ -215,7 +215,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Manage Users */}
-        {userData.role === "superAdmin" && (
+        {(userData.role === "superAdmin" || userData.role === "basicScienceAdmin") && (
           <Link
             href="/admin/users"
             className="group p-6 bg-gray-900 border border-gray-800 rounded-2xl hover:border-indigo-500/50 transition-all hover:bg-gray-800"
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
             </h3>
 
             <p className="text-sm text-gray-500 mt-2">
-              View users and assign roles.
+              View users and register participants.
             </p>
           </Link>
         )}

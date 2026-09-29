@@ -8,17 +8,27 @@ import {
   User, 
   GoogleAuthProvider 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  deleteDoc, 
+  writeBatch 
+} from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/utils/firebase';
 import { useRouter } from 'next/navigation';
 
-interface UserProfile {
+export interface UserProfile {
   name: string;
   email: string;
   college: string;
   isProfileComplete: boolean;
   registeredEvents?: string[];
-  role?: 'superAdmin' | 'admin' | 'abheriAdmin' | 'user';
+  role?: 'superAdmin' | 'admin' | 'abheriAdmin' | 'basicScienceAdmin' | 'user';
   department?: string; // For department admins
 }
 
@@ -71,16 +81,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .map(e => e.trim().toLowerCase());
         const isSuperAdmin = superAdminEmails.includes(email.toLowerCase());
 
+        // Check if there was an offline / manual user record created by admin for this email
+        let existingOfflineData: Partial<UserProfile> = {};
+        let offlineDocIdToDelete: string | null = null;
+
+        try {
+          const offlineQuery = query(
+            collection(db, 'users'),
+            where('email', '==', email.toLowerCase())
+          );
+          const offlineSnapshot = await getDocs(offlineQuery);
+          if (!offlineSnapshot.empty) {
+            const firstMatch = offlineSnapshot.docs[0];
+            if (firstMatch.id !== uid) {
+              existingOfflineData = firstMatch.data() as Partial<UserProfile>;
+              offlineDocIdToDelete = firstMatch.id;
+            }
+          }
+        } catch (err) {
+          console.warn('Error checking offline user records:', err);
+        }
+
         const initialData: UserProfile = {
-          name: '',
+          name: existingOfflineData.name || '',
           email: email,
-          college: '',
-          isProfileComplete: false,
-          registeredEvents: [],
-          role: isSuperAdmin ? 'superAdmin' : 'user'
+          college: existingOfflineData.college || '',
+          isProfileComplete: Boolean(existingOfflineData.name && existingOfflineData.college),
+          registeredEvents: existingOfflineData.registeredEvents || [],
+          role: isSuperAdmin ? 'superAdmin' : (existingOfflineData.role || 'user'),
+          department: existingOfflineData.department || '',
         };
         await setDoc(userDocRef, initialData);
         setUserData(initialData);
+
+        // If an offline placeholder record existed, sync existing registrations to new UID
+        if (offlineDocIdToDelete) {
+          try {
+            await deleteDoc(doc(db, 'users', offlineDocIdToDelete));
+            const regsQuery = query(
+              collection(db, 'registrations'),
+              where('userId', '==', offlineDocIdToDelete)
+            );
+            const regsSnapshot = await getDocs(regsQuery);
+            if (!regsSnapshot.empty) {
+              const batch = writeBatch(db);
+              regsSnapshot.docs.forEach((rDoc) => {
+                batch.update(rDoc.ref, { userId: uid });
+              });
+              await batch.commit();
+            }
+          } catch (syncErr) {
+            console.warn('Error linking offline registrations to new user uid:', syncErr);
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);

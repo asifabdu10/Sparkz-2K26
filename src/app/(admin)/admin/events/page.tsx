@@ -18,7 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
-import { departments } from "@/utils/constants/Constants";
+import { departments, isBasicScienceDepartment } from "@/utils/constants/Constants";
 import { Event } from "@/utils/types/event";
 import { compressImage } from "@/utils/imageUtils";
 import Image from "next/image";
@@ -169,34 +169,48 @@ export default function EventsManagement() {
     const fetchEvents = async () => {
         try {
             setLoading(true);
-            let q;
             if (userData?.role === 'superAdmin') {
-                q = query(collection(db, "events"));
+                const querySnapshot = await getDocs(collection(db, "events"));
+                const eventsList = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        imageUrl: data.imageUrl || data.image || "",
+                        bgImageUrl: data.bgImageUrl || data.bgImage || "",
+                    };
+                }) as Event[];
+                setEvents(eventsList);
+            } else if (userData?.role === 'basicScienceAdmin') {
+                const querySnapshot = await getDocs(collection(db, "events"));
+                const eventsList = (querySnapshot.docs
+                    .map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            imageUrl: data.imageUrl || data.image || "",
+                            bgImageUrl: data.bgImageUrl || data.bgImage || "",
+                        };
+                    }) as Event[])
+                    .filter(e => isBasicScienceDepartment(e.department));
+                setEvents(eventsList);
             } else if (userData?.role === 'admin' && userData?.department) {
-                // Filter by department for regular admins
-                // Note: This relies on manual entry matching the department string exactly.
-                q = query(collection(db, "events"), where("department", "==", userData.department));
+                const q = query(collection(db, "events"), where("department", "==", userData.department));
+                const querySnapshot = await getDocs(q);
+                const eventsList = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        imageUrl: data.imageUrl || data.image || "",
+                        bgImageUrl: data.bgImageUrl || data.bgImage || "",
+                    };
+                }) as Event[];
+                setEvents(eventsList);
             } else {
                 setEvents([]);
-                setLoading(false);
-                return;
             }
-
-            const querySnapshot = await getDocs(q);
-
-            /* eslint-disable @typescript-eslint/no-explicit-any */
-            const eventsList = querySnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    // Map legacy 'image' to 'imageUrl' if needed
-                    imageUrl: data.imageUrl || data.image || "",
-                    bgImageUrl: data.bgImageUrl || data.bgImage || "",
-                };
-            }) as Event[];
-
-            setEvents(eventsList);
         } catch (error) {
             console.error("Error fetching events:", error);
             toastError("Failed to fetch events");

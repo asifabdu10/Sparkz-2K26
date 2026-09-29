@@ -497,3 +497,15 @@ export const navItems = [
 // ];
 
 export const departments = ["All", "CSE", "EEE", "MECH", "CIVIL", "Basic Science & Humanities", "Football", "Expo"];
+
+export const isBasicScienceDepartment = (dept?: string): boolean => {
+    if (!dept) return false;
+    const d = dept.toLowerCase().trim();
+    return (
+        d === "basic science & humanities" ||
+        d === "basic science" ||
+        d === "basic sciences" ||
+        d === "bsh" ||
+        d.startsWith("basic science")
+    );
+};

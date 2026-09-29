@@ -33,7 +33,8 @@ export default function AdminLayout({
       } else if (
         userData?.role !== "superAdmin" &&
         userData?.role !== "admin" &&
-        userData?.role !== "abheriAdmin"
+        userData?.role !== "abheriAdmin" &&
+        userData?.role !== "basicScienceAdmin"
       ) {
         router.push("/");
       }
@@ -52,7 +53,8 @@ export default function AdminLayout({
     !userData ||
     (userData.role !== "superAdmin" &&
       userData.role !== "admin" &&
-      userData.role !== "abheriAdmin")
+      userData.role !== "abheriAdmin" &&
+      userData.role !== "basicScienceAdmin")
   ) {
     return null;
   }
@@ -62,25 +64,25 @@ export default function AdminLayout({
       name: "Dashboard",
       href: "/admin",
       icon: FiHome,
-      roles: ["superAdmin", "admin"],
+      roles: ["superAdmin", "admin", "basicScienceAdmin"],
     },
     {
       name: "Users",
       href: "/admin/users",
       icon: FiUsers,
-      roles: ["superAdmin"],
+      roles: ["superAdmin", "basicScienceAdmin"],
     },
     {
       name: "Events",
       href: "/admin/events",
       icon: FiCalendar,
-      roles: ["superAdmin", "admin"],
+      roles: ["superAdmin", "admin", "basicScienceAdmin"],
     },
     {
       name: "Registrations",
       href: "/admin/registrations",
       icon: FiList,
-      roles: ["superAdmin", "admin"],
+      roles: ["superAdmin", "admin", "basicScienceAdmin"],
     },
     {
       name: "Abheri",
