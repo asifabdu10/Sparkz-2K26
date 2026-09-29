@@ -21,6 +21,7 @@ import { AlertCircle, Calendar, Loader2, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 import { Event, RegistrationField } from "@/utils/types/event";
+import { allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import GradientBackground from "@/components/ui/GradientBackground";
 import dynamic from "next/dynamic";
 
@@ -113,6 +114,8 @@ export default function Register() {
   }, [event]);
 
   const isSpotRegistration = event?.registrationMode === "spot";
+  const isMultiAdmin = userData?.role === "basicScienceAdmin" || userData?.role === "superAdmin";
+  const canMultiRegister = allowsMultipleRegistrations(event) && isMultiAdmin;
 
   const feeNumber = useMemo(() => {
     if (!event || isFree) return 0;
@@ -603,11 +606,37 @@ export default function Register() {
           </div>
 
           {registered ? (
-            <div className="text-center py-16 bg-[#0B0B0E] rounded-2xl border border-emerald-500/20">
+            <div className="text-center py-16 bg-[#0B0B0E] rounded-2xl border border-emerald-500/20 px-6">
               <div className="text-5xl mb-4">✓</div>
               <h2 className="text-2xl font-bold text-emerald-300">You are registered!</h2>
               <p className="text-[#A1A1AA] mt-2">Your registration for {event.title} is saved successfully.</p>
-              <Link href="/events" className="inline-block mt-8 px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]">Back to Events</Link>
+              <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
+                {canMultiRegister && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegistered(false);
+                      setRegistrationId(null);
+                      setPaymentReady(false);
+                      setAcknowledged(false);
+                      setFormData({
+                        leaderName: "",
+                        leaderEmail: user?.email || "",
+                        leaderMobile: "",
+                        leaderCollege: "",
+                        leaderDepartment: "",
+                        leaderYear: "",
+                        extraData: {},
+                        teamMembers: [],
+                      });
+                    }}
+                    className="px-6 py-3 btn-gold font-semibold rounded-xl text-[#0B0B0E]"
+                  >
+                    + Register Another Entry / Team
+                  </button>
+                )}
+                <Link href="/events" className="inline-block px-6 py-3 bg-gray-800 hover:bg-gray-700 font-semibold rounded-xl text-white">Back to Events</Link>
+              </div>
             </div>
           ) : registrationClosed ? (
             <div className="text-center py-12 bg-[#0B0B0E] rounded-2xl border border-[rgba(212,163,89,0.2)]">

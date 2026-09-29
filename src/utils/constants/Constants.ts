@@ -509,3 +509,14 @@ export const isBasicScienceDepartment = (dept?: string): boolean => {
         d.startsWith("basic science")
     );
 };
+
+export const isBrainBattleEvent = (title?: string): boolean => {
+    if (!title) return false;
+    const t = title.toLowerCase().trim();
+    return t.includes("brain battle") || t.includes("brain-battle") || t.includes("brainbattle");
+};
+
+export const allowsMultipleRegistrations = (event?: { department?: string; title?: string } | null): boolean => {
+    if (!event) return false;
+    return isBasicScienceDepartment(event.department) || isBrainBattleEvent(event.title);
+};

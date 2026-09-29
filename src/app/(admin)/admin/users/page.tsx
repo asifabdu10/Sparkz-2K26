@@ -24,7 +24,7 @@ import {
     FiTrash2,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
-import { departments, isBasicScienceDepartment } from "@/utils/constants/Constants";
+import { departments, isBasicScienceDepartment, allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
 
 type MemberData = Record<string, string>;
@@ -510,15 +510,18 @@ export default function UsersManagement() {
                 targetUserId = newUserDocRef.id;
             }
 
-            const regCheckQuery = query(
-                collection(db, "registrations"),
-                where("eventId", "==", event.id),
-                where("userId", "==", targetUserId)
-            );
-            const regCheckSnapshot = await getDocs(regCheckQuery);
-            if (!regCheckSnapshot.empty) {
-                toastError("This user is already registered for this event.");
-                return;
+            const canRegisterMultiple = allowsMultipleRegistrations(event);
+            if (!canRegisterMultiple) {
+                const regCheckQuery = query(
+                    collection(db, "registrations"),
+                    where("eventId", "==", event.id),
+                    where("userId", "==", targetUserId)
+                );
+                const regCheckSnapshot = await getDocs(regCheckQuery);
+                if (!regCheckSnapshot.empty) {
+                    toastError("This user is already registered for this event.");
+                    return;
+                }
             }
 
             const batch = writeBatch(db);
@@ -686,7 +689,8 @@ export default function UsersManagement() {
             return;
         }
 
-        if (registeringUser.registeredEvents?.includes(event.title)) {
+        const canRegisterMultiple = allowsMultipleRegistrations(event);
+        if (!canRegisterMultiple && registeringUser.registeredEvents?.includes(event.title)) {
             toastError("This user is already registered for this event.");
             return;
         }
@@ -694,17 +698,19 @@ export default function UsersManagement() {
         try {
             setRegistering(true);
 
-            const existingQuery = query(
-                collection(db, "registrations"),
-                where("eventId", "==", event.id),
-                where("userId", "==", registeringUser.id)
-            );
+            if (!canRegisterMultiple) {
+                const existingQuery = query(
+                    collection(db, "registrations"),
+                    where("eventId", "==", event.id),
+                    where("userId", "==", registeringUser.id)
+                );
 
-            const existingSnapshot = await getDocs(existingQuery);
+                const existingSnapshot = await getDocs(existingQuery);
 
-            if (!existingSnapshot.empty) {
-                toastError("This user is already registered for this event.");
-                return;
+                if (!existingSnapshot.empty) {
+                    toastError("This user is already registered for this event.");
+                    return;
+                }
             }
 
             const batch = writeBatch(db);

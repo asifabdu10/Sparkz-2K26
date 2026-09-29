@@ -38,7 +38,7 @@ import {
   FiZap,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
-import { isBasicScienceDepartment } from "@/utils/constants/Constants";
+import { isBasicScienceDepartment, allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
 
 interface UserRegistration {
@@ -1069,15 +1069,18 @@ export default function RegistrationsManagement() {
         targetUserId = newUserDocRef.id;
       }
 
-      const regCheckQuery = query(
-        collection(db, "registrations"),
-        where("eventId", "==", event.id),
-        where("userId", "==", targetUserId)
-      );
-      const regCheckSnapshot = await getDocs(regCheckQuery);
-      if (!regCheckSnapshot.empty) {
-        toastError("This user is already registered for this event.");
-        return;
+      const canRegisterMultiple = allowsMultipleRegistrations(event);
+      if (!canRegisterMultiple) {
+        const regCheckQuery = query(
+          collection(db, "registrations"),
+          where("eventId", "==", event.id),
+          where("userId", "==", targetUserId)
+        );
+        const regCheckSnapshot = await getDocs(regCheckQuery);
+        if (!regCheckSnapshot.empty) {
+          toastError("This user is already registered for this event.");
+          return;
+        }
       }
 
       const batch = writeBatch(db);

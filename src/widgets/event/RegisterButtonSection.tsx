@@ -7,6 +7,7 @@ import { Event } from "@/utils/types/event";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { toastError } from "@/utils/common/Toast";
+import { allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 
@@ -37,10 +38,13 @@ function getSpotStart(event: Event): Date | null {
 }
 
 export default function RegisterButtonSection({ event }: Props) {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const router = useRouter();
   const [registered, setRegistered] = useState(false);
   const [checking, setChecking] = useState(true);
+
+  const isMultiAdmin = userData?.role === "basicScienceAdmin" || userData?.role === "superAdmin";
+  const canMultiRegister = allowsMultipleRegistrations(event) && isMultiAdmin;
 
   const registrationMode = event.registrationMode || "online";
 
@@ -121,6 +125,22 @@ export default function RegisterButtonSection({ event }: Props) {
     }
 
     if (registered) {
+      if (canMultiRegister) {
+        return (
+          <div className="flex flex-col gap-2.5 w-full">
+            <div className="w-full text-center py-2 px-4 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl text-sm">
+              ✓ Registered (Multiple entries enabled for admin)
+            </div>
+            <Link
+              href={`/events/${event.id}/register`}
+              className="btn-gold group relative flex items-center justify-center gap-3 w-full rounded-full p-4 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+            >
+              <span className="text-lg font-bold text-[#0B0B0E]">Register Another Entry</span>
+              <FaArrowRight className="text-[#0B0B0E]" />
+            </Link>
+          </div>
+        );
+      }
       return <button disabled className="w-full rounded-full p-4 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold">✓ Registered</button>;
     }
 
@@ -148,6 +168,22 @@ export default function RegisterButtonSection({ event }: Props) {
   }
 
   if (registered) {
+    if (canMultiRegister) {
+      return (
+        <div className="flex flex-col gap-2.5 w-full">
+          <div className="w-full text-center py-2 px-4 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl text-sm">
+            ✓ Registered (Multiple entries enabled for admin)
+          </div>
+          <Link
+            href={`/events/${event.id}/register`}
+            className="btn-gold group relative flex items-center justify-center gap-3 w-full rounded-full p-4 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+          >
+            <span className="text-lg font-bold text-[#0B0B0E]">Register Another Entry</span>
+            <FaArrowRight className="text-[#0B0B0E]" />
+          </Link>
+        </div>
+      );
+    }
     return (
       <button disabled className="w-full rounded-full p-4 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold cursor-default">
         ✓ Registered
