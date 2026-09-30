@@ -22,10 +22,12 @@ import {
     FiMusic,
     FiPlus,
     FiTrash2,
+    FiRefreshCw,
 } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments, isBasicScienceDepartment, allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
+import { getAllEvents } from "@/utils/firestoreCache";
 
 type MemberData = Record<string, string>;
 
@@ -146,14 +148,24 @@ export default function UsersManagement() {
         );
     }, [searchTerm, users]);
 
-    const fetchUsers = async () => {
+    // In-memory cache for admin users with 2-minute TTL
+    const fetchUsers = async (forceRefresh = false) => {
         try {
             setLoading(true);
-            const snapshot = await getDocs(collection(db, "users"));
-            const usersList = snapshot.docs.map((item) => ({
-                id: item.id,
-                ...item.data(),
-            })) as UserData[];
+
+            const now = Date.now();
+            let usersList: UserData[];
+
+            if (!forceRefresh && (fetchUsers as any).cache && now - (fetchUsers as any).cache.timestamp < 2 * 60 * 1000) {
+                usersList = (fetchUsers as any).cache.data;
+            } else {
+                const snapshot = await getDocs(collection(db, "users"));
+                usersList = snapshot.docs.map((item) => ({
+                    id: item.id,
+                    ...item.data(),
+                })) as UserData[];
+                (fetchUsers as any).cache = { data: usersList, timestamp: Date.now() };
+            }
 
             setUsers(usersList);
             setFilteredUsers(usersList);
@@ -165,14 +177,10 @@ export default function UsersManagement() {
         }
     };
 
-    const fetchEvents = async () => {
+    const fetchEvents = async (forceRefresh = false) => {
         try {
             setEventsLoading(true);
-            const snapshot = await getDocs(collection(db, "events"));
-            const eventList = snapshot.docs.map((item) => ({
-                id: item.id,
-                ...item.data(),
-            })) as Event[];
+            const eventList = await getAllEvents(forceRefresh);
             setEvents(eventList);
         } catch (error) {
             console.error("Error fetching events:", error);
@@ -1016,29 +1024,42 @@ export default function UsersManagement() {
                             : "Register participants and add event members for Basic Science & Humanities events."}
                     </p>
                 </div>
-                <button
-                    onClick={() => {
-                        setNewUserForm({
-                            selectedEventId: availableEvents[0]?.id || "",
-                            name: "",
-                            email: "",
-                            mobile: "",
-                            college: "",
-                            department: "",
-                            year: "",
-                            extraData: {},
-                            teamMembers: [],
-                        });
-                        if (availableEvents[0]?.id) {
-                            handleNewUserEventChange(availableEvents[0].id);
-                        }
-                        setIsAddUserModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/30"
-                >
-                    <FiUserPlus size={18} />
-                    Register New Participant (No Login Required)
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => {
+                            void fetchUsers(true);
+                            void fetchEvents(true);
+                        }}
+                        disabled={loading || eventsLoading}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-medium text-sm transition border border-gray-700 disabled:opacity-50 cursor-pointer"
+                    >
+                        <FiRefreshCw className={loading || eventsLoading ? "animate-spin" : ""} />
+                        Refresh
+                    </button>
+                    <button
+                        onClick={() => {
+                            setNewUserForm({
+                                selectedEventId: availableEvents[0]?.id || "",
+                                name: "",
+                                email: "",
+                                mobile: "",
+                                college: "",
+                                department: "",
+                                year: "",
+                                extraData: {},
+                                teamMembers: [],
+                            });
+                            if (availableEvents[0]?.id) {
+                                handleNewUserEventChange(availableEvents[0].id);
+                            }
+                            setIsAddUserModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/30"
+                    >
+                        <FiUserPlus size={18} />
+                        Register New Participant (No Login Required)
+                    </button>
+                </div>
             </div>
 
             <div className="mb-6 relative max-w-md">

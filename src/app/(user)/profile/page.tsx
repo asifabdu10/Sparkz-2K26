@@ -31,7 +31,7 @@ export default function ProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (saving || !user) return;
 
     if (!name.trim() || !college.trim()) {
       toastError("Please fill in all fields.");

@@ -19,8 +19,7 @@ import {
 import { motion } from "framer-motion";
 import { shimmer, toBase64, convertDriveUrl } from "@/utils/imageUtils";
 import GradientBackground from "@/components/ui/GradientBackground";
-import { db } from "@/utils/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { getEventById } from "@/utils/firestoreCache";
 import { Event } from "@/utils/types/event";
 
 // Loading component for suspense
@@ -210,24 +209,30 @@ export default function EventPage({ eventId }: { eventId: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
-    const fetchEvent = async () => {
-        try {
-            const docRef = doc(db, "events", eventId);
-            const docSnap = await getDoc(docRef);
+    let cancelled = false;
 
-            if (docSnap.exists()) {
-                setEvent({ id: docSnap.id, ...docSnap.data() } as Event);
-            } else {
-                setEvent(null);
-            }
-        } catch (error) {
-            console.error("Error fetching event:", error);
-            setEvent(null);
-        } finally {
-            setLoading(false);
+    const fetchEvent = async () => {
+      try {
+        const found = await getEventById(eventId);
+        if (!cancelled) {
+          setEvent(found);
         }
+      } catch (error) {
+        console.error("Error fetching event:", error);
+        if (!cancelled) {
+          setEvent(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     };
+
     fetchEvent();
+    return () => {
+      cancelled = true;
+    };
   }, [eventId]);
 
   if (loading) return <EventDetailsSkeleton />;

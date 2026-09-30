@@ -113,7 +113,7 @@ export default function AbheriAdminPage() {
 
         fetchRegistrations();
     }, [
-        userData,
+        userData?.role,
         loading,
         router,
         isSuperAdmin,

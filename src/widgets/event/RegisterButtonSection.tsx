@@ -8,8 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { toastError } from "@/utils/common/Toast";
 import { allowsMultipleRegistrations } from "@/utils/constants/Constants";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
-import { db } from "@/utils/firebase";
+import { checkUserEventRegistration } from "@/utils/firestoreCache";
 
 interface Props {
   event: Event;
@@ -68,19 +67,9 @@ export default function RegisterButtonSection({ event }: Props) {
       }
 
       try {
-        const q = query(
-          collection(db, "registrations"),
-          where("eventId", "==", event.id),
-          where("userId", "==", user.uid),
-          limit(1)
-        );
-        const snapshot = await getDocs(q);
+        const result = await checkUserEventRegistration(event.id, user.uid);
         if (!cancelled) {
-          const registration = snapshot.empty ? null : snapshot.docs[0].data();
-          setRegistered(
-            registration?.status === "paid" ||
-            registration?.status === "registered"
-          );
+          setRegistered(result.isRegistered);
         }
       } catch (error) {
         console.error("Registration status check failed:", error);
@@ -94,7 +83,7 @@ export default function RegisterButtonSection({ event }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [event.id, user]);
+  }, [event.id, user?.uid]);
 
   if (registrationMode === "none") {
     return (

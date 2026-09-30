@@ -8,11 +8,7 @@ import Particles from "@/widgets/common/Particles";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { convertDriveUrl } from "@/utils/imageUtils";
 
-import { db } from "@/utils/firebase";
-import {
-  collection,
-  getDocsFromServer,
-} from "firebase/firestore";
+import { getAllEvents } from "@/utils/firestoreCache";
 
 import { departments } from "@/utils/constants/Constants";
 import { Event } from "@/utils/types/event";
@@ -132,133 +128,31 @@ export default function EventsPage() {
   // ==========================================================
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchEvents = async () => {
       try {
         setLoading(true);
-
-        /*
-         * Get the latest data directly from Firestore.
-         *
-         * This prevents the event list from depending
-         * on an older cached version of the document.
-         */
-        const querySnapshot =
-          await getDocsFromServer(
-            collection(db, "events")
-          );
-
-        if (querySnapshot.empty) {
-          setEvents([]);
-          return;
+        const eventsList = await getAllEvents();
+        if (!cancelled) {
+          setEvents(eventsList);
         }
-
-        /*
-         * Convert Firestore documents into Event objects.
-         *
-         * New events:
-         *     imageUrl
-         *
-         * Old events:
-         *     image
-         *
-         * imageUrl is preferred.
-         */
-
-        const eventsList =
-          querySnapshot.docs.map((doc) => {
-            const data = doc.data();
-
-            // ------------------------------------------------
-            // DEBUG
-            // ------------------------------------------------
-
-            console.log(
-              "--------------------------------------"
-            );
-
-            console.log(
-              "Event:",
-              data.title
-            );
-
-            console.log(
-              "Event ID:",
-              doc.id
-            );
-
-            console.log(
-              "Google Drive imageUrl:",
-              data.imageUrl
-            );
-
-            console.log(
-              "Old image field:",
-              data.image
-            );
-
-            console.log(
-              "--------------------------------------"
-            );
-
-            // ------------------------------------------------
-            // IMAGE URL
-            // ------------------------------------------------
-
-            const rawImageUrl =
-              typeof data.imageUrl === "string" &&
-                data.imageUrl.trim() !== ""
-                ? data.imageUrl
-                : typeof data.image === "string" &&
-                  data.image.trim() !== ""
-                  ? data.image
-                  : "";
-
-            /*
-             * Normalise any Google Drive URL variant
-             * (sharing links, open?id= links, uc?export=view links)
-             * to a direct lh3.googleusercontent.com embed URL so the
-             * <Image> component can load it without 307 redirect loops.
-             */
-            const imageUrl = convertDriveUrl(rawImageUrl);
-
-            return {
-              id: doc.id,
-
-              title:
-                typeof data.title === "string"
-                  ? data.title
-                  : "",
-
-              department:
-                typeof data.department === "string"
-                  ? data.department
-                  : "",
-
-              imageUrl,
-            };
-          }) as Event[];
-
-        console.log(
-          "FINAL EVENTS:",
-          eventsList
-        );
-
-        setEvents(eventsList);
-
       } catch (error) {
-        console.error(
-          "Error fetching events:",
-          error
-        );
-
-        setEvents([]);
-
+        console.error("Error fetching events:", error);
+        if (!cancelled) {
+          setEvents([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchEvents();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ==========================================================

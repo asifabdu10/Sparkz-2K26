@@ -3,14 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  limit,
-} from "firebase/firestore";
-import { db } from "@/utils/firebase";
+import { checkUserAbheriRegistration } from "@/utils/firestoreCache";
 import { useAuth } from "@/context/AuthContext";
 import RisingLines from "@/components/ui/RisingLines";
 
@@ -104,32 +97,35 @@ export default function AbheriPage() {
   }, []);
 
   useEffect(() => {
-    const checkAbheriRegistration = async () => {
+    let cancelled = false;
+
+    const checkAbheri = async () => {
       if (!user) {
-        setAbheriRegistered(false);
-        setCheckingAbheriRegistration(false);
+        if (!cancelled) {
+          setAbheriRegistered(false);
+          setCheckingAbheriRegistration(false);
+        }
         return;
       }
 
       try {
-        const q = query(
-          collection(db, "abheri_registrations"),
-          where("userId", "==", user.uid),
-          limit(1)
-        );
-
-        const snapshot = await getDocs(q);
-        setAbheriRegistered(!snapshot.empty);
+        const result = await checkUserAbheriRegistration(user.uid);
+        if (!cancelled) {
+          setAbheriRegistered(result.isRegistered);
+        }
       } catch (error) {
         console.error("Failed to check Abheri registration:", error);
-        setAbheriRegistered(false);
+        if (!cancelled) setAbheriRegistered(false);
       } finally {
-        setCheckingAbheriRegistration(false);
+        if (!cancelled) setCheckingAbheriRegistration(false);
       }
     };
 
-    checkAbheriRegistration();
-  }, [user]);
+    checkAbheri();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   return (
     <div className="min-h-screen bg-[#0B0B0E] text-white overflow-x-hidden">

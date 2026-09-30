@@ -11,8 +11,8 @@ import {
   FiClock,
   FiXCircle,
 } from "react-icons/fi";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/utils/firebase";
+import { FiRefreshCw } from "react-icons/fi";
+import { getAdminDashboardStats } from "@/utils/firestoreCache";
 
 export default function AdminDashboard() {
   const { userData } = useAuth();
@@ -28,64 +28,35 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadDashboardStats = async (forceRefresh = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Uses Firestore getCountFromServer aggregation queries (~1 read per 1,000 docs)
+      // instead of downloading every document in the entire database.
+      const statsData = await getAdminDashboardStats(forceRefresh);
+
+      setTotalUsers(statsData.totalUsers);
+      setTotalEvents(statsData.totalEvents);
+      setTotalRegistrations(statsData.totalRegistrations);
+      setPaidRegistrations(statsData.paidRegistrations);
+      setPendingRegistrations(statsData.pendingRegistrations);
+      setFreeRegistrations(statsData.freeRegistrations);
+    } catch (err) {
+      console.error("Error loading dashboard statistics:", err);
+      setError(
+        "Unable to load dashboard statistics. Please check your Firestore permissions."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!userData) return;
-
-    const loadDashboardStats = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch all users
-        const usersSnapshot = await getDocs(collection(db, "users"));
-        setTotalUsers(usersSnapshot.size);
-
-        // Fetch all events
-        const eventsSnapshot = await getDocs(collection(db, "events"));
-        setTotalEvents(eventsSnapshot.size);
-
-        // Fetch all registrations
-        const registrationsSnapshot = await getDocs(
-          collection(db, "registrations")
-        );
-
-        let paid = 0;
-        let pending = 0;
-        let free = 0;
-
-        registrationsSnapshot.forEach((registrationDoc) => {
-          const data = registrationDoc.data();
-
-          const status = String(data.status || "").toLowerCase();
-
-          if (status === "paid") {
-            paid++;
-          } else if (status === "pending") {
-            pending++;
-          } else if (
-            status === "free" ||
-            status === "registered"
-          ) {
-            free++;
-          }
-        });
-
-        setTotalRegistrations(registrationsSnapshot.size);
-        setPaidRegistrations(paid);
-        setPendingRegistrations(pending);
-        setFreeRegistrations(free);
-      } catch (err) {
-        console.error("Error loading dashboard statistics:", err);
-        setError(
-          "Unable to load dashboard statistics. Please check your Firestore permissions."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboardStats();
-  }, [userData]);
+    loadDashboardStats(false);
+  }, [userData?.role]);
 
   if (!userData) return null;
 
@@ -113,13 +84,24 @@ export default function AdminDashboard() {
   return (
     <div>
       {/* Header */}
-      <h1 className="text-3xl font-bold text-white mb-2">
-        Dashboard
-      </h1>
-
-      <p className="text-gray-400 mb-8">
-        Welcome back, {userData.name}
-      </p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Dashboard
+          </h1>
+          <p className="text-gray-400">
+            Welcome back, {userData.name}
+          </p>
+        </div>
+        <button
+          onClick={() => loadDashboardStats(true)}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium rounded-xl border border-gray-700 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          <FiRefreshCw className={loading ? "animate-spin" : ""} />
+          <span>Refresh</span>
+        </button>
+      </div>
 
       {/* Error */}
       {error && (

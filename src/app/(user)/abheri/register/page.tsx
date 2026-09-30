@@ -15,6 +15,10 @@ import {
 } from "firebase/firestore";
 import { QRCodeSVG } from "qrcode.react";
 import { db } from "@/utils/firebase";
+import {
+  checkUserAbheriRegistration,
+  setUserAbheriRegistration,
+} from "@/utils/firestoreCache";
 import Link from "next/link";
 import { toastSuccess, toastError } from "@/utils/common/Toast";
 import {
@@ -191,26 +195,21 @@ export default function Register() {
   // ==================================================
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchRegistration = async () => {
       if (!user) {
-        setCheckingExistingRegistration(false);
+        if (!cancelled) setCheckingExistingRegistration(false);
         return;
       }
 
       try {
-        const q = query(
-          collection(db, "abheri_registrations"),
-          where("userId", "==", user.uid),
-          limit(1)
-        );
+        const result = await checkUserAbheriRegistration(user.uid);
+        if (cancelled) return;
 
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const docSnap = querySnapshot.docs[0];
-          const data = docSnap.data();
-
-          setExistingRegistrationId(docSnap.id);
+        if (result.isRegistered && result.data) {
+          const data = result.data;
+          setExistingRegistrationId(result.registrationId || null);
 
           setFormData({
             bandName: data.bandName || "",
@@ -252,14 +251,19 @@ export default function Register() {
           "Failed to check your Abheri registration."
         );
       } finally {
-        setCheckingExistingRegistration(false);
+        if (!cancelled) {
+          setCheckingExistingRegistration(false);
+        }
       }
     };
 
     if (!authLoading) {
       fetchRegistration();
     }
-  }, [user, authLoading]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, authLoading]);
 
   // ==================================================
   // SAVE FORM TO LOCAL STORAGE
@@ -615,6 +619,8 @@ export default function Register() {
   ) => {
     e.preventDefault();
 
+    if (loading) return;
+
     // Registration check
     if (!registrationOpen) {
       toastError(
@@ -889,6 +895,8 @@ export default function Register() {
           registrationData
         );
 
+        setUserAbheriRegistration(user.uid, true, registrationData, existingRegistrationId);
+
         toastSuccess(
           "Registration updated successfully!"
         );
@@ -929,6 +937,7 @@ export default function Register() {
           }
         );
 
+        setUserAbheriRegistration(user.uid, true, registrationData, user.uid);
         await refetchUserProfile();
 
         // ==================================================

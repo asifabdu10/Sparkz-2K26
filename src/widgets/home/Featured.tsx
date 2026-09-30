@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useInView } from "framer-motion";
-import { db } from "@/utils/firebase";
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { getFeaturedEvents } from "@/utils/firestoreCache";
 import { Event } from "@/utils/types/event";
 import { convertDriveUrl } from "@/utils/imageUtils";
 
@@ -20,68 +19,23 @@ export default function FeaturedEvents() {
   const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const fetchFeaturedEvents = async () => {
+    let cancelled = false;
+
+    const fetchFeatured = async () => {
       try {
-        const fetchedEvents: Event[] = [];
-
-        // 1. First, fetch the rc-car-racing event specifically
-        const rcCarQuery = query(
-          collection(db, "events"),
-          where("__name__", "==", "rc-car-racing"),
-          limit(1)
-        );
-        const rcCarSnapshot = await getDocs(rcCarQuery);
-
-        if (!rcCarSnapshot.empty) {
-          const rcCarEvent = {
-            id: rcCarSnapshot.docs[0].id,
-            ...rcCarSnapshot.docs[0].data(),
-          } as Event;
-          fetchedEvents.push(rcCarEvent);
+        const fetchedEvents = await getFeaturedEvents();
+        if (!cancelled) {
+          setEvents(fetchedEvents);
         }
-
-        // 2. Fetch featured events
-        const featuredQuery = query(
-          collection(db, "events"),
-          where("featured", "==", true),
-          limit(5)
-        );
-        const featuredSnapshot = await getDocs(featuredQuery);
-
-        featuredSnapshot.docs.forEach((doc) => {
-          const event = { id: doc.id, ...doc.data() } as Event;
-          // Avoid duplicates
-          if (!fetchedEvents.some((e) => e.id === event.id)) {
-            fetchedEvents.push(event);
-          }
-        });
-
-        // 3. If we still need more events, fetch some recent ones
-        if (fetchedEvents.length < 5) {
-          const recentQuery = query(
-            collection(db, "events"),
-            limit(8) // Fetch more to ensure we have enough after filtering
-          );
-          const recentSnapshot = await getDocs(recentQuery);
-
-          recentSnapshot.docs.forEach((doc) => {
-            const event = { id: doc.id, ...doc.data() } as Event;
-            // Avoid duplicates and limit total to 6-7 events
-            if (
-              !fetchedEvents.some((e) => e.id === event.id) &&
-              fetchedEvents.length < 7
-            ) {
-              fetchedEvents.push(event);
-            }
-          });
-        }
-
-        setEvents(fetchedEvents);
       } catch (err) {
         console.error("Failed to fetch featured events", err);
       }
     };
-    fetchFeaturedEvents();
+
+    fetchFeatured();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const total = events.length;

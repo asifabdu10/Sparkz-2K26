@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { getAllEvents } from "@/utils/firestoreCache";
 import {
   FiDownload,
   FiEye,
@@ -28,6 +29,7 @@ import {
   FiPlus,
   FiTrash2,
   FiCheckCircle,
+  FiRefreshCw,
   FiAlertCircle,
   FiClock,
   FiEdit2,
@@ -167,6 +169,15 @@ const formatValue = (value: unknown) => {
   return String(value);
 };
 
+// In-memory cache for admin registrations with 2-minute TTL
+let adminRegsCache: { data: UserRegistration[]; timestamp: number } | null = null;
+let adminRegsPromise: Promise<UserRegistration[]> | null = null;
+
+export function invalidateAdminRegistrationsCache() {
+  adminRegsCache = null;
+  adminRegsPromise = null;
+}
+
 export default function RegistrationsManagement() {
   const { userData } = useAuth();
 
@@ -239,27 +250,42 @@ export default function RegistrationsManagement() {
 
   useEffect(() => {
     if (!userData) return;
-    void loadData();
-  }, [userData]);
+    void loadData(false);
+  }, [userData?.role]);
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     try {
       setLoading(true);
 
-      const [eventsSnapshot, registrationsSnapshot] = await Promise.all([
-        getDocs(collection(db, "events")),
-        getDocs(collection(db, "registrations")),
+      const now = Date.now();
+      const eventsPromise = getAllEvents(forceRefresh);
+
+      let regsPromise: Promise<UserRegistration[]>;
+      if (!forceRefresh && adminRegsCache && now - adminRegsCache.timestamp < 2 * 60 * 1000) {
+        regsPromise = Promise.resolve(adminRegsCache.data);
+      } else if (adminRegsPromise) {
+        regsPromise = adminRegsPromise;
+      } else {
+        adminRegsPromise = (async () => {
+          try {
+            const registrationsSnapshot = await getDocs(collection(db, "registrations"));
+            const list = registrationsSnapshot.docs.map((item) => ({
+              id: item.id,
+              ...item.data(),
+            })) as UserRegistration[];
+            adminRegsCache = { data: list, timestamp: Date.now() };
+            return list;
+          } finally {
+            adminRegsPromise = null;
+          }
+        })();
+        regsPromise = adminRegsPromise;
+      }
+
+      const [eventList, registrationList] = await Promise.all([
+        eventsPromise,
+        regsPromise,
       ]);
-
-      const eventList = eventsSnapshot.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      })) as Event[];
-
-      const registrationList = registrationsSnapshot.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      })) as UserRegistration[];
 
       const allowedEventIds = new Set(eventList.map((event) => event.id));
       const visibleRegistrations = registrationList.filter((registration) =>
@@ -1276,6 +1302,14 @@ export default function RegistrationsManagement() {
           >
             <FiDownload />
             Export Excel Report
+          </button>
+          <button
+            onClick={() => void loadData(true)}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-40 font-semibold transition-colors shadow-lg border border-gray-700 text-white cursor-pointer"
+          >
+            <FiRefreshCw className={loading ? "animate-spin" : ""} />
+            Refresh
           </button>
         </div>
       </div>

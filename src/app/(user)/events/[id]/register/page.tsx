@@ -3,18 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   arrayUnion,
-  collection,
   deleteField,
   doc,
-  getDoc,
-  getDocs,
-  limit,
-  query,
   setDoc,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { db } from "@/utils/firebase";
+import {
+  checkUserEventRegistration,
+  getEventById,
+  setUserEventRegistration,
+} from "@/utils/firestoreCache";
 import Link from "next/link";
 import { toastError, toastInfo, toastSuccess } from "@/utils/common/Toast";
 import { AlertCircle, Calendar, Loader2, Plus, Trash2 } from "lucide-react";
@@ -155,22 +154,31 @@ export default function Register() {
     : 1;
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchEvent = async () => {
       try {
-        const snap = await getDoc(doc(db, "events", id));
-        if (!snap.exists()) {
+        const found = await getEventById(id);
+        if (!found) {
           toastError("Event not found");
           return;
         }
-        setEvent({ id: snap.id, ...snap.data() } as Event);
+        if (!cancelled) {
+          setEvent(found);
+        }
       } catch (error) {
         console.error(error);
         toastError("Failed to load event details");
       } finally {
-        setPageLoading(false);
+        if (!cancelled) {
+          setPageLoading(false);
+        }
       }
     };
     if (id) fetchEvent();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -199,42 +207,41 @@ export default function Register() {
 
   useEffect(() => {
     if (!event || !user || authLoading || event.registrationMode === "none") return;
+    let cancelled = false;
 
     const loadRegistration = async () => {
       try {
-        const q = query(
-          collection(db, "registrations"),
-          where("eventId", "==", event.id),
-          where("userId", "==", user.uid),
-          limit(1)
-        );
-        const snap = await getDocs(q);
+        const result = await checkUserEventRegistration(event.id, user.uid);
+        if (cancelled) return;
 
-        if (!snap.empty) {
-          const registration = snap.docs[0];
-          const data = registration.data();
-          setRegistrationId(registration.id);
+        if (result.isRegistered || result.data) {
+          const data = result.data;
+          if (result.registrationId) {
+            setRegistrationId(result.registrationId);
+          }
 
-          if (data.status === "paid" || data.status === "registered") {
+          if (result.isRegistered) {
             setRegistered(true);
             setAcknowledged(true);
           }
 
-          setFormData((current) => ({
-            ...current,
-            leaderName: data.leaderName || data.userName || current.leaderName,
-            leaderEmail: data.leaderEmail || data.userEmail || current.leaderEmail,
-            leaderMobile: data.leaderMobile || current.leaderMobile,
-            leaderCollege: data.leaderCollege || current.leaderCollege,
-            leaderDepartment: data.leaderDepartment || current.leaderDepartment,
-            leaderYear: data.leaderYear || current.leaderYear,
-            extraData: data.extraData || current.extraData,
-            teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : current.teamMembers,
-          }));
+          if (data) {
+            setFormData((current) => ({
+              ...current,
+              leaderName: data.leaderName || data.userName || current.leaderName,
+              leaderEmail: data.leaderEmail || data.userEmail || current.leaderEmail,
+              leaderMobile: data.leaderMobile || current.leaderMobile,
+              leaderCollege: data.leaderCollege || current.leaderCollege,
+              leaderDepartment: data.leaderDepartment || current.leaderDepartment,
+              leaderYear: data.leaderYear || current.leaderYear,
+              extraData: data.extraData || current.extraData,
+              teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : current.teamMembers,
+            }));
 
-          if (data.status === "pending") {
-            setPaymentReady(true);
-            toastInfo("Your details are saved. Complete payment to finish registration.");
+            if (data.status === "pending") {
+              setPaymentReady(true);
+              toastInfo("Your details are saved. Complete payment to finish registration.");
+            }
           }
         } else {
           const saved = localStorage.getItem(STORAGE_KEY);
@@ -253,7 +260,10 @@ export default function Register() {
     };
 
     loadRegistration();
-  }, [event, user, authLoading, STORAGE_KEY]);
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.id, user?.uid, authLoading]);
 
   useEffect(() => {
     if (!event || !user || registered || paymentReady) return;
@@ -443,7 +453,7 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate() || !event || !user) return;
+    if (loading || !validate() || !event || !user) return;
 
     setLoading(true);
     try {
@@ -455,13 +465,19 @@ export default function Register() {
           registeredEvents: arrayUnion(event.title),
         });
         await refetchUserProfile();
+        const finalId = savedRegId || registrationId || `${user.uid}_${event.id}`;
+        setUserEventRegistration(event.id, user.uid, {
+          isRegistered: true,
+          registrationId: finalId,
+          data: { status: "registered" },
+        });
         setRegistered(true);
         setAcknowledged(true);
 
         if (isSpotRegistration) {
           // Free spot events still receive the same ticket + email after the
           // registration is actually created. No payment is needed.
-          await sendSpotTicket(savedRegId || registrationId || `${user.uid}_${event.id}`);
+          await sendSpotTicket(finalId);
         } else {
           toastSuccess("Registration successful! 🎉");
         }
@@ -552,6 +568,11 @@ export default function Register() {
     });
 
     await refetchUserProfile();
+    setUserEventRegistration(event.id, user.uid, {
+      isRegistered: true,
+      registrationId,
+      data: { status: "paid" },
+    });
     setRegistered(true);
     setPaymentReady(false);
 

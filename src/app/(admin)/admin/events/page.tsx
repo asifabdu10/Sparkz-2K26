@@ -22,6 +22,7 @@ import { departments, isBasicScienceDepartment } from "@/utils/constants/Constan
 import { Event } from "@/utils/types/event";
 import { compressImage } from "@/utils/imageUtils";
 import Image from "next/image";
+import { getAllEvents, invalidateEventsCache } from "@/utils/firestoreCache";
 
 
 export default function EventsManagement() {
@@ -166,34 +167,15 @@ export default function EventsManagement() {
     };
 
 
-    const fetchEvents = async () => {
+    const fetchEvents = async (forceRefresh = false) => {
         try {
             setLoading(true);
             if (userData?.role === 'superAdmin') {
-                const querySnapshot = await getDocs(collection(db, "events"));
-                const eventsList = querySnapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        ...data,
-                        imageUrl: data.imageUrl || data.image || "",
-                        bgImageUrl: data.bgImageUrl || data.bgImage || "",
-                    };
-                }) as Event[];
+                const eventsList = await getAllEvents(forceRefresh);
                 setEvents(eventsList);
             } else if (userData?.role === 'basicScienceAdmin') {
-                const querySnapshot = await getDocs(collection(db, "events"));
-                const eventsList = (querySnapshot.docs
-                    .map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            ...data,
-                            imageUrl: data.imageUrl || data.image || "",
-                            bgImageUrl: data.bgImageUrl || data.bgImage || "",
-                        };
-                    }) as Event[])
-                    .filter(e => isBasicScienceDepartment(e.department));
+                const all = await getAllEvents(forceRefresh);
+                const eventsList = all.filter(e => isBasicScienceDepartment(e.department));
                 setEvents(eventsList);
             } else if (userData?.role === 'admin' && userData?.department) {
                 const q = query(collection(db, "events"), where("department", "==", userData.department));
@@ -236,6 +218,7 @@ export default function EventsManagement() {
             await updateDoc(doc(db, "events", event.id), {
                 registrationOpen: nextOpen,
             });
+            invalidateEventsCache();
             setEvents(prev => prev.map(e => e.id === event.id ? { ...e, registrationOpen: nextOpen } : e));
             toastSuccess(nextOpen ? `${event.title}: Registration opened` : `${event.title}: Registration closed`);
         } catch (error) {
@@ -260,6 +243,7 @@ export default function EventsManagement() {
                     })
                 )
             );
+            invalidateEventsCache();
             setEvents(prev => prev.map(e =>
                 (e.registrationMode || "online") === "online"
                     ? { ...e, registrationOpen: shouldOpen }
@@ -550,6 +534,7 @@ export default function EventsManagement() {
             // -----------------------------------------------------
 
             await deleteDoc(doc(db, "events", id));
+            invalidateEventsCache();
 
             // -----------------------------------------------------
             // 5. Update UI
@@ -818,10 +803,11 @@ export default function EventsManagement() {
             };
 
             await setDoc(doc(db, "events", eventId), eventData);
+            invalidateEventsCache();
 
             toastSuccess(formData.id ? "Event updated" : "Event created");
             setIsEditing(false);
-            fetchEvents();
+            fetchEvents(true);
         } catch (error) {
             console.error("Error saving event:", error);
             toastError("Failed to save event");
