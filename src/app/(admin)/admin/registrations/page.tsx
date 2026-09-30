@@ -1735,7 +1735,7 @@ export default function RegistrationsManagement() {
                       <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Payment Status</th>
                       <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Payment ID</th>
                       <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Actions</th>
-                      {isSuperAdmin && (
+                      {(isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(selectedSummary?.event.department))) && (
                         <th className="px-5 py-4 text-xs uppercase tracking-wider text-gray-500">Manage</th>
                       )}
                     </tr>
@@ -1814,7 +1814,7 @@ export default function RegistrationsManagement() {
                               );
                             })()}
                           </td>
-                          {isSuperAdmin && (
+                          {(isSuperAdmin || (isBasicScienceAdmin && isBasicScienceDepartment(selectedSummary?.event.department))) && (
                             <td className="px-5 py-4">
                               <button
                                 onClick={() => void deregisterUser(registration)}
@@ -2415,7 +2415,7 @@ export default function RegistrationsManagement() {
                           : `${selectedMinMembers}-${selectedMaxMembers}`}
                       </p>
                     </div>
-                    {isSuperAdmin && (
+                    {canManageSelected && (
                       <button
                         type="button"
                         onClick={addTeamMember}
@@ -2432,7 +2432,7 @@ export default function RegistrationsManagement() {
                         key={index}
                         className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 relative"
                       >
-                        {isSuperAdmin && (
+                        {canManageSelected && (
                           <button
                             type="button"
                             onClick={() => removeTeamMember(index)}
@@ -2449,7 +2449,7 @@ export default function RegistrationsManagement() {
                           <label className="block">
                             <span className="text-xs text-gray-500">Name *</span>
                             <input
-                              disabled={!isSuperAdmin}
+                              disabled={!canManageSelected}
                               value={member.name || ""}
                               onChange={(e) =>
                                 setEditingTeamMembers((current) =>
@@ -2467,7 +2467,7 @@ export default function RegistrationsManagement() {
                                 {field.name} {field.required && "*"}
                               </span>
                               <input
-                                disabled={!isSuperAdmin}
+                                disabled={!canManageSelected}
                                 type={memberInputType(field.type)}
                                 value={member[field.name] || ""}
                                 onChange={(e) =>
