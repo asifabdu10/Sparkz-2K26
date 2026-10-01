@@ -10,6 +10,7 @@ import {
   FiCheckCircle,
   FiClock,
   FiXCircle,
+  FiMusic,
 } from "react-icons/fi";
 import { FiRefreshCw } from "react-icons/fi";
 import { getAdminDashboardStats } from "@/utils/firestoreCache";
@@ -251,6 +252,26 @@ export default function AdminDashboard() {
             Check who registered & export data.
           </p>
         </Link>
+
+        {/* Abheri Registrations */}
+        {(userData.role === "superAdmin" || userData.role === "abheriAdmin") && (
+          <Link
+            href="/admin/abheri"
+            className="group p-6 bg-gray-900 border border-gray-800 rounded-2xl hover:border-purple-500/50 transition-all hover:bg-gray-800"
+          >
+            <div className="text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+              <FiMusic size={32} />
+            </div>
+
+            <h3 className="text-lg font-semibold text-white">
+              Abheri Registrations
+            </h3>
+
+            <p className="text-sm text-gray-500 mt-2">
+              View &amp; manage Battle of Bands entries.
+            </p>
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ export default function AdminLayout({
       name: "Dashboard",
       href: "/admin",
       icon: FiHome,
-      roles: ["superAdmin", "admin", "basicScienceAdmin"],
+      roles: ["superAdmin", "admin", "basicScienceAdmin", "abheriAdmin"],
     },
     {
       name: "Users",
