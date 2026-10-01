@@ -219,26 +219,29 @@ export default function AbheriAdmin() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={toggleRegistration}
-              disabled={
-                statusLoading ||
-                statusSaving ||
-                authLoading
-              }
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${registrationOpen
-                  ? "bg-red-600 hover:bg-red-500"
-                  : "bg-green-600 hover:bg-green-500"
-                }`}
-            >
-              {statusSaving
-                ? "Saving..."
-                : registrationOpen
-                  ? "Close"
-                  : "Open"}
-            </button>
+            {(userData?.role === "abheriAdmin" || userData?.role === "superAdmin") && (
+              <button
+                type="button"
+                onClick={toggleRegistration}
+                disabled={
+                  statusLoading ||
+                  statusSaving ||
+                  authLoading
+                }
+                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${registrationOpen
+                    ? "bg-red-600 hover:bg-red-500"
+                    : "bg-green-600 hover:bg-green-500"
+                  }`}
+              >
+                {statusSaving
+                  ? "Saving..."
+                  : registrationOpen
+                    ? "Close"
+                    : "Open"}
+              </button>
+            )}
           </div>
+
 
           {/* Export Excel */}
           <button

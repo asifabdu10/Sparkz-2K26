@@ -439,7 +439,7 @@ service cloud.firestore {
       //
       // User can read their own Abheri registration.
       //
-      // Abheri Admin / Super Admin can read all.
+      // Abheri Admin / Super Admin / Admin can read all.
       //
 
       allow read: if
@@ -457,6 +457,10 @@ service cloud.firestore {
           ||
 
           isAbheriAdmin()
+
+          ||
+
+          isAdmin()
         );
 
 

@@ -254,7 +254,7 @@ export default function AdminDashboard() {
         </Link>
 
         {/* Abheri Registrations */}
-        {(userData.role === "superAdmin" || userData.role === "abheriAdmin") && (
+        {(userData.role === "superAdmin" || userData.role === "abheriAdmin" || userData.role === "admin") && (
           <Link
             href="/admin/abheri"
             className="group p-6 bg-gray-900 border border-gray-800 rounded-2xl hover:border-purple-500/50 transition-all hover:bg-gray-800"
