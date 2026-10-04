@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0.043, 0.047, 0.063) });
     page.drawRectangle({ x: 24, y: 30, width: width - 48, height: height - 60, color: rgb(0.12, 0.15, 0.19), borderColor: rgb(0.3, 0.32, 0.36), borderWidth: 1 });
-    page.drawText("CARMEL CET  *  SPARKZ '26", { x: 48, y: height - 72, font: bold, size: 10, color: rgb(1, 0.27, 0.05) });
+    page.drawText("CARMEL CET  *  SPARKZ 2K26", { x: 48, y: height - 72, font: bold, size: 10, color: rgb(1, 0.27, 0.05) });
     page.drawText(cleanPdfText(event.title || "EVENT").slice(0, 38), { x: 48, y: height - 112, font: bold, size: 25, color: rgb(1, 1, 1) });
 
     const attendee = cleanPdfText(registration.leaderName || registration.userName || "Attendee");
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     } else {
       page.drawRectangle({ x: 590, y: 112, width: 92, height: 92, color: rgb(0.18, 0.22, 0.27), borderColor: rgb(0.4, 0.42, 0.46), borderWidth: 1 });
       page.drawText("VALID TICKET", { x: 600, y: 155, font: bold, size: 8, color: rgb(1, 0.75, 0.3) });
-      page.drawText("SPARKZ '26", { x: 605, y: 135, font: regular, size: 8, color: rgb(0.8, 0.8, 0.8) });
+      page.drawText("SPARKZ 2K26", { x: 605, y: 135, font: regular, size: 8, color: rgb(0.8, 0.8, 0.8) });
     }
 
     page.drawText("ADMIT ONE", { x: 607, y: 92, font: bold, size: 8, color: rgb(0.75, 0.77, 0.8) });
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     if (members.length > 0) {
       const roster = pdf.addPage([720, Math.max(420, 180 + members.length * 34)]);
       roster.drawRectangle({ x: 0, y: 0, width: 720, height: roster.getHeight(), color: rgb(0.043, 0.047, 0.063) });
-      roster.drawText("SPARKZ '26 - TEAM ROSTER", { x: 45, y: roster.getHeight() - 55, font: bold, size: 20, color: rgb(1, 0.27, 0.05) });
+      roster.drawText("SPARKZ 2K26 - TEAM ROSTER", { x: 45, y: roster.getHeight() - 55, font: bold, size: 20, color: rgb(1, 0.27, 0.05) });
       roster.drawText(cleanPdfText(event.title || "Event"), { x: 45, y: roster.getHeight() - 80, font: regular, size: 11, color: rgb(0.78, 0.79, 0.82) });
       roster.drawText(`Ticket: ${ticketNumber}`, { x: 45, y: roster.getHeight() - 100, font: regular, size: 9, color: rgb(0.78, 0.79, 0.82) });
       let y = roster.getHeight() - 140;
@@ -208,12 +208,12 @@ export async function POST(request: NextRequest) {
     }
 
     const teamNames = [attendee, ...members.map((m: Record<string, unknown>) => cleanPdfText(m?.name || ""))].filter(Boolean);
-    const emailSubject = `SPARKZ '26 Spot Registration — ${cleanPdfText(event.title) || "Ticket"}`;
+    const emailSubject = `Sparkz 2K26 Spot Registration — ${cleanPdfText(event.title) || "Ticket"}`;
     const attachmentFilename = `${String(event.title || "SPARKZ_Ticket").replace(/[^a-zA-Z0-9_-]/g, "_")}_Ticket.pdf`;
 
     const emailHtml = `
       <div style="font-family:Arial,sans-serif;background:#0b0c10;color:#fff;padding:30px">
-        <h1 style="color:#ff4500">SPARKZ '26 — Spot Registration Confirmed</h1>
+        <h1 style="color:#ff4500">Sparkz 2K26 — Spot Registration Confirmed</h1>
         <p>Your spot registration for <strong>${escapeHtml(event.title)}</strong> is confirmed.</p>
         <table cellpadding="8" style="border-collapse:collapse">
           <tr><td><b>Date</b></td><td>${escapeHtml(event.startDate || event.date || "TBA")}${event.endDate && event.endDate !== (event.startDate || event.date) ? ` – ${escapeHtml(event.endDate)}` : ""}</td></tr>

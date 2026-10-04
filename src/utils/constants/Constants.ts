@@ -2,8 +2,8 @@ import { Event } from "@/utils/types/event";
 
 export const navItems = [
     {
-        title:"Home",
-        to:"/"
+        title: "Home",
+        to: "/"
     },
     {
         title: "Events",
@@ -12,6 +12,15 @@ export const navItems = [
     {
         title: "ABHERI",
         to: "/abheri"
+    },
+    {
+        title: "Visitor Pass",
+        to: "/visitor-registration"
+    },
+    {
+        title: "Alumni Registration",
+        shortTitle: "Alumni",
+        to: "/alumni-registration"
     },
     {
         title: "About",

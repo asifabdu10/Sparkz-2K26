@@ -13,6 +13,8 @@ import {
   FiMenu,
   FiX,
   FiMusic,
+  FiUserCheck,
+  FiAward,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -89,6 +91,18 @@ export default function AdminLayout({
       href: "/admin/abheri",
       icon: FiMusic,
       roles: ["superAdmin", "abheriAdmin", "admin"],
+    },
+    {
+      name: "Visitor Reg.",
+      href: "/admin/visitor-registrations",
+      icon: FiUserCheck,
+      roles: ["superAdmin", "admin", "basicScienceAdmin"],
+    },
+    {
+      name: "Alumni Reg.",
+      href: "/admin/alumni-registrations",
+      icon: FiAward,
+      roles: ["superAdmin", "admin", "basicScienceAdmin"],
     },
   ];
 

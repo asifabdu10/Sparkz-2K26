@@ -28,11 +28,12 @@ export default function Header() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(58,39,13,0.4),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(212,163,89,0.08),transparent_35%)] opacity-70" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(58,39,13,0.3),transparent_50%),linear-gradient(240deg,rgba(212,163,89,0.06),transparent_50%)]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(212,163,89,0.4)] to-transparent" />
-        <div className="relative  flex  flex-wrap items-center justify-between gap-3 px-[5vw] py-4 sm:flex-nowrap sm:gap-6  sm:py-5">
+        <div className="relative flex flex-wrap items-center justify-between gap-3 px-[5vw] py-4 lg:flex-nowrap lg:gap-6 sm:py-5">
           {/* Left nav - Desktop Only */}
-          <div className="hidden flex-1 items-center gap-4 text-sm text-[#A1A1AA] sm:flex sm:gap-6">
-            {navItems?.slice(0, 3).map((item, index) => {
+          <div className="hidden flex-1 items-center gap-2 xl:gap-4 text-xs xl:text-sm text-[#A1A1AA] lg:flex">
+            {navItems?.slice(0, 4).map((item, index) => {
               const isSpecial = item.title === "ABHERI";
+              const isVisitor = item.to === "/visitor-registration";
               const isHashLink = item.to.startsWith("/#");
 
               return (
@@ -61,8 +62,10 @@ export default function Header() {
                       }
                     }
                   }}
-                  className={`relative rounded-full border px-3.5 py-1.5 transition duration-300 ${isSpecial
+                  className={`relative rounded-full border px-3 py-1.5 transition duration-300 whitespace-nowrap ${isSpecial
                       ? "group border-[rgba(212,163,89,0.35)] bg-[rgba(212,163,89,0.1)] hover:bg-[rgba(212,163,89,0.2)] hover:border-[#F3C87A] hover:shadow-[0_0_20px_rgba(212,163,89,0.25)]"
+                      : isVisitor
+                      ? "border-[rgba(212,163,89,0.3)] bg-[rgba(212,163,89,0.08)] text-[#F3C87A] hover:border-[#F3C87A] hover:bg-[rgba(212,163,89,0.18)] font-semibold"
                       : "border-transparent hover:border-[rgba(212,163,89,0.25)] hover:bg-[#131318] hover:text-[#FFFFFF]"
                     }`}
                 >
@@ -85,7 +88,7 @@ export default function Header() {
           </div>
 
           {/* Brand - Centered in Desktop */}
-          <div className="flex flex-[1.2] items-center justify-start sm:justify-center">
+          <div className="flex flex-initial lg:flex-[0.8] xl:flex-1 items-center justify-start lg:justify-center">
             <Link
               href="/"
               className="relative flex items-center justify-center transition-transform hover:scale-105"
@@ -103,9 +106,10 @@ export default function Header() {
           </div>
 
           {/* Right nav + CTA - Desktop Only */}
-          <div className="hidden flex-1 items-center justify-end gap-4 text-sm text-[#A1A1AA] sm:flex">
-            {navItems?.slice(3, 5).map((item, index) => {
+          <div className="hidden flex-1 items-center justify-end gap-2 xl:gap-4 text-xs xl:text-sm text-[#A1A1AA] lg:flex">
+            {navItems?.slice(4).map((item, index) => {
               const isSpecial = ["ABHERI", "ISRO", "ITBP"].includes(item.title);
+              const isAlumni = item.to === "/alumni-registration";
               const isHashLink = item.to.startsWith("/#");
 
               return (
@@ -133,21 +137,18 @@ export default function Header() {
                       }
                     }
                   }}
-                  className={`relative rounded-full border px-3.5 py-1.5 transition duration-300 ${isSpecial
+                  className={`relative rounded-full border px-3 py-1.5 transition duration-300 whitespace-nowrap ${isSpecial
                       ? "group border-[rgba(212,163,89,0.35)] bg-[rgba(212,163,89,0.1)] hover:bg-[rgba(212,163,89,0.2)] hover:border-[#F3C87A] hover:shadow-[0_0_20px_rgba(212,163,89,0.25)]"
+                      : isAlumni
+                      ? "border-[rgba(212,163,89,0.25)] hover:border-[#F3C87A] hover:bg-[#131318] hover:text-[#FFFFFF]"
                       : "border-transparent hover:border-[rgba(212,163,89,0.25)] hover:bg-[#131318] hover:text-[#FFFFFF]"
                     }`}
                 >
-                  {isSpecial ? (
-                    <span className="flex items-center gap-2">
-                      <span className="gold-gradient-text font-bold">
-                        {item.title}
-                      </span>
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F3C87A] opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F3C87A]"></span>
-                      </span>
-                    </span>
+                  {"shortTitle" in item && item.shortTitle ? (
+                    <>
+                      <span className="hidden xl:inline">{item.title}</span>
+                      <span className="xl:hidden">{item.shortTitle}</span>
+                    </>
                   ) : (
                     item.title
                   )}
@@ -184,7 +185,7 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] hover:bg-[#1a1a22] transition-colors"
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318] text-[#F3C87A] hover:bg-[#1a1a22] transition-colors ml-auto lg:ml-0"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -194,13 +195,15 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed left-0 right-0 top-[73px] bottom-0 z-20 bg-[#0B0B0E]/95 backdrop-blur-lg transition-all duration-300 ease-in-out sm:hidden ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
+        className={`fixed left-0 right-0 top-[73px] bottom-0 z-20 bg-[#0B0B0E]/95 backdrop-blur-lg transition-all duration-300 ease-in-out lg:hidden ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
           }`}
       >
         <div className="flex h-full flex-col items-center justify-start overflow-y-auto p-6 pt-8">
           <nav className="flex flex-col items-center gap-6 w-full max-w-sm">
             {navItems?.map((item, index) => {
               const isSpecial = item.title === "ABHERI";
+              const isVisitor = item.to === "/visitor-registration";
+              const isAlumni = item.to === "/alumni-registration";
               const isHashLink = item.to.startsWith("/#");
 
               return (
@@ -233,6 +236,10 @@ export default function Header() {
                   }}
                   className={`w-full text-center py-4 text-lg font-medium rounded-2xl border transition-all hover:scale-[1.02] ${isSpecial
                       ? "text-white border-[rgba(212,163,89,0.4)] bg-[rgba(212,163,89,0.1)] shadow-[0_0_15px_rgba(212,163,89,0.2)]"
+                      : isVisitor
+                      ? "text-[#F3C87A] border-[rgba(212,163,89,0.35)] bg-[rgba(212,163,89,0.08)] font-semibold"
+                      : isAlumni
+                      ? "text-white border-[rgba(212,163,89,0.25)] bg-[#131318] hover:border-[#F3C87A]"
                       : "text-[#A1A1AA] border-[rgba(212,163,89,0.2)] bg-[#131318] hover:text-white hover:border-[#F3C87A]"
                     }`}
                 >

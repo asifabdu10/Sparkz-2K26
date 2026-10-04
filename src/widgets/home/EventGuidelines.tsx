@@ -30,8 +30,9 @@ export default function EventGuidelines() {
   return (
     <section
       id="guidelines"
-      className="relative isolate overflow-hidden bg-[#0B0B0E] py-20 text-white"
+      className="relative isolate overflow-hidden bg-[#0B0B0E] py-20 text-white scroll-mt-20"
     >
+      <span id="rules" className="absolute -top-24 pointer-events-none" />
       {mounted && (
         <>
           <div className="pointer-events-none absolute left-[-10%] top-[5%] h-[420px] w-[420px] rounded-full bg-[#3A270D]/45 blur-[150px]" />

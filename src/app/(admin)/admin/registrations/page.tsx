@@ -14,6 +14,7 @@ import {
   writeBatch,
   query,
   where,
+  serverTimestamp,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -901,6 +902,37 @@ export default function RegistrationsManagement() {
       await updateDoc(doc(db, "users", userId), {
         registeredEvents: arrayRemove(eventTitle),
       });
+
+      // If this was a paid registration, check if the user has any other remaining paid registrations.
+      // If not, revoke their visitor pass (Grab Your Ticket) eligibility.
+      try {
+        const remainingPaidSnap = await getDocs(
+          query(
+            collection(db, "registrations"),
+            where("userId", "==", userId),
+            where("paymentStatus", "==", "paid")
+          )
+        );
+        if (remainingPaidSnap.empty) {
+          const visitorSnap = await getDocs(
+            query(
+              collection(db, "visitor_registrations"),
+              where("userId", "==", userId)
+            )
+          );
+          for (const vDoc of visitorSnap.docs) {
+            if (vDoc.data().approvalStatus !== "revoked") {
+              await updateDoc(doc(db, "visitor_registrations", vDoc.id), {
+                approvalStatus: "revoked",
+                revokedAt: serverTimestamp(),
+                revokedReason: `Deregistered from paid departmental event "${eventTitle}".`,
+              });
+            }
+          }
+        }
+      } catch (revErr) {
+        console.warn("Could not check/revoke visitor pass after deregistering:", revErr);
+      }
 
       setRegistrations((current) =>
         current.filter((item) => item.id !== registration.id)

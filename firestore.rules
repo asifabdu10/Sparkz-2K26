@@ -538,7 +538,7 @@ service cloud.firestore {
       // Abheri Admin and Super Admin can change settings.
       //
 
-      allow create, update: if isAbheriAdmin();
+      allow create, update: if isAbheriAdmin() || isAdmin();
 
 
       // -------------------------------------------------------
@@ -548,6 +548,59 @@ service cloud.firestore {
       // Only Super Admin can delete settings.
       //
 
+      allow delete: if isSuperAdmin();
+    }
+
+
+    // =========================================================
+    // VISITOR REGISTRATIONS
+    // =========================================================
+    //
+    // Separate collection — never mixed with event registrations.
+    // Public can create their own registration (via server API).
+    // Only admins can read all records.
+    // Proof documents are on Google Drive, admin-only via API.
+    // =========================================================
+
+    match /visitor_registrations/{regId} {
+
+      // User creates must go through server API (/api/visitor-registration/submit)
+      // which verifies confirmed paid departmental event registration.
+      // Direct client creation is only permitted for admins.
+      allow create: if isAdmin();
+
+      // Admins can read all; authenticated users can read their own.
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Only admins can update (e.g. set emailStatus).
+      allow update: if isAdmin();
+
+      // Only Super Admin can delete visitor registrations.
+      allow delete: if isSuperAdmin();
+    }
+
+
+    // =========================================================
+    // ALUMNI REGISTRATIONS
+    // =========================================================
+    //
+    // Completely separate from visitor_registrations.
+    // Alumni can create without authentication.
+    // Only admins can read all records.
+    // =========================================================
+
+    match /alumni_registrations/{regId} {
+
+      // Public (no auth) can create an alumni registration.
+      allow create: if true;
+
+      // Admins can read all; authenticated users can read their own.
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+
+      // Only admins can update alumni registration documents.
+      allow update: if isAdmin();
+
+      // Only Super Admin can delete alumni registrations.
       allow delete: if isSuperAdmin();
     }
 

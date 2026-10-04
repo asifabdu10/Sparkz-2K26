@@ -22,7 +22,7 @@ const coordinators = [
 const contactInfo = {
   address: "Carmel College of Engineering & Technology, Kerala, India",
   generalEmail: "sparkz@carmelcet.in",
-  website: "sparkz.carmelcet.in",
+  website: "sparkz2k26.carmelcet.in",
 };
 
 export default function ContactPage() {
@@ -30,7 +30,7 @@ export default function ContactPage() {
     <>
       <Head>
         <title>
-          Contact Us - Sparkz &apos;26 | Carmel College of Engineering &
+          Contact Us - Sparkz 2K26 | Carmel College of Engineering &
           Technology
         </title>
         <meta
@@ -314,7 +314,7 @@ export default function ContactPage() {
               className="mt-16 text-center"
             >
               <p className="text-[#A1A1AA] mb-6">
-                Ready to be part of Sparkz &apos;26?
+                Ready to be part of Sparkz'2K26?
               </p>
               <Link
                 href="/events"
