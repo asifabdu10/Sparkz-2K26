@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
+import { useMaintenance } from "@/context/MaintenanceContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const { user, userData, loading, logout } = useAuth();
+  const { isMaintenance } = useMaintenance();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -256,6 +258,29 @@ export default function AdminLayout({
       </AnimatePresence>
 
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-[#04050b] min-h-screen overflow-x-hidden">
+        {isMaintenance && (
+          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 to-red-950/40 border border-amber-500/50 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl animate-pulse">
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-amber-400 shrink-0" />
+              <div>
+                <p className="font-bold text-sm text-amber-300">
+                  🚨 SITE UNDER MAINTENANCE: Public access is blocked
+                </p>
+                <p className="text-xs text-amber-200/80">
+                  All visitors currently see the maintenance screen. Only admins have access.
+                </p>
+              </div>
+            </div>
+            {userData?.role === "superAdmin" && pathname !== "/admin" && (
+              <Link
+                href="/admin"
+                className="px-3 py-1.5 bg-amber-500 text-black hover:bg-amber-400 font-bold text-xs rounded-xl transition-colors shrink-0"
+              >
+                Go to Dashboard to Turn Off
+              </Link>
+            )}
+          </div>
+        )}
         {children}
       </main>
     </div>

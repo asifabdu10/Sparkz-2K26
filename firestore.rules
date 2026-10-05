@@ -526,6 +526,19 @@ service cloud.firestore {
 
 
     // =========================================================
+    // SYSTEM SETTINGS / MAINTENANCE MODE
+    // =========================================================
+
+    match /systemSettings/{settingId} {
+      // Anyone can read system settings (e.g. maintenance mode check)
+      allow read: if true;
+
+      // Only Super Admin can change system settings
+      allow write: if isSuperAdmin();
+    }
+
+
+    // =========================================================
     // VISITOR REGISTRATIONS
     // =========================================================
     //

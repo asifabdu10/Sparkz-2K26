@@ -5,6 +5,7 @@ import Header from "@/widgets/common/Header";
 import Footer from "@/widgets/common/Footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
+import { MaintenanceProvider } from "@/context/MaintenanceContext";
 import { Analytics } from "@vercel/analytics/next";
 
 const unBounded = Unbounded({
@@ -196,9 +197,11 @@ export default function RootLayout({
         className={`${unBounded.variable} ${outfit.variable} antialiased font-light bg-[#0B0B0E] text-white`}
       >
         <AuthProvider>
-          {children}
-          <Toaster position="bottom-center" />
-          <Analytics />
+          <MaintenanceProvider>
+            {children}
+            <Toaster position="bottom-center" />
+            <Analytics />
+          </MaintenanceProvider>
         </AuthProvider>
       </body>
     </html>
