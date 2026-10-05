@@ -1,6 +1,5 @@
 import Razorpay from "razorpay";
 import { NextRequest } from "next/server";
-import { saveRazorpayOrderIdSafe } from "@/utils/server/paymentReconciliation";
 
 function getRazorpayClient() {
   const key_id = (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim().replace(/^['"]|['"]$/g, "");
@@ -28,12 +27,6 @@ export async function POST(request: NextRequest) {
     const eventId = String(body.eventId || notes.eventId || "").trim();
     const userId = String(body.userId || notes.userId || "").trim();
 
-    const hasServiceAccount = Boolean(
-      process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
-      process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
-      process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT
-    );
-
     // Validate amount — minimum 1 rupee (100 paise)
     if (!amountRupees || amountRupees < 1) {
       return Response.json(
@@ -47,11 +40,6 @@ export async function POST(request: NextRequest) {
     // Mock test mode without touching live Razorpay API
     if (receipt.startsWith("test_mock_") || body.isMockTest === true) {
       const mockOrderId = `order_mock_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      if (registrationId && hasServiceAccount) {
-        try {
-          await saveRazorpayOrderIdSafe({ registrationId, orderId: mockOrderId });
-        } catch {}
-      }
       return Response.json({
         order_id: mockOrderId,
         amount: amountPaise,
@@ -69,22 +57,30 @@ export async function POST(request: NextRequest) {
       ...(userId ? { userId } : {}),
     };
 
-    const order = await razorpay.orders.create({
-      amount: amountPaise,
-      currency,
-      receipt,
-      notes: mergedNotes,
-    });
+    // Bound the upstream Razorpay request as well. The SDK does not expose
+    // an AbortSignal, so race it against a timeout and fail cleanly instead
+    // of keeping the browser on "Processing..." indefinitely.
+    const order = await Promise.race([
+      razorpay.orders.create({
+        amount: amountPaise,
+        currency,
+        receipt,
+        notes: mergedNotes,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Razorpay order creation timed out. Please try again."));
+        }, 12000);
+      }),
+    ]);
 
     console.log(`[create-order] Created Razorpay order ${order.id} for registration: ${registrationId || "N/A"}`);
 
-    if (registrationId && hasServiceAccount) {
-      try {
-        await saveRazorpayOrderIdSafe({ registrationId, orderId: order.id });
-      } catch (error) {
-        console.warn("[create-order] Pre-linking order ID to registration failed (non-fatal):", error);
-      }
-    }
+    // IMPORTANT: Do not wait for a Firestore write here. The order already
+    // contains registrationId/eventId/userId in Razorpay notes, and the
+    // verification API + webhook reconcile the payment server-side. Waiting
+    // for Firestore before returning the order can leave the checkout button
+    // stuck on "Processing..." when Firebase Admin is slow/unavailable.
 
     return Response.json({
       order_id: order.id,

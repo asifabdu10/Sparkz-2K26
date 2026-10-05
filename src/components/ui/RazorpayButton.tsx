@@ -158,20 +158,37 @@ export default function RazorpayButton({
 
     try {
       // ── Step 1: create order on our backend ───────────────────────────
-      const orderRes = await fetch("/api/razorpay/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: amountRupees,
-          receipt: `evt_${eventId}_${Date.now()}`,
-          notes: { eventId, userId, registrationId: metadata?.registrationId || "" },
-          registrationId: metadata?.registrationId || "",
-          eventId,
-          userId,
-        }),
-      });
+      // Do not let a stalled API request leave the payment button in
+      // "Processing..." forever. The order endpoint is intentionally kept
+      // independent from Firestore writes so Razorpay can open promptly.
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
-      const orderData = await orderRes.json();
+      let orderRes: Response;
+      try {
+        orderRes = await fetch("/api/razorpay/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            amount: amountRupees,
+            receipt: `evt_${eventId}_${Date.now()}`,
+            notes: { eventId, userId, registrationId: metadata?.registrationId || "" },
+            registrationId: metadata?.registrationId || "",
+            eventId,
+            userId,
+          }),
+        });
+      } catch (fetchError: any) {
+        if (fetchError?.name === "AbortError") {
+          throw new Error("Payment server took too long to respond. Please try again.");
+        }
+        throw new Error("Unable to connect to the payment server. Please check your internet connection and try again.");
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
+      const orderData = await orderRes.json().catch(() => ({}));
 
       if (!orderRes.ok) {
         throw new Error(orderData.error || "Failed to create order");
@@ -302,9 +319,11 @@ export default function RazorpayButton({
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
-        onError={() =>
-          toastError("Failed to load payment gateway. Check your connection.")
-        }
+        onError={() => {
+          setScriptReady(false);
+          setLoading(false);
+          toastError("Failed to load payment gateway. Check your connection.");
+        }}
       />
 
       <button
