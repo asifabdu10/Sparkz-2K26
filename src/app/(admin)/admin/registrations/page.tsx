@@ -40,7 +40,7 @@ import {
   FiFilter,
   FiZap,
 } from "react-icons/fi";
-import { toastError, toastSuccess } from "@/utils/common/Toast";
+import { toastError, toastInfo, toastSuccess } from "@/utils/common/Toast";
 import { isBasicScienceDepartment, allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
 
@@ -59,16 +59,18 @@ interface EventSummary {
   freeCount: number;
 }
 
-const isPendingRegistration = (reg: UserRegistration): boolean => {
-  const pStatus = String(reg.paymentStatus || "").toLowerCase().trim();
-  const rStatus = String(reg.status || "").toLowerCase().trim();
-  return pStatus === "pending" || rStatus === "pending";
-};
-
 const isPaidRegistration = (reg: UserRegistration): boolean => {
   const pStatus = String(reg.paymentStatus || "").toLowerCase().trim();
   const rStatus = String(reg.status || "").toLowerCase().trim();
   return pStatus === "paid" || rStatus === "paid" || rStatus === "registered";
+};
+
+const isPendingRegistration = (reg: UserRegistration): boolean => {
+  if (isPaidRegistration(reg)) return false;
+  if (isFreeRegistration(reg)) return false;
+  const pStatus = String(reg.paymentStatus || "").toLowerCase().trim();
+  const rStatus = String(reg.status || "").toLowerCase().trim();
+  return pStatus === "pending" || rStatus === "pending";
 };
 
 const isFreeRegistration = (reg: UserRegistration): boolean => {
@@ -227,6 +229,7 @@ export default function RegistrationsManagement() {
   const [quickPaymentId, setQuickPaymentId] = useState("");
   const [quickOrderId, setQuickOrderId] = useState("");
   const [quickConfirming, setQuickConfirming] = useState(false);
+  const [syncingRazorpay, setSyncingRazorpay] = useState(false);
 
   // Copy helper
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -640,7 +643,7 @@ export default function RegistrationsManagement() {
 
       const updateData: Record<string, any> = {
         paymentStatus: "paid",
-        status: "paid",
+        status: "registered",
         razorpayPaymentId: trimmedPaymentId,
         razorpayOrderId: (orderIdToUse || "").trim() || (registration.razorpayOrderId || ""),
         paidAt: registration.paidAt || new Date(),
@@ -676,13 +679,67 @@ export default function RegistrationsManagement() {
       }
 
       toastSuccess(
-        `Registration confirmed! Marked as Paid & linked to user profile for ${eventTitle || "event"}.`
+        `Registration confirmed! Marked as Paid & registered for ${eventTitle || "event"}.`
       );
     } catch (error) {
       console.error("Error confirming registration:", error);
       toastError("Failed to confirm registration. Please check console or permissions.");
     } finally {
       setQuickConfirming(false);
+    }
+  };
+
+  // 1-Click Sync & Verification with Razorpay API
+  const handleSyncWithRazorpay = async (registration: UserRegistration, orderIdOverride?: string) => {
+    const orderIdToUse = (orderIdOverride || registration.razorpayOrderId || "").trim();
+    if (!orderIdToUse && !registration.id) {
+      toastError("No Razorpay Order ID or Registration ID found to verify.");
+      return;
+    }
+
+    try {
+      setSyncingRazorpay(true);
+      const res = await fetch("/api/razorpay/sync-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registrationId: registration.id,
+          orderId: orderIdToUse,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || data.error || "Failed to sync with Razorpay");
+      }
+
+      if (data.isPaid) {
+        toastSuccess(data.message || "Payment verified and registration marked paid!");
+        const updatedRegistration: UserRegistration = {
+          ...registration,
+          paymentStatus: "paid",
+          status: "registered",
+          razorpayPaymentId: data.paymentId || registration.razorpayPaymentId,
+          razorpayOrderId: orderIdToUse || registration.razorpayOrderId,
+          paidAt: registration.paidAt || new Date(),
+          updatedAt: new Date(),
+        };
+
+        setRegistrations((current) =>
+          current.map((r) => (r.id === registration.id ? updatedRegistration : r))
+        );
+
+        if (selectedRegistration?.id === registration.id) {
+          setSelectedRegistration(updatedRegistration);
+        }
+      } else {
+        toastInfo(data.message || "Order is not captured/paid in Razorpay.");
+      }
+    } catch (err: any) {
+      console.error("Razorpay sync error:", err);
+      toastError(err?.message || "Failed to sync with Razorpay");
+    } finally {
+      setSyncingRazorpay(false);
     }
   };
 
@@ -1963,7 +2020,26 @@ export default function RegistrationsManagement() {
                         </div>
                       </div>
 
-                      <div className="mt-3.5 flex justify-end">
+                      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          disabled={
+                            syncingRazorpay ||
+                            (!selectedRegistration.razorpayOrderId && !quickOrderId.trim())
+                          }
+                          onClick={() =>
+                            void handleSyncWithRazorpay(
+                              selectedRegistration,
+                              quickOrderId.trim() || selectedRegistration.razorpayOrderId
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-xs transition-all shadow-md shadow-indigo-950"
+                          title="Checks Razorpay directly for this order and auto-reconciles if captured"
+                        >
+                          <FiZap size={14} />
+                          {syncingRazorpay ? "Checking Razorpay..." : "Auto-Check & Sync with Razorpay"}
+                        </button>
+
                         <button
                           type="button"
                           disabled={quickConfirming || !quickPaymentId.trim()}

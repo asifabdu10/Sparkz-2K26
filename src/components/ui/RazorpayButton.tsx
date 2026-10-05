@@ -124,6 +124,8 @@ export default function RazorpayButton({
           receipt: `evt_${eventId}_${Date.now()}`,
           notes: { eventId, userId, registrationId: metadata?.registrationId || "" },
           registrationId: metadata?.registrationId || "",
+          eventId,
+          userId,
         }),
       });
 

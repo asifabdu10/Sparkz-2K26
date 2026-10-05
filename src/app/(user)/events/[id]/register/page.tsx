@@ -5,6 +5,7 @@ import {
   arrayUnion,
   deleteField,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -211,13 +212,14 @@ export default function Register() {
 
     const loadRegistration = async () => {
       try {
-        const result = await checkUserEventRegistration(event.id, user.uid);
+        const result = await checkUserEventRegistration(event.id, user.uid, true);
         if (cancelled) return;
 
         if (result.isRegistered || result.data) {
           const data = result.data;
-          if (result.registrationId) {
-            setRegistrationId(result.registrationId);
+          const regId = result.registrationId || `${user.uid}_${event.id}`;
+          if (regId) {
+            setRegistrationId(regId);
           }
 
           if (result.isRegistered) {
@@ -238,9 +240,24 @@ export default function Register() {
               teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : current.teamMembers,
             }));
 
-            if (data.status === "pending") {
+            if (data.status === "pending" && !result.isRegistered) {
               setPaymentReady(true);
               toastInfo("Your details are saved. Complete payment to finish registration.");
+
+              // If order ID exists, verify with Razorpay in background (e.g. mobile UPI tab switch recovery)
+              if (data.razorpayOrderId) {
+                fetch(`/api/razorpay/sync-payment?registrationId=${encodeURIComponent(regId)}`)
+                  .then((res) => res.json())
+                  .then((syncRes) => {
+                    if (!cancelled && syncRes.success && syncRes.isPaid) {
+                      setRegistered(true);
+                      setPaymentReady(false);
+                      setAcknowledged(true);
+                      toastSuccess("Payment confirmed! You are registered 🎉");
+                    }
+                  })
+                  .catch(() => {});
+              }
             }
           }
         } else {
@@ -401,6 +418,28 @@ export default function Register() {
     if (!user || !event) throw new Error("Login is required.");
 
     const idToUse = registrationId || `${user.uid}_${event.id}`;
+
+    // PREVENT STATUS REGRESSION: Never overwrite an already-paid registration
+    const existingSnap = await getDoc(doc(db, "registrations", idToUse));
+    if (existingSnap.exists()) {
+      const existingData = existingSnap.data();
+      const isAlreadyPaid =
+        existingData?.paymentStatus === "paid" ||
+        existingData?.status === "registered" ||
+        existingData?.status === "paid";
+      if (isAlreadyPaid) {
+        setRegistered(true);
+        setRegistrationId(idToUse);
+        setUserEventRegistration(event.id, user.uid, {
+          isRegistered: true,
+          registrationId: idToUse,
+          data: existingData,
+        });
+        toastSuccess("You are already registered for this event!");
+        return idToUse;
+      }
+    }
+
     const registration = {
       eventId: event.id,
       eventTitle: event.title,
@@ -555,7 +594,7 @@ export default function Register() {
     // verified the Razorpay signature. Only now do we turn the pending draft
     // into a real paid registration.
     await updateDoc(doc(db, "registrations", registrationId), {
-      status: "paid",
+      status: "registered",
       paymentStatus: "paid",
       razorpayPaymentId: paymentId,
       razorpayOrderId: orderId,
@@ -571,7 +610,7 @@ export default function Register() {
     setUserEventRegistration(event.id, user.uid, {
       isRegistered: true,
       registrationId,
-      data: { status: "paid" },
+      data: { status: "registered", paymentStatus: "paid" },
     });
     setRegistered(true);
     setPaymentReady(false);

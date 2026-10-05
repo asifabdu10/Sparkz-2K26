@@ -314,7 +314,10 @@ export async function checkUserEventRegistration(
       const regDoc = snapshot.docs[0];
       const data = regDoc.data();
       const status = data.status;
-      const isRegistered = status === "paid" || status === "registered";
+      const isRegistered =
+        status === "paid" ||
+        status === "registered" ||
+        String(data.paymentStatus || "").toLowerCase().trim() === "paid";
 
       const res: UserEventRegistrationStatus = {
         isRegistered,
