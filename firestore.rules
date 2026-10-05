@@ -36,6 +36,37 @@ service cloud.firestore {
         ).data.registrationOpen == true;
     }
 
+    function isEventRegistrationOpen(eventId) {
+      return exists(/databases/$(database)/documents/events/$(eventId))
+        && (
+          // Spot registration mode
+          (
+            ('registrationMode' in get(/databases/$(database)/documents/events/$(eventId)).data)
+            && get(/databases/$(database)/documents/events/$(eventId)).data.registrationMode == 'spot'
+            && ('spotRegistrationOpen' in get(/databases/$(database)/documents/events/$(eventId)).data)
+            && get(/databases/$(database)/documents/events/$(eventId)).data.spotRegistrationOpen == true
+            && (
+              !('spotRegistrationStartsAt' in get(/databases/$(database)/documents/events/$(eventId)).data)
+              || get(/databases/$(database)/documents/events/$(eventId)).data.spotRegistrationStartsAt == null
+              || !(get(/databases/$(database)/documents/events/$(eventId)).data.spotRegistrationStartsAt is timestamp)
+              || get(/databases/$(database)/documents/events/$(eventId)).data.spotRegistrationStartsAt <= request.time
+            )
+          )
+          ||
+          // Online registration mode (default if registrationMode is missing or not 'spot'/'none')
+          (
+            (
+              !('registrationMode' in get(/databases/$(database)/documents/events/$(eventId)).data)
+              || get(/databases/$(database)/documents/events/$(eventId)).data.registrationMode == 'online'
+            )
+            && (
+              !('registrationOpen' in get(/databases/$(database)/documents/events/$(eventId)).data)
+              || get(/databases/$(database)/documents/events/$(eventId)).data.registrationOpen == true
+            )
+          )
+        );
+    }
+
     // =========================================================
     // SUPER ADMIN
     // =========================================================
@@ -250,63 +281,15 @@ service cloud.firestore {
         isAuthenticated()
         &&
         (
-          // ---------------------------------------------------
-          // SUPER ADMIN OR BASIC SCIENCE ADMIN REGISTRATION
-          // ---------------------------------------------------
-          isSuperAdmin()
-
+          isAdmin()
           ||
-
-          isBasicScienceAdmin()
-
-          ||
-
-          // ---------------------------------------------------
-          // NORMAL USER REGISTRATION
-          // ---------------------------------------------------
           (
-            request.resource.data.userId ==
-              request.auth.uid
-
+            request.resource.data.userId == request.auth.uid
             &&
-
-            exists(
-              /databases/$(database)/documents/events/$(request.resource.data.eventId)
-            )
-
-            &&
-
-            (
-              (
-                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationMode == 'spot'
-                &&
-                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.spotRegistrationOpen == true
-                &&
-                (
-                  !('spotRegistrationStartsAt' in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data)
-                  ||
-                  get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.spotRegistrationStartsAt <= request.time
-                )
-              )
-              ||
-              (
-                get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationMode != 'spot'
-                &&
-                (
-                  !(
-                    'registrationOpen'
-                    in get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data
-                  )
-                  ||
-                  get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.registrationOpen == true
-                )
-              )
-            )
+            isEventRegistrationOpen(request.resource.data.eventId)
           )
         )
-
         &&
-
         request.resource.data.status
           in [
             'registered',
@@ -328,15 +311,11 @@ service cloud.firestore {
         isAuthenticated()
         &&
         (
+          resource == null
+          ||
           resource.data.userId ==
             request.auth.uid
-
           ||
-
-          isSuperAdmin()
-
-          ||
-
           isAdmin()
         );
 
@@ -347,7 +326,7 @@ service cloud.firestore {
       //
       // User can update their own registration.
       //
-      // Super Admin and Basic Science Admin can update any registration.
+      // Admins can update any registration.
       //
 
       allow update: if
@@ -356,14 +335,8 @@ service cloud.firestore {
         (
           resource.data.userId ==
             request.auth.uid
-
           ||
-
-          isSuperAdmin()
-
-          ||
-
-          isBasicScienceAdmin()
+          isAdmin()
         );
 
 

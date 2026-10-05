@@ -420,42 +420,46 @@ export default function Register() {
     const idToUse = registrationId || `${user.uid}_${event.id}`;
 
     // PREVENT STATUS REGRESSION: Never overwrite an already-paid registration
-    const existingSnap = await getDoc(doc(db, "registrations", idToUse));
-    if (existingSnap.exists()) {
-      const existingData = existingSnap.data();
-      const isAlreadyPaid =
-        existingData?.paymentStatus === "paid" ||
-        existingData?.status === "registered" ||
-        existingData?.status === "paid";
-      if (isAlreadyPaid) {
-        setRegistered(true);
-        setRegistrationId(idToUse);
-        setUserEventRegistration(event.id, user.uid, {
-          isRegistered: true,
-          registrationId: idToUse,
-          data: existingData,
-        });
-        toastSuccess("You are already registered for this event!");
-        return idToUse;
+    try {
+      const existingSnap = await getDoc(doc(db, "registrations", idToUse));
+      if (existingSnap.exists()) {
+        const existingData = existingSnap.data();
+        const isAlreadyPaid =
+          existingData?.paymentStatus === "paid" ||
+          existingData?.status === "registered" ||
+          existingData?.status === "paid";
+        if (isAlreadyPaid) {
+          setRegistered(true);
+          setRegistrationId(idToUse);
+          setUserEventRegistration(event.id, user.uid, {
+            isRegistered: true,
+            registrationId: idToUse,
+            data: existingData,
+          });
+          toastSuccess("You are already registered for this event!");
+          return idToUse;
+        }
       }
+    } catch (checkErr) {
+      console.warn("Could not check existing registration status:", checkErr);
     }
 
     const registration = {
       eventId: event.id,
       eventTitle: event.title,
       userId: user.uid,
-      userEmail: user.email || formData.leaderEmail,
-      userName: user.displayName || formData.leaderName,
-      leaderName: formData.leaderName,
-      leaderEmail: formData.leaderEmail,
-      leaderMobile: formData.leaderMobile,
-      leaderCollege: formData.leaderCollege,
-      leaderDepartment: formData.leaderDepartment,
+      userEmail: user.email || formData.leaderEmail || "",
+      userName: user.displayName || formData.leaderName || "",
+      leaderName: formData.leaderName || "",
+      leaderEmail: formData.leaderEmail || "",
+      leaderMobile: formData.leaderMobile || "",
+      leaderCollege: formData.leaderCollege || "",
+      leaderDepartment: formData.leaderDepartment || "",
       leaderYear:
         event.showMemberYear === false || event.department === "Football"
           ? deleteField()
-          : formData.leaderYear,
-      extraData: formData.extraData,
+          : (formData.leaderYear || ""),
+      extraData: formData.extraData || {},
       teamMembers:
         event.eveType === "team"
           ? formData.teamMembers.map((member) => {
@@ -468,7 +472,7 @@ export default function Register() {
           })
           : [],
       teamSize: event.eveType === "team" ? 1 + formData.teamMembers.length : 1,
-      registrationFee: feeNumber,
+      registrationFee: feeNumber ?? 0,
       department: event.department || "",
       // A paid registration is only considered registered after Razorpay
       // signature verification. Spot registration uses the same payment flow
@@ -476,7 +480,7 @@ export default function Register() {
       status: isFree ? "registered" : "pending",
       paymentStatus: isFree ? "free" : "pending",
       registrationMethod: isSpotRegistration ? "spot" : (isFree ? "free" : "online"),
-      spotRegistration: isSpotRegistration,
+      spotRegistration: Boolean(isSpotRegistration),
       updatedAt: new Date(),
     };
 
@@ -532,9 +536,9 @@ export default function Register() {
             : "Details saved. Complete the payment to finish registration."
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration save error:", error);
-      toastError("Could not save registration details. Please try again.");
+      toastError(error?.message ? `Could not save registration: ${error.message}` : "Could not save registration details. Please try again.");
     } finally {
       setLoading(false);
     }
