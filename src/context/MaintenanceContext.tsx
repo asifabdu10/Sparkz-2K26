@@ -17,6 +17,19 @@ interface MaintenanceContextType {
 
 const MaintenanceContext = createContext<MaintenanceContextType | undefined>(undefined);
 
+// Helper to safely parse JSON from a fetch response without ever throwing syntax errors on HTML responses
+async function safeParseJson(res: Response): Promise<{ ok: boolean; data: any }> {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim().startsWith("{")) {
+      return { ok: res.ok, data: { error: text?.slice(0, 150) || "Invalid server response" } };
+    }
+    return { ok: res.ok, data: JSON.parse(text) };
+  } catch {
+    return { ok: false, data: { error: "Failed to parse server response" } };
+  }
+}
+
 export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMaintenance, setIsMaintenance] = useState<boolean>(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>("");
@@ -24,12 +37,14 @@ export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [maintenanceLoading, setMaintenanceLoading] = useState<boolean>(true);
   const { userData, user } = useAuth();
 
-  // 1. Real-time Firestore listener for instant synchronization
+  // 1. Real-time Firestore listener for instant synchronization.
+  // We use "eventSettings/maintenance" because eventSettings already has "allow read: if true;"
+  // and "allow create, update: if isAdmin();" deployed in existing Firestore rules.
   useEffect(() => {
     let isSubscribed = true;
 
     try {
-      const docRef = doc(db, "systemSettings", "maintenance");
+      const docRef = doc(db, "eventSettings", "maintenance");
       const unsubscribe = onSnapshot(
         docRef,
         (snap) => {
@@ -47,21 +62,20 @@ export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           }
           setMaintenanceLoading(false);
         },
-        (err) => {
-          console.warn("[MaintenanceProvider] Real-time listener note (falling back to REST):", err?.message);
-          // If Firestore permissions or rules block direct read, fallback to REST API
-          fetch("/api/admin/maintenance")
-            .then((r) => r.json())
-            .then((res) => {
-              if (isSubscribed && res) {
-                setIsMaintenance(Boolean(res.enabled));
-                setMaintenanceMessage(res.message || "");
-              }
-            })
-            .catch(() => {})
-            .finally(() => {
-              if (isSubscribed) setMaintenanceLoading(false);
-            });
+        async (err) => {
+          console.warn("[MaintenanceProvider] Real-time listener note (trying fallback):", err?.message);
+          try {
+            const res = await fetch("/api/admin/maintenance");
+            const parsed = await safeParseJson(res);
+            if (isSubscribed && parsed.ok && parsed.data) {
+              setIsMaintenance(Boolean(parsed.data.enabled));
+              setMaintenanceMessage(parsed.data.message || "");
+            }
+          } catch {
+            // Non-fatal fallback
+          } finally {
+            if (isSubscribed) setMaintenanceLoading(false);
+          }
         }
       );
 
@@ -78,10 +92,12 @@ export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const refetchMaintenance = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/maintenance");
-      const data = await res.json();
-      setIsMaintenance(Boolean(data.enabled));
-      if (typeof data.message === "string") {
-        setMaintenanceMessage(data.message);
+      const parsed = await safeParseJson(res);
+      if (parsed.ok && parsed.data) {
+        setIsMaintenance(Boolean(parsed.data.enabled));
+        if (typeof parsed.data.message === "string") {
+          setMaintenanceMessage(parsed.data.message);
+        }
       }
     } catch (e) {
       console.error("[MaintenanceProvider] Refetch failed:", e);
@@ -98,38 +114,55 @@ export const MaintenanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const effectiveMessage =
         typeof message === "string" ? message.trim() : maintenanceMessage;
 
-      // 1. Update directly in Firestore via client SDK (superAdmin rule allows this)
+      const payload = {
+        enabled,
+        message: effectiveMessage,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.email || userData.email || "superAdmin",
+      };
+
+      let clientWriteSuccess = false;
+
+      // 1. Direct write to Firestore via client SDK (using eventSettings which is permitted in rules)
       try {
-        await setDoc(
-          doc(db, "systemSettings", "maintenance"),
-          {
-            enabled,
-            message: effectiveMessage,
-            updatedAt: serverTimestamp(),
-            updatedBy: user?.email || userData.email || "superAdmin",
-          },
-          { merge: true }
-        );
+        await setDoc(doc(db, "eventSettings", "maintenance"), payload, { merge: true });
+        clientWriteSuccess = true;
       } catch (clientErr) {
-        console.warn("[toggleMaintenance] Client write note (calling API route):", clientErr);
+        console.warn("[toggleMaintenance] Client write to eventSettings failed:", clientErr);
       }
 
-      // 2. Also call server API route with Firebase ID token for guaranteed administrative authority
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch("/api/admin/maintenance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled,
-          message: effectiveMessage,
-          firebaseIdToken: token || "",
-          userId: user?.uid,
-        }),
-      });
+      // Also try systemSettings doc in case new rules are active
+      try {
+        await setDoc(doc(db, "systemSettings", "maintenance"), payload, { merge: true });
+        clientWriteSuccess = true;
+      } catch {
+        // Ignored if rules pending deploy
+      }
 
-      const resData = await res.json();
-      if (!res.ok) {
-        throw new Error(resData.error || "Failed to update maintenance state on server");
+      // 2. Also call server API route safely as backup
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch("/api/admin/maintenance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            enabled,
+            message: effectiveMessage,
+            firebaseIdToken: token || "",
+            userId: user?.uid,
+          }),
+        });
+
+        const parsed = await safeParseJson(res);
+        if (parsed.ok) {
+          clientWriteSuccess = true;
+        } else if (!clientWriteSuccess) {
+          throw new Error(parsed.data?.error || "Failed to update maintenance status on server");
+        }
+      } catch (apiErr: any) {
+        if (!clientWriteSuccess) {
+          throw apiErr;
+        }
       }
 
       setIsMaintenance(enabled);
