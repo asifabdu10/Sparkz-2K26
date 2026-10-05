@@ -5,7 +5,12 @@ let adminApp: App | null = null;
 let adminDb: Firestore | null = null;
 
 function parseServiceAccount(): Record<string, any> {
-  let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+  let raw = (
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
+    process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT ||
+    ""
+  ).trim();
   if (!raw) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not configured");
   }

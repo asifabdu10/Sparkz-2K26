@@ -2,10 +2,19 @@ import Razorpay from "razorpay";
 import { NextRequest } from "next/server";
 import { saveRazorpayOrderIdSafe } from "@/utils/server/paymentReconciliation";
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+function getRazorpayClient() {
+  const key_id = (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim().replace(/^['"]|['"]$/g, "");
+  const key_secret = (process.env.RAZORPAY_KEY_SECRET || "").trim().replace(/^['"]|['"]$/g, "");
+
+  if (!key_id || !key_secret) {
+    throw new Error("Razorpay credentials (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET) are missing or invalid in server environment.");
+  }
+
+  return {
+    razorpay: new Razorpay({ key_id, key_secret }),
+    key_id,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,12 +28,11 @@ export async function POST(request: NextRequest) {
     const eventId = String(body.eventId || notes.eventId || "").trim();
     const userId = String(body.userId || notes.userId || "").trim();
 
-    if (registrationId && !process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-      return Response.json(
-        { error: "Payment reconciliation is not configured. Please contact the administrator before paying." },
-        { status: 503 }
-      );
-    }
+    const hasServiceAccount = Boolean(
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
+      process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT
+    );
 
     // Validate amount — minimum 1 rupee (100 paise)
     if (!amountRupees || amountRupees < 1) {
@@ -39,15 +47,20 @@ export async function POST(request: NextRequest) {
     // Mock test mode without touching live Razorpay API
     if (receipt.startsWith("test_mock_") || body.isMockTest === true) {
       const mockOrderId = `order_mock_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      if (registrationId && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        await saveRazorpayOrderIdSafe({ registrationId, orderId: mockOrderId });
+      if (registrationId && hasServiceAccount) {
+        try {
+          await saveRazorpayOrderIdSafe({ registrationId, orderId: mockOrderId });
+        } catch {}
       }
       return Response.json({
         order_id: mockOrderId,
         amount: amountPaise,
         currency,
+        key_id: "rzp_test_mock_key",
       });
     }
+
+    const { razorpay, key_id } = getRazorpayClient();
 
     const mergedNotes: Record<string, string> = {
       ...notes,
@@ -65,15 +78,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[create-order] Created Razorpay order ${order.id} for registration: ${registrationId || "N/A"}`);
 
-    if (registrationId && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    if (registrationId && hasServiceAccount) {
       try {
         await saveRazorpayOrderIdSafe({ registrationId, orderId: order.id });
       } catch (error) {
-        console.error("Failed to link Razorpay order ID:", error);
-        return Response.json(
-          { error: "Payment order was created, but the registration could not be linked to the payment. Please retry." },
-          { status: 500 }
-        );
+        console.warn("[create-order] Pre-linking order ID to registration failed (non-fatal):", error);
       }
     }
 
@@ -81,6 +90,7 @@ export async function POST(request: NextRequest) {
       order_id: order.id,
       amount: order.amount,
       currency: order.currency,
+      key_id,
     });
   } catch (error: any) {
     console.error("Razorpay create-order error:", error);

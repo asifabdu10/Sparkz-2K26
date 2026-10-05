@@ -69,20 +69,50 @@ export default function RazorpayButton({
     }
 
     return new Promise((resolve) => {
+      let resolved = false;
+
+      // 1. Polling interval every 100ms for up to 4s in case checkout.js is already in DOM / executing
+      const interval = setInterval(() => {
+        if (typeof window !== "undefined" && window.Razorpay) {
+          if (!resolved) {
+            resolved = true;
+            clearInterval(interval);
+            setScriptReady(true);
+            resolve(true);
+          }
+        }
+      }, 100);
+
+      // 4-second timeout guarantee so the button can never hang indefinitely
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          clearInterval(interval);
+          resolve(typeof window !== "undefined" && Boolean(window.Razorpay));
+        }
+      }, 4000);
+
       const existingScript = document.querySelector(
         'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
       );
       if (existingScript) {
         existingScript.addEventListener("load", () => {
-          setScriptReady(true);
-          resolve(true);
+          if (!resolved) {
+            resolved = true;
+            clearInterval(interval);
+            clearTimeout(timeout);
+            setScriptReady(true);
+            resolve(true);
+          }
         });
-        existingScript.addEventListener("error", () => resolve(false));
-        // In case it finished loading between check and listener:
-        if (typeof window !== "undefined" && window.Razorpay) {
-          setScriptReady(true);
-          resolve(true);
-        }
+        existingScript.addEventListener("error", () => {
+          if (!resolved) {
+            resolved = true;
+            clearInterval(interval);
+            clearTimeout(timeout);
+            resolve(false);
+          }
+        });
         return;
       }
 
@@ -90,10 +120,22 @@ export default function RazorpayButton({
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.async = true;
       script.onload = () => {
-        setScriptReady(true);
-        resolve(true);
+        if (!resolved) {
+          resolved = true;
+          clearInterval(interval);
+          clearTimeout(timeout);
+          setScriptReady(true);
+          resolve(true);
+        }
       };
-      script.onerror = () => resolve(false);
+      script.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearInterval(interval);
+          clearTimeout(timeout);
+          resolve(false);
+        }
+      };
       document.body.appendChild(script);
     });
   };
@@ -135,11 +177,23 @@ export default function RazorpayButton({
         throw new Error(orderData.error || "Failed to create order");
       }
 
+      const razorpayKey =
+        orderData.key_id ||
+        orderData.keyId ||
+        process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+        "";
+
+      if (!razorpayKey) {
+        throw new Error(
+          "Payment gateway key is missing. Please verify server environment configuration."
+        );
+      }
+
       // ── Step 2: open Razorpay checkout modal ──────────────────────────
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        key: razorpayKey,
         amount: orderData.amount,          // paise
-        currency: orderData.currency,
+        currency: orderData.currency || "INR",
         name: "Sparkz 2K26",
         description: eventTitle,
         order_id: orderData.order_id,
@@ -164,6 +218,7 @@ export default function RazorpayButton({
           razorpay_signature: string;
         }) => {
           // ── Step 3: verify signature on our backend ─────────────────
+          setLoading(true);
           try {
             const firebaseIdToken = await auth.currentUser?.getIdToken();
             const verifyRes = await fetch("/api/razorpay/verify-payment", {
@@ -208,13 +263,22 @@ export default function RazorpayButton({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const rzp = new window.Razorpay(options);
 
-      rzp.on("payment.failed", (res: { error: { description: string } }) => {
-        toastError(res.error.description || "Payment failed. Please retry.");
+      rzp.on("payment.failed", (res: any) => {
+        toastError(res?.error?.description || "Payment failed. Please retry.");
         setLoading(false);
       });
 
-      rzp.open();
+      try {
+        rzp.open();
+        // Modal is now open on screen; reset button state so it is never stuck on Processing
+        setLoading(false);
+      } catch (openErr: any) {
+        console.error("Razorpay open error:", openErr);
+        toastError(openErr?.message || "Failed to open payment modal. Please retry.");
+        setLoading(false);
+      }
     } catch (err: any) {
+      console.error("Payment initiation error:", err);
       toastError(err?.message || "Something went wrong. Please try again.");
       setLoading(false);
     }
