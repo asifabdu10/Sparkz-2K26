@@ -7,6 +7,7 @@ export interface ReconcilePaymentArgs {
   source:
     | "verify_payment_api"
     | "webhook_payment_captured"
+    | "webhook_payment_authorized"
     | "webhook_order_paid"
     | "admin_sync"
     | "client_recovery";
@@ -232,15 +233,31 @@ export async function reconcileSuccessfulPayment(
         };
       }
 
-      if (payment.status !== "captured") {
+      if (payment.status === "authorized") {
+        try {
+          console.log(`[ReconcilePayment] Payment ${razorpayPaymentId} is authorized. Auto-capturing...`);
+          const captured = await rzp.payments.capture(
+            razorpayPaymentId,
+            payment.amount,
+            payment.currency || "INR"
+          );
+          capturedPayment = captured;
+          console.log(`[ReconcilePayment] Payment ${razorpayPaymentId} captured successfully.`);
+        } catch (captureErr: any) {
+          console.warn(`[ReconcilePayment] Capture note (accepting authorized payment):`, captureErr?.message);
+          capturedPayment = payment;
+        }
+      } else if (payment.status === "captured") {
+        capturedPayment = payment;
+      } else {
         console.warn(
-          `[ReconcilePayment] Payment ${razorpayPaymentId} has status '${payment.status}' (not captured yet)`
+          `[ReconcilePayment] Payment ${razorpayPaymentId} has status '${payment.status}'`
         );
         return {
           success: false,
           orderId: razorpayOrderId,
           paymentId: razorpayPaymentId,
-          error: `Payment status is ${payment.status}, expected captured`,
+          error: `Payment status is ${payment.status}, expected captured or authorized`,
         };
       }
 
@@ -259,19 +276,35 @@ export async function reconcileSuccessfulPayment(
     try {
       const paymentsList = await rzp.orders.fetchPayments(razorpayOrderId);
       const items = (paymentsList as any).items || [];
-      capturedPayment = items.find((p: any) => p.status === "captured");
+      capturedPayment =
+        items.find((p: any) => p.status === "captured") ||
+        items.find((p: any) => p.status === "authorized");
 
       if (!capturedPayment) {
-        console.warn(`[ReconcilePayment] No captured payment found for order ${razorpayOrderId}`);
+        console.warn(`[ReconcilePayment] No captured or authorized payment found for order ${razorpayOrderId}`);
         return {
           success: false,
           orderId: razorpayOrderId,
-          error: "No captured payment found for this order in Razorpay",
+          error: "No captured or authorized payment found for this order in Razorpay",
         };
       }
 
+      if (capturedPayment.status === "authorized") {
+        try {
+          console.log(`[ReconcilePayment] Auto-capturing authorized payment ${capturedPayment.id}...`);
+          const captured = await rzp.payments.capture(
+            capturedPayment.id,
+            capturedPayment.amount,
+            capturedPayment.currency || "INR"
+          );
+          capturedPayment = captured;
+        } catch (capErr: any) {
+          console.warn(`[ReconcilePayment] Auto-capture note:`, capErr?.message);
+        }
+      }
+
       razorpayPaymentId = capturedPayment.id;
-      console.log(`[ReconcilePayment] Found captured payment ${razorpayPaymentId} for order ${razorpayOrderId}`);
+      console.log(`[ReconcilePayment] Found valid payment ${razorpayPaymentId} for order ${razorpayOrderId}`);
     } catch (err: any) {
       console.error(`[ReconcilePayment] Failed to fetch order payments for ${razorpayOrderId}:`, err?.message);
       return {
@@ -288,29 +321,37 @@ export async function reconcileSuccessfulPayment(
     ...(capturedPayment?.notes || {}),
   };
 
-  // If notes are empty, attempt to fetch order notes
-  if (!mergedNotes.registrationId && !mergedNotes.userId) {
+  // If any key identifier is missing, fetch order notes from Razorpay
+  if (!mergedNotes.registrationId || !mergedNotes.userId || !mergedNotes.eventId) {
     try {
       const order = await rzp.orders.fetch(razorpayOrderId);
       if (order?.notes) {
-        Object.assign(mergedNotes, order.notes);
+        for (const [k, v] of Object.entries(order.notes)) {
+          if (!mergedNotes[k] && v) {
+            mergedNotes[k] = v;
+          }
+        }
       }
     } catch {
       // Non-fatal, continue with available data
     }
   }
 
-  const registrationId =
+  let userId = args.userId || mergedNotes.userId;
+  let eventId = args.eventId || mergedNotes.eventId;
+  let registrationId =
     args.registrationId ||
     mergedNotes.registrationId ||
-    (args.userId && args.eventId ? `${args.userId}_${args.eventId}` : undefined) ||
-    (mergedNotes.userId && mergedNotes.eventId ? `${mergedNotes.userId}_${mergedNotes.eventId}` : undefined);
+    (userId && eventId ? `${userId}_${eventId}` : undefined);
 
-  const userId = args.userId || mergedNotes.userId;
-  const eventId = args.eventId || mergedNotes.eventId;
+  if ((!userId || !eventId) && registrationId && registrationId.includes("_")) {
+    const parts = registrationId.split("_");
+    if (!userId && parts[0]) userId = parts[0];
+    if (!eventId && parts.length > 1) eventId = parts.slice(1).join("_");
+  }
 
   // ── Step 3: Find registration document in Firestore ────────────────────────
-  const regRef = await findRegistrationDoc(db, {
+  let regRef = await findRegistrationDoc(db, {
     registrationId,
     razorpayOrderId,
     userId,
@@ -318,16 +359,123 @@ export async function reconcileSuccessfulPayment(
   });
 
   if (!regRef) {
-    console.error(
-      `[ReconcilePayment] UNMATCHED PAYMENT: Razorpay captured payment ${razorpayPaymentId} for order ${razorpayOrderId}, but no matching registration document was found.`,
+    // CRITICAL AUTO-RECOVERY:
+    // The payment is verified in Razorpay and money was debited from customer.
+    // If the registration draft does not exist, create it immediately. NEVER leave a paid user unregistered.
+    const targetDocId =
+      registrationId ||
+      (userId && eventId ? `${userId}_${eventId}` : `recovered_${razorpayOrderId}`);
+
+    console.warn(
+      `[ReconcilePayment] UNMATCHED PAYMENT RECOVERY: Creating registration ${targetDocId} for paid order ${razorpayOrderId}, payment ${razorpayPaymentId}`,
       { registrationId, userId, eventId }
     );
+
+    regRef = db.collection("registrations").doc(targetDocId);
+
+    // Fetch user details from Firestore if available
+    let userName = mergedNotes.userName || "";
+    let userEmail = mergedNotes.userEmail || "";
+    let leaderPhone = mergedNotes.userPhone || mergedNotes.leaderMobile || "";
+    let leaderCollege = "";
+    let leaderDepartment = "";
+    let leaderYear = "";
+
+    if (userId) {
+      try {
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (userDoc.exists) {
+          const uData = userDoc.data() || {};
+          userName = userName || uData.displayName || uData.name || "";
+          userEmail = userEmail || uData.email || "";
+          leaderPhone = leaderPhone || uData.phoneNumber || uData.phone || "";
+          leaderCollege = uData.collegeName || uData.college || "";
+          leaderDepartment = uData.department || "";
+          leaderYear = uData.year || "";
+        }
+      } catch (err: any) {
+        console.warn(`[ReconcilePayment] Could not fetch user doc for ${userId}:`, err?.message);
+      }
+    }
+
+    // Fetch event details from Firestore if available
+    let eventTitle = mergedNotes.eventTitle || "";
+    let eventDepartment = "";
+    let registrationFee = capturedPayment?.amount ? Math.round(capturedPayment.amount / 100) : 0;
+
+    if (eventId) {
+      try {
+        const eventDoc = await db.collection("events").doc(eventId).get();
+        if (eventDoc.exists) {
+          const eData = eventDoc.data() || {};
+          eventTitle = eventTitle || eData.title || "";
+          eventDepartment = eData.department || "";
+          if (!registrationFee && eData.fee) {
+            registrationFee = Number(eData.fee) || 0;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[ReconcilePayment] Could not fetch event doc for ${eventId}:`, err?.message);
+      }
+    }
+
+    await regRef.set(
+      {
+        id: targetDocId,
+        eventId: eventId || "",
+        eventTitle: eventTitle || "Event Registration",
+        department: eventDepartment || "",
+        userId: userId || "",
+        userName: userName || "Participant",
+        userEmail: userEmail || "",
+        leaderName: userName || "Participant",
+        leaderEmail: userEmail || "",
+        leaderMobile: leaderPhone || "",
+        leaderCollege: leaderCollege || "",
+        leaderDepartment: leaderDepartment || "",
+        leaderYear: leaderYear || "",
+        teamMembers: [],
+        teamSize: 1,
+        registrationFee,
+        status: "registered",
+        paymentStatus: "paid",
+        registrationMethod: "online",
+        razorpayOrderId,
+        razorpayPaymentId,
+        paymentSource: source,
+        paidAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        autoRecovered: true,
+      },
+      { merge: true }
+    );
+
+    // Sync user profile registeredEvents
+    if (userId && eventTitle) {
+      try {
+        await db.collection("users").doc(userId).set(
+          {
+            registeredEvents: FieldValue.arrayUnion(eventTitle),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (userErr: any) {
+        console.warn(`[ReconcilePayment] Could not update user registeredEvents:`, userErr?.message);
+      }
+    }
+
+    console.log(
+      `[ReconcilePayment] AUTO-RECOVERED: Created registration ${targetDocId} for order ${razorpayOrderId}, payment ${razorpayPaymentId}`
+    );
+
     return {
-      success: false,
-      notFound: true,
-      orderId: razorpayOrderId,
+      success: true,
+      registrationId: targetDocId,
       paymentId: razorpayPaymentId,
-      error: `No registration found matching order ${razorpayOrderId}`,
+      orderId: razorpayOrderId,
+      alreadyReconciled: false,
     };
   }
 
@@ -476,10 +624,39 @@ export async function checkAndReconcileOrder(args: {
     const order = await rzp.orders.fetch(orderId);
     console.log(`[checkAndReconcileOrder] Order ${orderId} status: ${order.status}, amount_paid: ${order.amount_paid}`);
 
-    if (order.status === "paid" || (order.amount_paid && order.amount_paid > 0)) {
-      // Order was captured in Razorpay! Reconcile immediately.
+    let shouldReconcile = order.status === "paid" || (order.amount_paid && order.amount_paid > 0);
+    let resolvedPaymentId: string | undefined;
+
+    // Check payments of this order if not already marked paid or to find payment ID
+    try {
+      const paymentsList = await rzp.orders.fetchPayments(orderId);
+      const items = (paymentsList as any).items || [];
+      const paidPayment =
+        items.find((p: any) => p.status === "captured") ||
+        items.find((p: any) => p.status === "authorized");
+
+      if (paidPayment) {
+        resolvedPaymentId = paidPayment.id;
+        shouldReconcile = true;
+
+        if (paidPayment.status === "authorized") {
+          try {
+            console.log(`[checkAndReconcileOrder] Payment ${paidPayment.id} is authorized. Auto-capturing...`);
+            await rzp.payments.capture(paidPayment.id, paidPayment.amount, paidPayment.currency || "INR");
+          } catch (capErr: any) {
+            console.warn(`[checkAndReconcileOrder] Auto-capture note:`, capErr?.message);
+          }
+        }
+      }
+    } catch (payListErr: any) {
+      console.warn(`[checkAndReconcileOrder] Could not fetch order payments list:`, payListErr?.message);
+    }
+
+    if (shouldReconcile) {
+      // Order/payment was confirmed in Razorpay! Reconcile immediately.
       const result = await reconcileSuccessfulPayment({
         razorpayOrderId: orderId,
+        razorpayPaymentId: resolvedPaymentId,
         registrationId,
         source: "admin_sync",
       });
@@ -501,7 +678,7 @@ export async function checkAndReconcileOrder(args: {
 
     return {
       isPaid: false,
-      message: `Razorpay order status is '${order.status}'. Payment has not been captured yet.`,
+      message: `Razorpay order status is '${order.status}'. Payment has not been authorized or captured yet.`,
     };
   } catch (err: any) {
     console.error(`[checkAndReconcileOrder] Error verifying order ${orderId}:`, err?.message);

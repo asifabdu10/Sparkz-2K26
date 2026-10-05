@@ -57,8 +57,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Razorpay Webhook] Valid webhook received: ${event} (Event ID: ${eventId || "N/A"})`);
 
-    // Handle successful payment events
-    if (event === "payment.captured" || event === "order.paid") {
+    // Handle successful payment events (captured, authorized, or order.paid)
+    if (
+      event === "payment.captured" ||
+      event === "order.paid" ||
+      event === "payment.authorized"
+    ) {
       const payment = payload?.payload?.payment?.entity;
       const order = payload?.payload?.order?.entity;
 
@@ -76,15 +80,20 @@ export async function POST(request: NextRequest) {
         status: payment?.status || order?.status,
       });
 
-      if (!orderId) {
-        console.warn(`[Razorpay Webhook] Event ${event} missing orderId`);
-        return Response.json({ success: true, message: "Ignored: missing orderId" }, { status: 200 });
+      if (!orderId && !paymentId) {
+        console.warn(`[Razorpay Webhook] Event ${event} missing orderId and paymentId`);
+        return Response.json({ success: true, message: "Ignored: missing orderId and paymentId" }, { status: 200 });
       }
 
       const reconcileResult = await reconcileSuccessfulPayment({
         razorpayOrderId: orderId,
         razorpayPaymentId: paymentId || undefined,
-        source: event === "order.paid" ? "webhook_order_paid" : "webhook_payment_captured",
+        source:
+          event === "order.paid"
+            ? "webhook_order_paid"
+            : event === "payment.authorized"
+            ? "webhook_payment_authorized"
+            : "webhook_payment_captured",
         notes,
       });
 

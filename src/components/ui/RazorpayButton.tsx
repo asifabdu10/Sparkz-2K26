@@ -165,6 +165,7 @@ export default function RazorpayButton({
       const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
       let orderRes: Response;
+      const effectiveRegId = metadata?.registrationId || (userId && eventId ? `${userId}_${eventId}` : "");
       try {
         orderRes = await fetch("/api/razorpay/create-order", {
           method: "POST",
@@ -173,8 +174,8 @@ export default function RazorpayButton({
           body: JSON.stringify({
             amount: amountRupees,
             receipt: `evt_${eventId}_${Date.now()}`,
-            notes: { eventId, userId, registrationId: metadata?.registrationId || "" },
-            registrationId: metadata?.registrationId || "",
+            notes: { eventId, userId, registrationId: effectiveRegId },
+            registrationId: effectiveRegId,
             eventId,
             userId,
           }),
@@ -248,7 +249,7 @@ export default function RazorpayButton({
                 eventId,
                 userId,
                 metadata,
-                registrationId: metadata?.registrationId || "",
+                registrationId: metadata?.registrationId || (userId && eventId ? `${userId}_${eventId}` : ""),
                 firebaseIdToken: firebaseIdToken || "",
               }),
             });

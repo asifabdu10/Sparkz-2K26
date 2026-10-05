@@ -592,35 +592,50 @@ export default function Register() {
   };
 
   const completePaidRegistration = async (paymentId: string, orderId: string) => {
-    if (!user || !event || !registrationId) throw new Error("Registration session expired.");
+    if (!user || !event) throw new Error("Registration session expired.");
 
-    // This function is called only after /api/razorpay/verify-payment has
-    // verified the Razorpay signature. Only now do we turn the pending draft
-    // into a real paid registration.
-    await updateDoc(doc(db, "registrations", registrationId), {
-      status: "registered",
-      paymentStatus: "paid",
-      razorpayPaymentId: paymentId,
-      razorpayOrderId: orderId,
-      paidAt: new Date(),
-      updatedAt: new Date(),
-    });
+    const idToUse = registrationId || `${user.uid}_${event.id}`;
 
-    await updateDoc(doc(db, "users", user.uid), {
-      registeredEvents: arrayUnion(event.title),
-    });
+    // Note: /api/razorpay/verify-payment already reconciled this on the server
+    // using Firebase Admin SDK. Client-side writes update the local cache.
+    try {
+      await updateDoc(doc(db, "registrations", idToUse), {
+        status: "registered",
+        paymentStatus: "paid",
+        razorpayPaymentId: paymentId,
+        razorpayOrderId: orderId,
+        paidAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } catch (clientWriteErr) {
+      console.warn("Client registration update note (server already reconciled):", clientWriteErr);
+    }
 
-    await refetchUserProfile();
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        registeredEvents: arrayUnion(event.title),
+      });
+    } catch (userWriteErr) {
+      console.warn("Client user update note (server already reconciled):", userWriteErr);
+    }
+
+    try {
+      await refetchUserProfile();
+    } catch (refetchErr) {
+      console.warn("User profile refetch note:", refetchErr);
+    }
+
     setUserEventRegistration(event.id, user.uid, {
       isRegistered: true,
-      registrationId,
+      registrationId: idToUse,
       data: { status: "registered", paymentStatus: "paid" },
     });
+    setRegistrationId(idToUse);
     setRegistered(true);
     setPaymentReady(false);
 
     if (isSpotRegistration) {
-      await sendSpotTicket(registrationId);
+      await sendSpotTicket(idToUse);
     } else {
       toastSuccess("Payment successful! You are registered 🎉");
     }
