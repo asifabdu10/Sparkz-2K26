@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   let registrationIdToUpdate = "";
   try {
     const body = await request.json();
-    const { email, name, passedOutYear, batch, contact, registrationId } = body;
+    const { email, name, department, passedOutYear, batch, contact, registrationId } = body;
     registrationIdToUpdate = registrationId || "";
 
     if (!email) return NextResponse.json({ success: false, error: "Email address is required." }, { status: 400 });
@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;width:40%;">Registration ID</td><td>${escapeHtml(registrationId)}</td></tr>
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Name</td><td>${escapeHtml(name)}</td></tr>
-            <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Batch</td><td>${escapeHtml(batch)}</td></tr>
+            ${department ? `<tr><td style="padding:8px 0;font-weight:bold;color:#555;">Department</td><td>${escapeHtml(department)}</td></tr>` : ""}
+            ${batch ? `<tr><td style="padding:8px 0;font-weight:bold;color:#555;">Batch</td><td>${escapeHtml(batch)}</td></tr>` : ""}
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Passed Out Year</td><td>${escapeHtml(passedOutYear)}</td></tr>
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Contact</td><td>${escapeHtml(contact)}</td></tr>
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Email</td><td>${escapeHtml(email)}</td></tr>

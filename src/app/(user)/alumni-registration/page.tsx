@@ -6,8 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 
 interface FormState {
   name: string;
+  department: string;
   passedOutYear: string;
-  batch: string;
   contact: string;
   email: string;
 }
@@ -15,8 +15,9 @@ interface FormState {
 interface ExistingAlumniReg {
   id: string;
   name: string;
+  department?: string;
   passedOutYear: number | string;
-  batch: string;
+  batch?: string;
   contact: string;
   email: string;
   status?: string;
@@ -24,13 +25,20 @@ interface ExistingAlumniReg {
   createdAt?: { seconds: number } | null;
 }
 
-const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({ length: 20 }, (_, i) => String(currentYear - i));
+const departmentOptions = [
+  "Civil Engineering",
+  "Computer Engineering",
+  "Mechanical Engineering",
+  "Electrical Engineering",
+];
+
+// Passout year options from 2018 to 2025
+const yearOptions = ["2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"];
 
 export default function AlumniRegistrationPage() {
   const { user, userData } = useAuth();
   const [form, setForm] = useState<FormState>({
-    name: "", passedOutYear: "", batch: "", contact: "", email: "",
+    name: "", department: "", passedOutYear: "", contact: "", email: "",
   });
   const [existingReg, setExistingReg] = useState<ExistingAlumniReg | null>(null);
   const [checkingExisting, setCheckingExisting] = useState<boolean>(true);
@@ -70,8 +78,8 @@ export default function AlumniRegistrationPage() {
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required.";
+    if (!form.department.trim()) e.department = "Department is required.";
     if (!form.passedOutYear || isNaN(Number(form.passedOutYear))) e.passedOutYear = "Passed out year is required.";
-    if (!form.batch.trim()) e.batch = "Batch is required (e.g. 2021-2025).";
     if (!/^\d{10}$/.test(form.contact.trim())) e.contact = "Enter a valid 10-digit contact number.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = "Enter a valid email address.";
     setErrors(e);
@@ -83,9 +91,19 @@ export default function AlumniRegistrationPage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+        } catch (tokenErr) {
+          console.warn("Failed to retrieve ID token:", tokenErr);
+        }
+      }
+
       const res = await fetch("/api/alumni-registration/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           ...form,
           userId: user?.uid || null,
@@ -159,10 +177,18 @@ export default function AlumniRegistrationPage() {
               <span className="text-gray-400 text-xs">Name</span>
               <span className="text-white font-semibold">{existingReg.name}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-xs">Batch</span>
-              <span className="text-white">{existingReg.batch}</span>
-            </div>
+            {existingReg.department && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Department</span>
+                <span className="text-white">{existingReg.department}</span>
+              </div>
+            )}
+            {existingReg.batch && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Batch</span>
+                <span className="text-white">{existingReg.batch}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-xs">Passed Out Year</span>
               <span className="text-white">{existingReg.passedOutYear}</span>
@@ -248,17 +274,20 @@ export default function AlumniRegistrationPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Department *</label>
+                    <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={inputClass("department")}>
+                      <option value="">Select department</option>
+                      {departmentOptions.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
+                    </select>
+                    {errors.department && <p className="text-red-400 text-xs mt-1">{errors.department}</p>}
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Passed Out Year *</label>
                     <select value={form.passedOutYear} onChange={(e) => setForm({ ...form, passedOutYear: e.target.value })} className={inputClass("passedOutYear")}>
                       <option value="">Select year</option>
                       {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
                     </select>
                     {errors.passedOutYear && <p className="text-red-400 text-xs mt-1">{errors.passedOutYear}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Batch *</label>
-                    <input type="text" placeholder="e.g. 2021-2025" value={form.batch} onChange={(e) => setForm({ ...form, batch: e.target.value })} className={inputClass("batch")} />
-                    {errors.batch && <p className="text-red-400 text-xs mt-1">{errors.batch}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

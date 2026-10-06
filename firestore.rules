@@ -577,8 +577,9 @@ service cloud.firestore {
 
     match /alumni_registrations/{regId} {
 
-      // Public (no auth) can create an alumni registration.
-      allow create: if true;
+      // All public registrations must go through secure server API (/api/alumni-registration/submit)
+      // Direct client creation is restricted to admins.
+      allow create: if isAdmin();
 
       // Admins can read all; authenticated users can read their own.
       allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);

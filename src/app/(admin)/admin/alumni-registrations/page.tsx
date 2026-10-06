@@ -11,8 +11,9 @@ interface AlumniRegistration {
   id: string;
   userId?: string;
   name: string;
+  department?: string;
   passedOutYear: number;
-  batch: string;
+  batch?: string;
   contact: string;
   email: string;
   status?: "registered" | "deregistered";
@@ -60,8 +61,8 @@ export default function AlumniRegistrationsAdmin() {
         body: JSON.stringify({
           email: reg.email,
           name: reg.name,
+          department: reg.department,
           passedOutYear: reg.passedOutYear,
-          batch: reg.batch,
           contact: reg.contact,
           registrationId: reg.id,
         }),
@@ -87,7 +88,7 @@ export default function AlumniRegistrationsAdmin() {
     reg: AlumniRegistration,
     action: "deregister" | "restore" | "delete" = "deregister"
   ) => {
-    let confirmMsg = `Are you sure you want to deregister ${reg.name} (${reg.batch})?`;
+    let confirmMsg = `Are you sure you want to deregister ${reg.name}?`;
     if (action === "delete") confirmMsg = `Permanently delete alumni registration for ${reg.name}? This cannot be undone.`;
     if (action === "restore") confirmMsg = `Restore alumni registration for ${reg.name}?`;
 
@@ -145,8 +146,8 @@ export default function AlumniRegistrationsAdmin() {
           body: JSON.stringify({
             email: reg.email,
             name: reg.name,
+            department: reg.department,
             passedOutYear: reg.passedOutYear,
-            batch: reg.batch,
             contact: reg.contact,
             registrationId: reg.id,
           }),
@@ -170,7 +171,7 @@ export default function AlumniRegistrationsAdmin() {
     (reg) =>
       reg.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reg.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reg.batch?.toLowerCase().includes(searchTerm.toLowerCase())
+      reg.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const activeCount = registrations.filter((r) => r.status !== "deregistered").length;
@@ -180,8 +181,8 @@ export default function AlumniRegistrationsAdmin() {
   const handleExport = () => {
     const exportData = filteredRegistrations.map((reg) => ({
       "Name": reg.name,
+      "Department": reg.department || "N/A",
       "Passed Out Year": reg.passedOutYear,
-      "Batch": reg.batch,
       "Contact": reg.contact,
       "Email": reg.email,
       "Status": reg.status === "deregistered" ? "Deregistered" : "Registered",
@@ -234,7 +235,7 @@ export default function AlumniRegistrationsAdmin() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
-          placeholder="Search by name, email, or batch..."
+          placeholder="Search by name, email, or department..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-gray-800 border border-gray-700 text-white pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -253,8 +254,8 @@ export default function AlumniRegistrationsAdmin() {
                 <tr>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">#</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Name</th>
+                  <th className="px-4 py-4 font-semibold whitespace-nowrap">Department</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Passed Out Year</th>
-                  <th className="px-4 py-4 font-semibold whitespace-nowrap">Batch</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Contact</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Email</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Registration Status</th>
@@ -276,12 +277,14 @@ export default function AlumniRegistrationsAdmin() {
                         <div className="font-medium text-white">{reg.name}</div>
                         <div className="text-gray-500 text-xs font-mono">{reg.id.slice(0, 8)}...</div>
                       </td>
+                      <td className="px-4 py-4 text-gray-300 font-medium">
+                        {reg.department || <span className="text-gray-500 italic">N/A</span>}
+                      </td>
                       <td className="px-4 py-4">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#F3C87A]/20 text-[#F3C87A]">
                           {reg.passedOutYear}
                         </span>
                       </td>
-                      <td className="px-4 py-4 text-gray-300">{reg.batch}</td>
                       <td className="px-4 py-4 text-gray-300 font-mono text-xs">{reg.contact}</td>
                       <td className="px-4 py-4 text-gray-300 text-xs">{reg.email}</td>
                       <td className="px-4 py-4">
