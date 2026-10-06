@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "@/utils/firebase";
 import {
@@ -56,6 +56,12 @@ export default function AlumniRegistrationsAdmin() {
   // Registration ON/OFF state (Super Admin only)
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(true);
   const [statusLoading, setStatusLoading] = useState(false);
+
+  // Registration Capacity / Limit state (Super Admin only)
+  const [totalCapacity, setTotalCapacity] = useState<number>(200);
+  const [capacityInput, setCapacityInput] = useState<string>("200");
+  const [isEditingCapacity, setIsEditingCapacity] = useState<boolean>(false);
+  const [savingCapacity, setSavingCapacity] = useState<boolean>(false);
 
   // Edit Modal State
   const [editingReg, setEditingReg] = useState<AlumniRegistration | null>(null);
@@ -120,6 +126,10 @@ export default function AlumniRegistrationsAdmin() {
         if (typeof data?.registrationOpen === "boolean") {
           setRegistrationOpen(data.registrationOpen);
         }
+        if (typeof data?.totalCapacity === "number" && data.totalCapacity > 0) {
+          setTotalCapacity(data.totalCapacity);
+          setCapacityInput(String(data.totalCapacity));
+        }
       }
     } catch (err) {
       console.warn("Could not fetch alumni registration status:", err);
@@ -173,6 +183,60 @@ export default function AlumniRegistrationsAdmin() {
       setStatusLoading(false);
     }
   };
+
+  const handleSaveCapacity = async () => {
+    if (!isSuperAdmin) {
+      toastError("Only Super Admin can change the alumni registration limit.");
+      return;
+    }
+
+    const parsed = Number(capacityInput);
+    if (isNaN(parsed) || parsed < 1) {
+      toastError("Please enter a valid registration limit (minimum 1).");
+      return;
+    }
+
+    setSavingCapacity(true);
+    try {
+      let token = "";
+      if (user) {
+        try {
+          token = await user.getIdToken();
+        } catch (e) {
+          console.warn("Could not get ID token:", e);
+        }
+      }
+
+      const res = await fetch("/api/alumni-registration/toggle-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          totalCapacity: parsed,
+          firebaseIdToken: token,
+          adminEmail: user?.email,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to update limit");
+
+      setTotalCapacity(parsed);
+      setIsEditingCapacity(false);
+      toastSuccess(`Alumni registration limit updated to ${parsed}!`);
+    } catch (err: any) {
+      console.error("Error updating alumni registration limit:", err);
+      toastError(err?.message || "Failed to update registration limit.");
+    } finally {
+      setSavingCapacity(false);
+    }
+  };
+
+  const activeRegistrationsCount = useMemo(() => {
+    return registrations.filter((r) => r.status !== "deregistered").length;
+  }, [registrations]);
 
   const formatDate = (ts: { seconds: number } | null) => {
     if (!ts?.seconds) return "N/A";
@@ -464,61 +528,155 @@ export default function AlumniRegistrationsAdmin() {
         </div>
       </div>
 
-      {/* ── Registration ON / OFF Control Banner (Super Admin Only) ─────── */}
-      <div className="bg-[#181824] border border-gray-700/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
-        <div className="flex items-start sm:items-center gap-3.5">
-          <div
-            className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 flex-shrink-0 ${
-              registrationOpen ? "bg-emerald-400 animate-pulse" : "bg-red-500"
-            }`}
-          />
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="text-white font-semibold text-sm">Alumni Registration Status:</span>
-              <span
-                className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+      {/* ── Super Admin Controls: Status & Registration Limit ───────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Registration ON/OFF Toggle Card */}
+        <div className="bg-[#181824] border border-gray-700/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div
+              className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 flex-shrink-0 ${
+                registrationOpen ? "bg-emerald-400 animate-pulse" : "bg-red-500"
+              }`}
+            />
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-white font-semibold text-sm">Alumni Registration:</span>
+                <span
+                  className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    registrationOpen
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : "bg-red-500/20 text-red-300 border border-red-500/30"
+                  }`}
+                >
+                  {registrationOpen ? "Open / Active" : "Closed / Inactive"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {registrationOpen
+                  ? "Public registration is currently accepting submissions on the website."
+                  : "Registration is turned off. Candidates cannot submit new forms."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isSuperAdmin ? (
+              <button
+                onClick={handleToggleRegistration}
+                disabled={statusLoading}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
                   registrationOpen
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                    : "bg-red-500/20 text-red-300 border border-red-500/30"
+                    ? "bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40"
                 }`}
               >
-                {registrationOpen ? "Open / Active" : "Closed / Inactive"}
+                {statusLoading ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : registrationOpen ? (
+                  <ToggleRight size={18} />
+                ) : (
+                  <ToggleLeft size={18} />
+                )}
+                {registrationOpen ? "Turn OFF" : "Turn ON"}
+              </button>
+            ) : (
+              <span className="text-xs text-gray-400 flex items-center gap-1.5 italic bg-gray-800/80 px-3 py-1.5 rounded-lg border border-gray-700">
+                <ShieldAlert size={14} className="text-amber-400" />
+                Super Admin Only
               </span>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-              {registrationOpen
-                ? "Public alumni registration is currently live and accepting registrations on the website."
-                : "Public alumni registration is currently turned off. Candidates cannot submit new forms."}
-            </p>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {isSuperAdmin ? (
-            <button
-              onClick={handleToggleRegistration}
-              disabled={statusLoading}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
-                registrationOpen
-                  ? "bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40"
-                  : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40"
+        {/* Registration Limit / Capacity Card */}
+        <div className="bg-gradient-to-r from-[#181824] via-[#15151f] to-[#12121a] border border-[#F3C87A]/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3 shadow-lg">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#F3C87A]/10 border border-[#F3C87A]/30 flex items-center justify-center text-[#F3C87A] text-lg font-bold shadow-inner">
+                🎓
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-white">Registration Limit:</span>
+                  <span className="text-lg font-black text-[#F3C87A]">{totalCapacity}</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      activeRegistrationsCount >= totalCapacity
+                        ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                        : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    }`}
+                  >
+                    {activeRegistrationsCount >= totalCapacity ? "Full" : `${Math.max(0, totalCapacity - activeRegistrationsCount)} Spots Left`}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  <strong className="text-white">{activeRegistrationsCount}</strong> / {totalCapacity} registered ({Math.min(100, Math.round((activeRegistrationsCount / (totalCapacity || 1)) * 100))}%)
+                </p>
+              </div>
+            </div>
+
+            {isSuperAdmin && (
+              <div className="flex-shrink-0">
+                {isEditingCapacity ? (
+                  <div className="flex items-center gap-1.5 bg-gray-900/90 border border-[#F3C87A]/40 p-1.5 rounded-xl">
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={capacityInput}
+                      onChange={(e) => setCapacityInput(e.target.value)}
+                      className="w-16 px-2 py-1 bg-gray-800 border border-gray-700 text-white rounded-lg text-xs font-bold focus:outline-none focus:border-[#F3C87A]"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSaveCapacity}
+                      disabled={savingCapacity}
+                      className="px-2.5 py-1 bg-[#F3C87A] hover:bg-[#e6b960] text-[#0B0B0E] text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {savingCapacity ? "..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingCapacity(false);
+                        setCapacityInput(String(totalCapacity));
+                      }}
+                      disabled={savingCapacity}
+                      className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsEditingCapacity(true);
+                      setCapacityInput(String(totalCapacity));
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F3C87A]/10 hover:bg-[#F3C87A]/20 text-[#F3C87A] border border-[#F3C87A]/40 rounded-xl text-xs font-bold transition-all shadow-sm"
+                  >
+                    <Pencil size={12} />
+                    <span>Edit Limit</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${
+                activeRegistrationsCount >= totalCapacity
+                  ? "bg-red-500"
+                  : activeRegistrationsCount >= totalCapacity * 0.8
+                  ? "bg-amber-400"
+                  : "bg-emerald-400"
               }`}
-            >
-              {statusLoading ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : registrationOpen ? (
-                <ToggleRight size={18} />
-              ) : (
-                <ToggleLeft size={18} />
-              )}
-              {registrationOpen ? "Turn OFF Registration" : "Turn ON Registration"}
-            </button>
-          ) : (
-            <span className="text-xs text-gray-400 flex items-center gap-1.5 italic bg-gray-800/80 px-3 py-1.5 rounded-lg border border-gray-700">
-              <ShieldAlert size={14} className="text-amber-400" />
-              Super Admin Only
-            </span>
-          )}
+              style={{
+                width: `${Math.min(100, Math.round((activeRegistrationsCount / (totalCapacity || 1)) * 100))}%`,
+              }}
+            />
+          </div>
         </div>
       </div>
 

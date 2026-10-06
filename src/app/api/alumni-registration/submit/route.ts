@@ -74,17 +74,54 @@ export async function POST(request: NextRequest) {
 
     const db = getAdminDb();
 
-    // ── 2. Check if Alumni Registration is Open ──────────────────────────
+    // ── 2. Check if Alumni Registration is Open & Capacity Available ───
     try {
       const settingsSnap = await db.collection("eventSettings").doc("alumni").get();
+      let registrationOpen = true;
+      let totalCapacity = 200; // Default limit of 200 like visitor registrations
+
       if (settingsSnap.exists) {
         const settingsData = settingsSnap.data();
-        if (settingsData?.registrationOpen === false) {
-          return NextResponse.json(
-            { success: false, error: "Alumni registration is currently closed by the administration." },
-            { status: 403 }
-          );
+        if (typeof settingsData?.registrationOpen === "boolean") {
+          registrationOpen = settingsData.registrationOpen;
         }
+        if (typeof settingsData?.totalCapacity === "number" && settingsData.totalCapacity > 0) {
+          totalCapacity = settingsData.totalCapacity;
+        }
+      }
+
+      if (!registrationOpen) {
+        return NextResponse.json(
+          { success: false, error: "Alumni registration is currently closed by the administration." },
+          { status: 403 }
+        );
+      }
+
+      // Check current active alumni registrations against limit
+      let activeCount = 0;
+      try {
+        const countSnap = await db
+          .collection("alumni_registrations")
+          .where("status", "==", "registered")
+          .count()
+          .get();
+        activeCount = countSnap.data().count;
+      } catch {
+        const snap = await db
+          .collection("alumni_registrations")
+          .where("status", "==", "registered")
+          .get();
+        activeCount = snap.size;
+      }
+
+      if (activeCount >= totalCapacity) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `All ${totalCapacity} alumni registration spots are filled. Registration is currently full.`,
+          },
+          { status: 403 }
+        );
       }
     } catch (settErr) {
       console.warn("Could not check eventSettings/alumni:", settErr);

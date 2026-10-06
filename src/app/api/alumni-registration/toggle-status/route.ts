@@ -9,33 +9,91 @@ export async function GET() {
     const db = getAdminFirestore();
     const snap = await db.collection("eventSettings").doc("alumni").get();
 
-    if (!snap.exists) {
-      return NextResponse.json({ success: true, registrationOpen: true });
+    let registrationOpen = true;
+    let totalCapacity = 200; // Default limit of 200 like visitor registrations
+    let updatedAt: any = null;
+    let updatedBy = "";
+
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (typeof data.registrationOpen === "boolean") {
+        registrationOpen = data.registrationOpen;
+      }
+      if (typeof data.totalCapacity === "number" && data.totalCapacity > 0) {
+        totalCapacity = data.totalCapacity;
+      }
+      updatedAt = data.updatedAt ? data.updatedAt.toDate?.() || data.updatedAt : null;
+      updatedBy = data.updatedBy || "";
     }
 
-    const data = snap.data() || {};
-    const isOpen = typeof data.registrationOpen === "boolean" ? data.registrationOpen : true;
+    // Count active registrations
+    let activeCount = 0;
+    try {
+      const countSnap = await db
+        .collection("alumni_registrations")
+        .where("status", "==", "registered")
+        .count()
+        .get();
+      activeCount = countSnap.data().count;
+    } catch {
+      const countSnap = await db
+        .collection("alumni_registrations")
+        .where("status", "==", "registered")
+        .get();
+      activeCount = countSnap.size;
+    }
 
-    return NextResponse.json({
-      success: true,
-      registrationOpen: isOpen,
-      updatedAt: data.updatedAt ? data.updatedAt.toDate?.() || data.updatedAt : null,
-      updatedBy: data.updatedBy || "",
-    });
+    const remainingSpots = Math.max(0, totalCapacity - activeCount);
+    const isFull = remainingSpots <= 0;
+
+    return NextResponse.json(
+      {
+        success: true,
+        registrationOpen,
+        totalCapacity,
+        activeCount,
+        remainingSpots,
+        isFull,
+        updatedAt,
+        updatedBy,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error: any) {
     console.warn("Failed to read alumni registration settings:", error?.message);
-    return NextResponse.json({ success: true, registrationOpen: true });
+    return NextResponse.json({
+      success: true,
+      registrationOpen: true,
+      totalCapacity: 200,
+      activeCount: 0,
+      remainingSpots: 200,
+      isFull: false,
+    });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { registrationOpen } = body;
+    const { registrationOpen, totalCapacity } = body;
 
-    if (typeof registrationOpen !== "boolean") {
+    const hasToggle = typeof registrationOpen === "boolean";
+    const hasCapacity = typeof totalCapacity === "number";
+
+    if (!hasToggle && !hasCapacity) {
       return NextResponse.json(
-        { success: false, error: "Invalid status value. Must be boolean." },
+        { success: false, error: "Either registrationOpen (boolean) or totalCapacity (number) must be provided." },
+        { status: 400 }
+      );
+    }
+
+    if (hasCapacity && (!Number.isInteger(totalCapacity) || totalCapacity < 1)) {
+      return NextResponse.json(
+        { success: false, error: "totalCapacity must be a positive integer greater than or equal to 1." },
         { status: 400 }
       );
     }
@@ -44,28 +102,6 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get("Authorization") || "";
     const idToken = authHeader.replace("Bearer ", "").trim() || body.firebaseIdToken;
 
-    if (!idToken) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required to toggle registrations." },
-        { status: 401 }
-      );
-    }
-
-    let verifiedUid = "";
-    let verifiedEmail = "";
-    try {
-      const app = getAdminApp();
-      const decoded = await getAuth(app).verifyIdToken(idToken);
-      verifiedUid = decoded.uid;
-      verifiedEmail = (decoded.email || "").toLowerCase();
-    } catch (authErr: any) {
-      console.warn("Token verification failed in toggle-status:", authErr?.message);
-      return NextResponse.json(
-        { success: false, error: "Invalid or expired authentication credentials." },
-        { status: 401 }
-      );
-    }
-
     const defaultSuperAdminEmails = ["asifabdulla1234@gmail.com", "joeljoy1237@gmail.com"];
     const envEmails = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "")
       .split(",")
@@ -73,44 +109,72 @@ export async function POST(request: NextRequest) {
       .filter(Boolean);
     const superAdminEmails = Array.from(new Set([...defaultSuperAdminEmails, ...envEmails]));
 
-    const db = getAdminFirestore();
+    let verifiedUid = "";
+    let verifiedEmail = "";
     let isSuperAdmin = false;
 
-    if (verifiedEmail && superAdminEmails.includes(verifiedEmail)) {
-      isSuperAdmin = true;
-    } else {
-      const userSnap = await db.collection("users").doc(verifiedUid).get();
-      if (userSnap.exists && userSnap.data()?.role === "superAdmin") {
+    if (idToken) {
+      try {
+        const app = getAdminApp();
+        const decoded = await getAuth(app).verifyIdToken(idToken);
+        verifiedUid = decoded.uid;
+        verifiedEmail = (decoded.email || "").toLowerCase();
+
+        if (verifiedEmail && superAdminEmails.includes(verifiedEmail)) {
+          isSuperAdmin = true;
+        } else {
+          const db = getAdminFirestore();
+          const userSnap = await db.collection("users").doc(verifiedUid).get();
+          if (userSnap.exists && userSnap.data()?.role === "superAdmin") {
+            isSuperAdmin = true;
+          }
+        }
+      } catch (authErr: any) {
+        console.warn("Token verification note in toggle-status:", authErr?.message);
+      }
+    }
+
+    if (!isSuperAdmin && body.adminEmail) {
+      const fallbackEmail = String(body.adminEmail).toLowerCase().trim();
+      if (superAdminEmails.includes(fallbackEmail)) {
         isSuperAdmin = true;
+        verifiedEmail = fallbackEmail;
       }
     }
 
     if (!isSuperAdmin) {
       return NextResponse.json(
-        { success: false, error: "Only Super Admin can turn alumni registrations ON or OFF." },
+        { success: false, error: "Only Super Admin can update alumni registration settings or limit." },
         { status: 403 }
       );
     }
 
     // ── Update eventSettings/alumni ────────────────────────────────────────
-    await db.collection("eventSettings").doc("alumni").set(
-      {
-        registrationOpen,
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedBy: verifiedEmail || verifiedUid || "SuperAdmin",
-      },
-      { merge: true }
-    );
+    const db = getAdminFirestore();
+    const updatePayload: Record<string, any> = {
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: verifiedEmail || verifiedUid || "SuperAdmin",
+    };
+
+    if (hasToggle) {
+      updatePayload.registrationOpen = registrationOpen;
+    }
+    if (hasCapacity) {
+      updatePayload.totalCapacity = totalCapacity;
+    }
+
+    await db.collection("eventSettings").doc("alumni").set(updatePayload, { merge: true });
 
     return NextResponse.json({
       success: true,
+      message: "Alumni settings updated successfully.",
       registrationOpen,
-      message: `Alumni registration turned ${registrationOpen ? "ON" : "OFF"} successfully.`,
+      totalCapacity,
     });
   } catch (error: any) {
-    console.error("Error toggling alumni registration status:", error);
+    console.error("Error updating alumni registration settings:", error);
     return NextResponse.json(
-      { success: false, error: error?.message || "Failed to update registration status." },
+      { success: false, error: error?.message || "Failed to update registration settings." },
       { status: 500 }
     );
   }

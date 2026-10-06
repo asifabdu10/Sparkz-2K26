@@ -44,18 +44,32 @@ export default function AlumniRegistrationPage() {
   const [existingReg, setExistingReg] = useState<ExistingAlumniReg | null>(null);
   const [checkingExisting, setCheckingExisting] = useState<boolean>(true);
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(true);
+  const [totalCapacity, setTotalCapacity] = useState<number>(200);
+  const [activeCount, setActiveCount] = useState<number>(0);
+  const [isFull, setIsFull] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; emailSent?: boolean; id?: string } | null>(null);
 
   // Check registration status & check if current user is already registered as alumni
   useEffect(() => {
-    // 1. Fetch registration open / closed status
+    // 1. Fetch registration open / closed status and capacity limits
     fetch("/api/alumni-registration/toggle-status")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && typeof data.registrationOpen === "boolean") {
-          setRegistrationOpen(data.registrationOpen);
+        if (data.success) {
+          if (typeof data.registrationOpen === "boolean") {
+            setRegistrationOpen(data.registrationOpen);
+          }
+          if (typeof data.totalCapacity === "number") {
+            setTotalCapacity(data.totalCapacity);
+          }
+          if (typeof data.activeCount === "number") {
+            setActiveCount(data.activeCount);
+          }
+          if (typeof data.isFull === "boolean") {
+            setIsFull(data.isFull);
+          }
         }
       })
       .catch((err) => console.warn("Failed to check alumni registration status:", err));
@@ -273,6 +287,52 @@ export default function AlumniRegistrationPage() {
     );
   }
 
+  // ── 2.5 Show Registration Full screen if capacity limit is reached ─────────
+  if (isFull && (!existingReg || existingReg.status === "deregistered")) {
+    return (
+      <div className="min-h-screen bg-[#0B0B0E] py-16 px-4 flex items-center justify-center">
+        <div className="pointer-events-none fixed left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
+        <div className="pointer-events-none fixed right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 max-w-lg w-full bg-[#131318] border border-amber-500/30 rounded-2xl p-8 text-center space-y-6 shadow-2xl"
+        >
+          <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
+            🎟️
+          </div>
+
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-400 mb-3">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Registration Limit Reached
+            </div>
+            <h1 className="text-3xl font-black text-white">Alumni Registrations Full</h1>
+            <p className="text-gray-400 text-sm mt-3 leading-relaxed">
+              All <strong className="text-[#F3C87A]">{totalCapacity}</strong> alumni registration spots for <strong className="text-white">Sparkz 2K26</strong> have been filled. Online registrations are now closed.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center flex-1 bg-[#F3C87A] text-[#0B0B0E] font-bold py-3 rounded-xl hover:bg-[#e6b960] transition-colors text-sm"
+            >
+              Back to Home
+            </Link>
+            <Link
+              href="/events"
+              className="inline-flex items-center justify-center flex-1 bg-[#1f1f2c] border border-gray-700 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors text-sm"
+            >
+              Explore Events
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   // ── 3. Show already registered pass screen ──────────────────────────────────
   if (existingReg && existingReg.status !== "deregistered") {
     return (
@@ -381,6 +441,11 @@ export default function AlumniRegistrationPage() {
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">Alumni Registration</h1>
           <p className="text-gray-400 text-sm">Register as a passed-out alumnus of Carmel College</p>
+          {totalCapacity > 0 && (
+            <p className="text-xs text-[#F3C87A] mt-2 font-medium">
+              Limited to {totalCapacity} attendees &bull; {Math.max(0, totalCapacity - activeCount)} spots left
+            </p>
+          )}
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
