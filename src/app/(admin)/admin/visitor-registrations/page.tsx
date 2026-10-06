@@ -38,6 +38,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import {
+  getAdminVisitorRegistrations,
+  updateCachedAdminVisitor,
+  removeCachedAdminVisitor,
+  addCachedAdminVisitor,
+} from "@/utils/firestoreCache";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 
 interface VisitorRegistration {
@@ -261,13 +267,10 @@ export default function VisitorRegistrationsAdmin() {
     }
   };
 
-  const fetchRegistrations = async () => {
+  const fetchRegistrations = async (forceRefresh = false) => {
     try {
       setRefreshing(true);
-      const q = query(collection(db, "visitor_registrations"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      const data: VisitorRegistration[] = [];
-      snap.forEach((d) => data.push({ id: d.id, ...d.data() } as VisitorRegistration));
+      const data = (await getAdminVisitorRegistrations(forceRefresh)) as VisitorRegistration[];
       setRegistrations(data);
     } catch (error) {
       console.error("Error fetching visitor registrations:", error);
@@ -660,7 +663,7 @@ export default function VisitorRegistrationsAdmin() {
           </div>
 
           <button
-            onClick={fetchRegistrations}
+            onClick={() => fetchRegistrations(true)}
             disabled={refreshing}
             className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded-xl border border-gray-700 transition-colors disabled:opacity-50 text-sm font-medium"
             title="Refresh list"

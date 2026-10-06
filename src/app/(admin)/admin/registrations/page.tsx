@@ -18,7 +18,14 @@ import {
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { getAllEvents } from "@/utils/firestoreCache";
+import {
+  getAllEvents,
+  getAdminRegistrations,
+  invalidateAdminRegistrationsCache,
+  updateCachedAdminRegistration,
+  removeCachedAdminRegistration,
+  addCachedAdminRegistration,
+} from "@/utils/firestoreCache";
 import {
   FiDownload,
   FiEye,
@@ -172,14 +179,6 @@ const formatValue = (value: unknown) => {
   return String(value);
 };
 
-// In-memory cache for admin registrations with 2-minute TTL
-let adminRegsCache: { data: UserRegistration[]; timestamp: number } | null = null;
-let adminRegsPromise: Promise<UserRegistration[]> | null = null;
-
-export function invalidateAdminRegistrationsCache() {
-  adminRegsCache = null;
-  adminRegsPromise = null;
-}
 
 export default function RegistrationsManagement() {
   const { userData } = useAuth();
@@ -261,34 +260,9 @@ export default function RegistrationsManagement() {
     try {
       setLoading(true);
 
-      const now = Date.now();
-      const eventsPromise = getAllEvents(forceRefresh);
-
-      let regsPromise: Promise<UserRegistration[]>;
-      if (!forceRefresh && adminRegsCache && now - adminRegsCache.timestamp < 2 * 60 * 1000) {
-        regsPromise = Promise.resolve(adminRegsCache.data);
-      } else if (adminRegsPromise) {
-        regsPromise = adminRegsPromise;
-      } else {
-        adminRegsPromise = (async () => {
-          try {
-            const registrationsSnapshot = await getDocs(collection(db, "registrations"));
-            const list = registrationsSnapshot.docs.map((item) => ({
-              id: item.id,
-              ...item.data(),
-            })) as UserRegistration[];
-            adminRegsCache = { data: list, timestamp: Date.now() };
-            return list;
-          } finally {
-            adminRegsPromise = null;
-          }
-        })();
-        regsPromise = adminRegsPromise;
-      }
-
       const [eventList, registrationList] = await Promise.all([
-        eventsPromise,
-        regsPromise,
+        getAllEvents(forceRefresh),
+        getAdminRegistrations(forceRefresh) as Promise<UserRegistration[]>,
       ]);
 
       const allowedEventIds = new Set(eventList.map((event) => event.id));

@@ -27,7 +27,12 @@ import {
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments, isBasicScienceDepartment, allowsMultipleRegistrations } from "@/utils/constants/Constants";
 import { Event, RegistrationField } from "@/utils/types/event";
-import { getAllEvents } from "@/utils/firestoreCache";
+import {
+    getAllEvents,
+    getAdminUsers,
+    updateCachedAdminUser,
+    invalidateAdminUsersCache,
+} from "@/utils/firestoreCache";
 
 type MemberData = Record<string, string>;
 
@@ -148,25 +153,11 @@ export default function UsersManagement() {
         );
     }, [searchTerm, users]);
 
-    // In-memory cache for admin users with 2-minute TTL
+    // Multi-tier cached loader for admin users
     const fetchUsers = async (forceRefresh = false) => {
         try {
             setLoading(true);
-
-            const now = Date.now();
-            let usersList: UserData[];
-
-            if (!forceRefresh && (fetchUsers as any).cache && now - (fetchUsers as any).cache.timestamp < 2 * 60 * 1000) {
-                usersList = (fetchUsers as any).cache.data;
-            } else {
-                const snapshot = await getDocs(collection(db, "users"));
-                usersList = snapshot.docs.map((item) => ({
-                    id: item.id,
-                    ...item.data(),
-                })) as UserData[];
-                (fetchUsers as any).cache = { data: usersList, timestamp: Date.now() };
-            }
-
+            const usersList = (await getAdminUsers(forceRefresh)) as UserData[];
             setUsers(usersList);
             setFilteredUsers(usersList);
         } catch (error) {
@@ -240,6 +231,10 @@ export default function UsersManagement() {
                 )
             );
 
+            updateCachedAdminUser(userId, {
+                role: editRole,
+                department: editRole === "admin" ? editDept : undefined,
+            });
             setEditingId(null);
         } catch (error) {
             console.error("Error updating user:", error);
@@ -653,6 +648,7 @@ export default function UsersManagement() {
                 `${newUserForm.name.trim()} successfully registered for ${event.title}!`
             );
 
+            invalidateAdminUsersCache();
             setIsAddUserModalOpen(false);
             setNewUserForm({
                 selectedEventId: "",

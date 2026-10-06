@@ -8,6 +8,7 @@ import {
   limit,
   query,
   where,
+  orderBy,
 } from "firebase/firestore";
 import { Event } from "@/utils/types/event";
 import { convertDriveUrl } from "@/utils/imageUtils";
@@ -492,3 +493,382 @@ export function invalidateAdminStatsCache() {
   adminStatsCache = null;
   adminStatsPromise = null;
 }
+
+// ============================================================
+// ADMIN COLLECTIONS MULTI-TIER CACHE
+// (Users, Registrations, Visitors, Alumni, Abheri)
+// ============================================================
+
+const ADMIN_COLLECTIONS_TTL = 3 * 60 * 1000; // 3 minutes TTL
+
+// Helper to safely load from sessionStorage (client-side only)
+function getSessionCache<T>(key: string): { data: T; timestamp: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.timestamp === "number" &&
+      Date.now() - parsed.timestamp < ADMIN_COLLECTIONS_TTL &&
+      Array.isArray(parsed.data)
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Ignore storage parse errors
+  }
+  return null;
+}
+
+// Helper to safely save to sessionStorage
+function setSessionCache<T>(key: string, data: T) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {
+    // Ignore quota errors
+  }
+}
+
+// Helper to remove from sessionStorage
+function clearSessionCache(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+// ── 1. Admin Users Cache ─────────────────────────────────────
+let adminUsersCache: { data: any[]; timestamp: number } | null = null;
+let adminUsersPromise: Promise<any[]> | null = null;
+
+export async function getAdminUsers(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  if (!forceRefresh && adminUsersCache && now - adminUsersCache.timestamp < ADMIN_COLLECTIONS_TTL) {
+    return adminUsersCache.data;
+  }
+
+  if (!forceRefresh) {
+    const sessionItem = getSessionCache<any[]>("sparkz_admin_users");
+    if (sessionItem) {
+      adminUsersCache = sessionItem;
+      return sessionItem.data;
+    }
+  }
+
+  if (adminUsersPromise) {
+    return adminUsersPromise;
+  }
+
+  adminUsersPromise = (async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "users"));
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      adminUsersCache = { data: list, timestamp: Date.now() };
+      setSessionCache("sparkz_admin_users", list);
+      return list;
+    } finally {
+      adminUsersPromise = null;
+    }
+  })();
+
+  return adminUsersPromise;
+}
+
+export function invalidateAdminUsersCache() {
+  adminUsersCache = null;
+  adminUsersPromise = null;
+  clearSessionCache("sparkz_admin_users");
+}
+
+export function updateCachedAdminUser(userId: string, partialData: Record<string, any>) {
+  if (adminUsersCache) {
+    adminUsersCache.data = adminUsersCache.data.map((u) =>
+      u.id === userId ? { ...u, ...partialData } : u
+    );
+    setSessionCache("sparkz_admin_users", adminUsersCache.data);
+  }
+}
+
+export function addCachedAdminUser(newUser: Record<string, any>) {
+  if (adminUsersCache) {
+    adminUsersCache.data = [newUser, ...adminUsersCache.data];
+    setSessionCache("sparkz_admin_users", adminUsersCache.data);
+  }
+}
+
+// ── 2. Admin Registrations Cache ─────────────────────────────
+let adminRegsCache: { data: any[]; timestamp: number } | null = null;
+let adminRegsPromise: Promise<any[]> | null = null;
+
+export async function getAdminRegistrations(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  if (!forceRefresh && adminRegsCache && now - adminRegsCache.timestamp < ADMIN_COLLECTIONS_TTL) {
+    return adminRegsCache.data;
+  }
+
+  if (!forceRefresh) {
+    const sessionItem = getSessionCache<any[]>("sparkz_admin_registrations");
+    if (sessionItem) {
+      adminRegsCache = sessionItem;
+      return sessionItem.data;
+    }
+  }
+
+  if (adminRegsPromise) {
+    return adminRegsPromise;
+  }
+
+  adminRegsPromise = (async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "registrations"));
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      adminRegsCache = { data: list, timestamp: Date.now() };
+      setSessionCache("sparkz_admin_registrations", list);
+      return list;
+    } finally {
+      adminRegsPromise = null;
+    }
+  })();
+
+  return adminRegsPromise;
+}
+
+export function invalidateAdminRegistrationsCache() {
+  adminRegsCache = null;
+  adminRegsPromise = null;
+  clearSessionCache("sparkz_admin_registrations");
+}
+
+export function updateCachedAdminRegistration(regId: string, partialData: Record<string, any>) {
+  if (adminRegsCache) {
+    adminRegsCache.data = adminRegsCache.data.map((r) =>
+      r.id === regId ? { ...r, ...partialData } : r
+    );
+    setSessionCache("sparkz_admin_registrations", adminRegsCache.data);
+  }
+}
+
+export function removeCachedAdminRegistration(regId: string) {
+  if (adminRegsCache) {
+    adminRegsCache.data = adminRegsCache.data.filter((r) => r.id !== regId);
+    setSessionCache("sparkz_admin_registrations", adminRegsCache.data);
+  }
+}
+
+export function addCachedAdminRegistration(newReg: Record<string, any>) {
+  if (adminRegsCache) {
+    adminRegsCache.data = [newReg, ...adminRegsCache.data];
+    setSessionCache("sparkz_admin_registrations", adminRegsCache.data);
+  }
+}
+
+// ── 3. Admin Visitor Registrations Cache ─────────────────────
+let adminVisitorCache: { data: any[]; timestamp: number } | null = null;
+let adminVisitorPromise: Promise<any[]> | null = null;
+
+export async function getAdminVisitorRegistrations(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  if (!forceRefresh && adminVisitorCache && now - adminVisitorCache.timestamp < ADMIN_COLLECTIONS_TTL) {
+    return adminVisitorCache.data;
+  }
+
+  if (!forceRefresh) {
+    const sessionItem = getSessionCache<any[]>("sparkz_admin_visitors");
+    if (sessionItem) {
+      adminVisitorCache = sessionItem;
+      return sessionItem.data;
+    }
+  }
+
+  if (adminVisitorPromise) {
+    return adminVisitorPromise;
+  }
+
+  adminVisitorPromise = (async () => {
+    try {
+      const q = query(collection(db, "visitor_registrations"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      adminVisitorCache = { data: list, timestamp: Date.now() };
+      setSessionCache("sparkz_admin_visitors", list);
+      return list;
+    } finally {
+      adminVisitorPromise = null;
+    }
+  })();
+
+  return adminVisitorPromise;
+}
+
+export function invalidateAdminVisitorCache() {
+  adminVisitorCache = null;
+  adminVisitorPromise = null;
+  clearSessionCache("sparkz_admin_visitors");
+}
+
+export function updateCachedAdminVisitor(visitorId: string, partialData: Record<string, any>) {
+  if (adminVisitorCache) {
+    adminVisitorCache.data = adminVisitorCache.data.map((v) =>
+      v.id === visitorId ? { ...v, ...partialData } : v
+    );
+    setSessionCache("sparkz_admin_visitors", adminVisitorCache.data);
+  }
+}
+
+export function removeCachedAdminVisitor(visitorId: string) {
+  if (adminVisitorCache) {
+    adminVisitorCache.data = adminVisitorCache.data.filter((v) => v.id !== visitorId);
+    setSessionCache("sparkz_admin_visitors", adminVisitorCache.data);
+  }
+}
+
+export function addCachedAdminVisitor(newVisitor: Record<string, any>) {
+  if (adminVisitorCache) {
+    adminVisitorCache.data = [newVisitor, ...adminVisitorCache.data];
+    setSessionCache("sparkz_admin_visitors", adminVisitorCache.data);
+  }
+}
+
+// ── 4. Admin Alumni Registrations Cache ──────────────────────
+let adminAlumniCache: { data: any[]; timestamp: number } | null = null;
+let adminAlumniPromise: Promise<any[]> | null = null;
+
+export async function getAdminAlumniRegistrations(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  if (!forceRefresh && adminAlumniCache && now - adminAlumniCache.timestamp < ADMIN_COLLECTIONS_TTL) {
+    return adminAlumniCache.data;
+  }
+
+  if (!forceRefresh) {
+    const sessionItem = getSessionCache<any[]>("sparkz_admin_alumni");
+    if (sessionItem) {
+      adminAlumniCache = sessionItem;
+      return sessionItem.data;
+    }
+  }
+
+  if (adminAlumniPromise) {
+    return adminAlumniPromise;
+  }
+
+  adminAlumniPromise = (async () => {
+    try {
+      const q = query(collection(db, "alumni_registrations"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      adminAlumniCache = { data: list, timestamp: Date.now() };
+      setSessionCache("sparkz_admin_alumni", list);
+      return list;
+    } finally {
+      adminAlumniPromise = null;
+    }
+  })();
+
+  return adminAlumniPromise;
+}
+
+export function invalidateAdminAlumniCache() {
+  adminAlumniCache = null;
+  adminAlumniPromise = null;
+  clearSessionCache("sparkz_admin_alumni");
+}
+
+export function updateCachedAdminAlumni(alumniId: string, partialData: Record<string, any>) {
+  if (adminAlumniCache) {
+    adminAlumniCache.data = adminAlumniCache.data.map((a) =>
+      a.id === alumniId ? { ...a, ...partialData } : a
+    );
+    setSessionCache("sparkz_admin_alumni", adminAlumniCache.data);
+  }
+}
+
+export function removeCachedAdminAlumni(alumniId: string) {
+  if (adminAlumniCache) {
+    adminAlumniCache.data = adminAlumniCache.data.filter((a) => a.id !== alumniId);
+    setSessionCache("sparkz_admin_alumni", adminAlumniCache.data);
+  }
+}
+
+// ── 5. Admin Abheri Registrations Cache ──────────────────────
+let adminAbheriCache: { data: any[]; timestamp: number } | null = null;
+let adminAbheriPromise: Promise<any[]> | null = null;
+
+export async function getAdminAbheriRegistrations(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+
+  if (!forceRefresh && adminAbheriCache && now - adminAbheriCache.timestamp < ADMIN_COLLECTIONS_TTL) {
+    return adminAbheriCache.data;
+  }
+
+  if (!forceRefresh) {
+    const sessionItem = getSessionCache<any[]>("sparkz_admin_abheri");
+    if (sessionItem) {
+      adminAbheriCache = sessionItem;
+      return sessionItem.data;
+    }
+  }
+
+  if (adminAbheriPromise) {
+    return adminAbheriPromise;
+  }
+
+  adminAbheriPromise = (async () => {
+    try {
+      const q = query(collection(db, "abheri_registrations"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      adminAbheriCache = { data: list, timestamp: Date.now() };
+      setSessionCache("sparkz_admin_abheri", list);
+      return list;
+    } finally {
+      adminAbheriPromise = null;
+    }
+  })();
+
+  return adminAbheriPromise;
+}
+
+export function invalidateAdminAbheriCache() {
+  adminAbheriCache = null;
+  adminAbheriPromise = null;
+  clearSessionCache("sparkz_admin_abheri");
+}
+
+export function updateCachedAdminAbheri(regId: string, partialData: Record<string, any>) {
+  if (adminAbheriCache) {
+    adminAbheriCache.data = adminAbheriCache.data.map((a) =>
+      a.id === regId ? { ...a, ...partialData } : a
+    );
+    setSessionCache("sparkz_admin_abheri", adminAbheriCache.data);
+  }
+}
+
