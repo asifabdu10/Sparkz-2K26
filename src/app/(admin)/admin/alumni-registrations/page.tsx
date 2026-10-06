@@ -1,11 +1,34 @@
 "use client";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "@/utils/firebase";
-import { Loader2, Download, Search, Mail, UserX, UserCheck, Trash2 } from "lucide-react";
+import {
+  Loader2,
+  Download,
+  Search,
+  Mail,
+  UserX,
+  UserCheck,
+  Trash2,
+  Pencil,
+  ToggleLeft,
+  ToggleRight,
+  ShieldAlert,
+  Check,
+  X,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { useAuth } from "@/context/AuthContext";
+
+const DEPARTMENT_OPTIONS = [
+  "Civil Engineering",
+  "Computer Engineering",
+  "Mechanical Engineering",
+  "Electrical Engineering",
+] as const;
+
+const YEAR_OPTIONS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
 
 interface AlumniRegistration {
   id: string;
@@ -30,7 +53,49 @@ export default function AlumniRegistrationsAdmin() {
   const [deregisteringId, setDeregisteringId] = useState<string | null>(null);
   const [bulkSending, setBulkSending] = useState(false);
 
-  useEffect(() => { fetchRegistrations(); }, []);
+  // Registration ON/OFF state (Super Admin only)
+  const [registrationOpen, setRegistrationOpen] = useState<boolean>(true);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  // Edit Modal State
+  const [editingReg, setEditingReg] = useState<AlumniRegistration | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    department: string;
+    passedOutYear: number;
+    contact: string;
+    email: string;
+    status: "registered" | "deregistered";
+    emailStatus: string;
+    batch: string;
+  }>({
+    name: "",
+    department: "Computer Engineering",
+    passedOutYear: 2025,
+    contact: "",
+    email: "",
+    status: "registered",
+    emailStatus: "pending",
+    batch: "",
+  });
+
+  const defaultSuperAdminEmails = ["asifabdulla1234@gmail.com", "joeljoy1237@gmail.com"];
+  const envEmails = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const superAdminEmails = Array.from(new Set([...defaultSuperAdminEmails, ...envEmails]));
+
+  const currentEmail = user?.email?.toLowerCase().trim() || "";
+  const isSuperAdmin =
+    userData?.role === "superAdmin" ||
+    (Boolean(currentEmail) && superAdminEmails.includes(currentEmail));
+
+  useEffect(() => {
+    fetchRegistrations();
+    fetchRegistrationStatus();
+  }, []);
 
   const fetchRegistrations = async () => {
     try {
@@ -44,6 +109,68 @@ export default function AlumniRegistrationsAdmin() {
       toastError("Failed to fetch alumni registrations");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRegistrationStatus = async () => {
+    try {
+      const snap = await getDoc(doc(db, "eventSettings", "alumni"));
+      if (snap.exists()) {
+        const data = snap.data();
+        if (typeof data?.registrationOpen === "boolean") {
+          setRegistrationOpen(data.registrationOpen);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch alumni registration status:", err);
+    }
+  };
+
+  const handleToggleRegistration = async () => {
+    if (!isSuperAdmin) {
+      toastError("Only Super Admin can turn alumni registrations ON or OFF.");
+      return;
+    }
+
+    const nextState = !registrationOpen;
+    const confirmMessage = nextState
+      ? "Turn ON Alumni Registration?\n\nPublic alumni candidates will be able to register on the website."
+      : "Turn OFF Alumni Registration?\n\nPublic alumni candidates will see a closed notice and will NOT be able to submit new registrations.";
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setStatusLoading(true);
+    try {
+      let token = "";
+      if (user) {
+        try {
+          token = await user.getIdToken();
+        } catch (e) {
+          console.warn("Could not get ID token:", e);
+        }
+      }
+
+      const res = await fetch("/api/alumni-registration/toggle-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ registrationOpen: nextState, firebaseIdToken: token }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to update registration status");
+
+      setRegistrationOpen(nextState);
+      toastSuccess(
+        nextState ? "Alumni registrations are now OPEN!" : "Alumni registrations are now CLOSED."
+      );
+    } catch (err: any) {
+      console.error("Error toggling registration status:", err);
+      toastError(err?.message || "Failed to toggle registration status.");
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -124,18 +251,123 @@ export default function AlumniRegistrationsAdmin() {
       }
     } catch (err: unknown) {
       const e = err as { message?: string };
-      toastError(e?.message || "Failed to update alumni registration");
+      toastError(e?.message || "Action failed");
     } finally {
       setDeregisteringId(null);
     }
   };
 
-  const handleSendAllPending = async () => {
-    const pending = registrations.filter((r) => r.status !== "deregistered" && r.emailStatus !== "sent");
-    if (!pending.length) {
-      toastSuccess("All active alumni have already received their confirmation emails!");
+  const handleOpenEdit = (reg: AlumniRegistration) => {
+    setEditingReg(reg);
+    setEditForm({
+      name: reg.name || "",
+      department: reg.department || "Computer Engineering",
+      passedOutYear: Number(reg.passedOutYear) || 2025,
+      contact: reg.contact || "",
+      email: reg.email || "",
+      status: reg.status === "deregistered" ? "deregistered" : "registered",
+      emailStatus: reg.emailStatus || "pending",
+      batch: reg.batch || "",
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReg) return;
+
+    if (!editForm.name.trim()) {
+      toastError("Full name is required.");
       return;
     }
+    if (!/^\d{10}$/.test(editForm.contact.trim())) {
+      toastError("Contact number must be exactly 10 digits.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email.trim())) {
+      toastError("Enter a valid email address.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      let token = "";
+      if (user) {
+        try {
+          token = await user.getIdToken();
+        } catch (tokenErr) {
+          console.warn("Could not get ID token for update:", tokenErr);
+        }
+      }
+
+      const res = await fetch("/api/alumni-registration/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          registrationId: editingReg.id,
+          name: editForm.name.trim(),
+          department: editForm.department,
+          passedOutYear: editForm.passedOutYear,
+          contact: editForm.contact.trim(),
+          email: editForm.email.trim().toLowerCase(),
+          status: editForm.status,
+          emailStatus: editForm.emailStatus,
+          batch: editForm.batch.trim(),
+          adminEmail: user?.email,
+          firebaseIdToken: token,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to update alumni details");
+
+      // Update state locally
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === editingReg.id
+            ? {
+                ...r,
+                name: editForm.name.trim(),
+                department: editForm.department,
+                passedOutYear: editForm.passedOutYear,
+                contact: editForm.contact.trim(),
+                email: editForm.email.trim().toLowerCase(),
+                status: editForm.status,
+                emailStatus: editForm.emailStatus,
+                batch: editForm.batch.trim(),
+              }
+            : r
+        )
+      );
+
+      toastSuccess(`Updated details for ${editForm.name.trim()}`);
+      setEditingReg(null);
+    } catch (err: any) {
+      console.error("Error updating alumni candidate:", err);
+      toastError(err?.message || "Failed to save changes.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleSendAllPending = async () => {
+    const pending = registrations.filter(
+      (r) => r.status !== "deregistered" && r.emailStatus !== "sent"
+    );
+    if (pending.length === 0) {
+      toastSuccess("No pending emails to send.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Send confirmation emails to ${pending.length} alumni candidate(s)?`
+      )
+    )
+      return;
+
     setBulkSending(true);
     let successCount = 0;
     for (const reg of pending) {
@@ -198,6 +430,7 @@ export default function AlumniRegistrationsAdmin() {
 
   return (
     <div className="space-y-6">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white">Alumni Registrations</h1>
@@ -231,6 +464,65 @@ export default function AlumniRegistrationsAdmin() {
         </div>
       </div>
 
+      {/* ── Registration ON / OFF Control Banner (Super Admin Only) ─────── */}
+      <div className="bg-[#181824] border border-gray-700/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div
+            className={`w-3.5 h-3.5 rounded-full mt-1 sm:mt-0 flex-shrink-0 ${
+              registrationOpen ? "bg-emerald-400 animate-pulse" : "bg-red-500"
+            }`}
+          />
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-white font-semibold text-sm">Alumni Registration Status:</span>
+              <span
+                className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                  registrationOpen
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "bg-red-500/20 text-red-300 border border-red-500/30"
+                }`}
+              >
+                {registrationOpen ? "Open / Active" : "Closed / Inactive"}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {registrationOpen
+                ? "Public alumni registration is currently live and accepting registrations on the website."
+                : "Public alumni registration is currently turned off. Candidates cannot submit new forms."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isSuperAdmin ? (
+            <button
+              onClick={handleToggleRegistration}
+              disabled={statusLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
+                registrationOpen
+                  ? "bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40"
+                  : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40"
+              }`}
+            >
+              {statusLoading ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : registrationOpen ? (
+                <ToggleRight size={18} />
+              ) : (
+                <ToggleLeft size={18} />
+              )}
+              {registrationOpen ? "Turn OFF Registration" : "Turn ON Registration"}
+            </button>
+          ) : (
+            <span className="text-xs text-gray-400 flex items-center gap-1.5 italic bg-gray-800/80 px-3 py-1.5 rounded-lg border border-gray-700">
+              <ShieldAlert size={14} className="text-amber-400" />
+              Super Admin Only
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Search Bar ────────────────────────────────────────────────────── */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
@@ -242,6 +534,7 @@ export default function AlumniRegistrationsAdmin() {
         />
       </div>
 
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex justify-center p-12">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
@@ -267,11 +560,18 @@ export default function AlumniRegistrationsAdmin() {
               <tbody className="divide-y divide-gray-700">
                 {filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-8 text-center text-gray-400">No alumni registrations found.</td>
+                    <td colSpan={10} className="px-6 py-8 text-center text-gray-400">
+                      No alumni registrations found.
+                    </td>
                   </tr>
                 ) : (
                   filteredRegistrations.map((reg, i) => (
-                    <tr key={reg.id} className={`hover:bg-gray-700/50 transition-colors ${reg.status === "deregistered" ? "opacity-60 bg-red-950/10" : ""}`}>
+                    <tr
+                      key={reg.id}
+                      className={`hover:bg-gray-700/50 transition-colors ${
+                        reg.status === "deregistered" ? "opacity-60 bg-red-950/10" : ""
+                      }`}
+                    >
                       <td className="px-4 py-4 text-gray-400 text-xs">{i + 1}</td>
                       <td className="px-4 py-4">
                         <div className="font-medium text-white">{reg.name}</div>
@@ -301,19 +601,32 @@ export default function AlumniRegistrationsAdmin() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                          reg.emailStatus === "sent"
-                            ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                            : reg.emailStatus === "failed"
-                            ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                            : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                        }`}>
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                            reg.emailStatus === "sent"
+                              ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                              : reg.emailStatus === "failed"
+                              ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                              : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          }`}
+                        >
                           {reg.emailStatus || "pending"}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-gray-400 text-xs">{formatDate(reg.createdAt)}</td>
                       <td className="px-4 py-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
+                          {/* ── Edit Button ─────────────────────────────── */}
+                          <button
+                            onClick={() => handleOpenEdit(reg)}
+                            title="Edit candidate details"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 transition-colors"
+                          >
+                            <Pencil size={13} />
+                            Edit
+                          </button>
+
+                          {/* ── Email Button ────────────────────────────── */}
                           <button
                             onClick={() => handleSendEmail(reg)}
                             disabled={resendingId === reg.id || bulkSending}
@@ -337,6 +650,7 @@ export default function AlumniRegistrationsAdmin() {
                             )}
                           </button>
 
+                          {/* ── Restore / Deregister Button ─────────────── */}
                           {reg.status === "deregistered" ? (
                             <button
                               onClick={() => handleDeregister(reg, "restore")}
@@ -359,6 +673,7 @@ export default function AlumniRegistrationsAdmin() {
                             </button>
                           )}
 
+                          {/* ── Delete Button ───────────────────────────── */}
                           <button
                             onClick={() => handleDeregister(reg, "delete")}
                             disabled={deregisteringId === reg.id}
@@ -374,6 +689,161 @@ export default function AlumniRegistrationsAdmin() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Candidate Edit Modal ──────────────────────────────────────────── */}
+      {editingReg && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#181824] border border-gray-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-gray-700/80 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Pencil size={18} className="text-[#F3C87A]" />
+                  Edit Alumni Candidate
+                </h2>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {editingReg.id}</p>
+              </div>
+              <button
+                onClick={() => setEditingReg(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Department *</label>
+                  <select
+                    value={editForm.department}
+                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                    required
+                  >
+                    {DEPARTMENT_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Passed Out Year *</label>
+                  <select
+                    value={editForm.passedOutYear}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, passedOutYear: Number(e.target.value) })
+                    }
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                    required
+                  >
+                    {YEAR_OPTIONS.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Contact (10 digits) *</label>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={editForm.contact}
+                    onChange={(e) => setEditForm({ ...editForm, contact: e.target.value })}
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#F3C87A]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Status *</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        status: e.target.value as "registered" | "deregistered",
+                      })
+                    }
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                  >
+                    <option value="registered">Registered</option>
+                    <option value="deregistered">Deregistered</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-[#F3C87A]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Email Confirmation Status</label>
+                  <select
+                    value={editForm.emailStatus}
+                    onChange={(e) => setEditForm({ ...editForm, emailStatus: e.target.value })}
+                    className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="sent">Sent</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Batch (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2018-2022"
+                  value={editForm.batch}
+                  onChange={(e) => setEditForm({ ...editForm, batch: e.target.value })}
+                  className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-700/80">
+                <button
+                  type="button"
+                  onClick={() => setEditingReg(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-300 hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="flex items-center gap-2 bg-[#F3C87A] hover:bg-[#e6b960] disabled:opacity-50 text-[#0B0B0E] font-bold px-5 py-2 rounded-xl text-sm transition-all shadow-md"
+                >
+                  {savingEdit ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {savingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

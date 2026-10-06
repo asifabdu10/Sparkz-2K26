@@ -37,100 +37,132 @@ function getAdminAuth() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { name, department, passedOutYear, contact, email, userId } = body;
-
-    // ── 1. Secure Input Validation & Sanitization ─────────────────────────
-    if (!name || typeof name !== "string" || name.trim().length < 2 || name.trim().length > 100) {
-      return NextResponse.json({ success: false, error: "Please enter a valid full name (2-100 characters)." }, { status: 400 });
-    }
-
-    const trimmedDept = typeof department === "string" ? department.trim() : "";
-    if (!ALLOWED_DEPARTMENTS.includes(trimmedDept as (typeof ALLOWED_DEPARTMENTS)[number])) {
-      return NextResponse.json({
-        success: false,
-        error: `Please select a valid department from: ${ALLOWED_DEPARTMENTS.join(", ")}.`,
-      }, { status: 400 });
-    }
-
-    const yearNum = Number(passedOutYear);
-    if (!Number.isInteger(yearNum) || yearNum < 2018 || yearNum > 2025) {
-      return NextResponse.json({
-        success: false,
-        error: "Passed out year must be a valid year between 2018 and 2025.",
-      }, { status: 400 });
-    }
-
-    const contactStr = String(contact ?? "").trim();
-    if (!/^\d{10}$/.test(contactStr)) {
-      return NextResponse.json({ success: false, error: "Valid 10-digit contact number is required." }, { status: 400 });
-    }
-
-    const emailStr = String(email ?? "").trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
-      return NextResponse.json({ success: false, error: "Valid email address is required." }, { status: 400 });
-    }
-
-    // ── 2. Secure Identity Verification ────────────────────────────────────
-    let verifiedUserId: string | null = null;
+    // ── 1. Require Verified Google Authentication ────────────────────────
     const authHeader = request.headers.get("Authorization") || "";
     const idToken = authHeader.replace("Bearer ", "").trim();
 
-    if (idToken) {
-      try {
-        const decoded = await getAdminAuth().verifyIdToken(idToken);
-        verifiedUserId = decoded.uid;
-      } catch (authErr) {
-        console.warn("Failed to verify ID token in alumni registration:", authErr);
-        // If an explicit userId was sent without valid token matching it, reject spoofing
-        if (userId) {
-          return NextResponse.json({ success: false, error: "Invalid authentication credentials." }, { status: 401 });
-        }
-      }
-    } else if (userId && typeof userId === "string") {
-      // If client sent userId without auth token, do not trust untrusted userId
-      verifiedUserId = null;
+    if (!idToken) {
+      return NextResponse.json(
+        { success: false, error: "Only Google logged-in users can register as alumni. Please sign in." },
+        { status: 401 }
+      );
+    }
+
+    let verifiedUid = "";
+    let verifiedEmail = "";
+    let googleDisplayName = "";
+
+    try {
+      const decoded = await getAdminAuth().verifyIdToken(idToken);
+      verifiedUid = decoded.uid;
+      verifiedEmail = (decoded.email || "").toLowerCase().trim();
+      googleDisplayName = (decoded.name || "").trim();
+    } catch (authErr: any) {
+      console.warn("Failed to verify Google ID token in alumni submit:", authErr?.message);
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired Google login session. Please sign in again." },
+        { status: 401 }
+      );
+    }
+
+    if (!verifiedUid || !verifiedEmail) {
+      return NextResponse.json(
+        { success: false, error: "Unable to retrieve verified Google email. Please sign in with Google." },
+        { status: 400 }
+      );
     }
 
     const db = getAdminDb();
 
-    // ── 3. Duplicate Registration Check ────────────────────────────────────
-    // Check if an active registration already exists for this email
+    // ── 2. Check if Alumni Registration is Open ──────────────────────────
+    try {
+      const settingsSnap = await db.collection("eventSettings").doc("alumni").get();
+      if (settingsSnap.exists) {
+        const settingsData = settingsSnap.data();
+        if (settingsData?.registrationOpen === false) {
+          return NextResponse.json(
+            { success: false, error: "Alumni registration is currently closed by the administration." },
+            { status: 403 }
+          );
+        }
+      }
+    } catch (settErr) {
+      console.warn("Could not check eventSettings/alumni:", settErr);
+    }
+
+    // ── 3. Input Validation for Department, Year & Contact ────────────────
+    const body = await request.json().catch(() => ({}));
+    const { department, passedOutYear, contact } = body;
+
+    const trimmedDept = typeof department === "string" ? department.trim() : "";
+    if (!ALLOWED_DEPARTMENTS.includes(trimmedDept as (typeof ALLOWED_DEPARTMENTS)[number])) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Please select a valid department from: ${ALLOWED_DEPARTMENTS.join(", ")}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const yearNum = Number(passedOutYear);
+    if (!Number.isInteger(yearNum) || yearNum < 2018 || yearNum > 2025) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Passed out year must be a valid year between 2018 and 2025.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const contactStr = String(contact ?? "").trim();
+    if (!/^\d{10}$/.test(contactStr)) {
+      return NextResponse.json(
+        { success: false, error: "Valid 10-digit contact number is required." },
+        { status: 400 }
+      );
+    }
+
+    // ── 4. Duplicate Registration Check ────────────────────────────────────
+    // Check if an active registration already exists for this Google email
     const existingEmailSnap = await db.collection("alumni_registrations")
-      .where("email", "==", emailStr)
+      .where("email", "==", verifiedEmail)
       .get();
 
     const activeEmail = existingEmailSnap.docs.find((d) => d.data().status !== "deregistered");
     if (activeEmail) {
       return NextResponse.json(
-        { success: false, error: "An active alumni registration already exists for this email address." },
+        { success: false, error: "An active alumni registration already exists for this Google email address." },
         { status: 409 }
       );
     }
 
-    // Check if an active registration already exists for this verified user ID
-    if (verifiedUserId) {
-      const existingUserSnap = await db.collection("alumni_registrations")
-        .where("userId", "==", verifiedUserId)
-        .get();
+    // Check if an active registration already exists for this Google user ID
+    const existingUserSnap = await db.collection("alumni_registrations")
+      .where("userId", "==", verifiedUid)
+      .get();
 
-      const activeUser = existingUserSnap.docs.find((d) => d.data().status !== "deregistered");
-      if (activeUser) {
-        return NextResponse.json(
-          { success: false, error: "You are already registered as an alumnus." },
-          { status: 409 }
-        );
-      }
+    const activeUser = existingUserSnap.docs.find((d) => d.data().status !== "deregistered");
+    if (activeUser) {
+      return NextResponse.json(
+        { success: false, error: "You are already registered as an alumnus with this account." },
+        { status: 409 }
+      );
     }
 
-    // ── 4. Atomic & Secure Write to Firestore ─────────────────────────────
+    // ── 5. Store Candidate in Firebase ─────────────────────────────────────
+    // Name is stored in Firebase as the email used for login as requested
+    const candidateName = verifiedEmail;
+
     const docData: Record<string, unknown> = {
-      userId: verifiedUserId || null,
-      name: name.trim(),
+      userId: verifiedUid,
+      name: candidateName, // Stored as the Google email used for login
+      email: verifiedEmail,
+      googleDisplayName: googleDisplayName || null,
       department: trimmedDept,
       passedOutYear: yearNum,
       contact: contactStr,
-      email: emailStr,
       status: "registered",
       emailStatus: "pending",
       createdAt: FieldValue.serverTimestamp(),
@@ -139,27 +171,28 @@ export async function POST(request: NextRequest) {
 
     const docRef = await db.collection("alumni_registrations").add(docData);
 
-    // If registered by a logged-in user, link alumni record securely to their user profile
-    if (verifiedUserId) {
-      try {
-        await db.collection("users").doc(verifiedUserId).set(
-          {
-            isAlumni: true,
-            alumniRegistrationId: docRef.id,
-            alumniDepartment: trimmedDept,
-            alumniPassedOutYear: yearNum,
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-      } catch (userMergeErr) {
-        console.warn("Could not merge alumni profile info into users document:", userMergeErr);
-      }
+    // Sync alumni details to users collection
+    try {
+      await db.collection("users").doc(verifiedUid).set(
+        {
+          isAlumni: true,
+          alumniRegistrationId: docRef.id,
+          alumniDepartment: trimmedDept,
+          alumniPassedOutYear: yearNum,
+          alumniContact: contactStr,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (userMergeErr) {
+      console.warn("Could not merge alumni profile info into users document:", userMergeErr);
     }
 
     return NextResponse.json({
       success: true,
       id: docRef.id,
+      name: candidateName,
+      email: verifiedEmail,
       message: "Alumni registration saved securely.",
     });
   } catch (error: unknown) {
