@@ -79,27 +79,19 @@ export default function AlumniRegistrationPage() {
       return;
     }
 
-    let cancelled = false;
-    (async () => {
-      try {
-        const token = await user.getIdToken(true);
-        const response = await fetch("/api/alumni-registration/check", {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        const data = await response.json().catch(() => ({}));
-        if (cancelled) return;
+    const checkParams = new URLSearchParams();
+    if (user.uid) checkParams.set("userId", user.uid);
+    if (user.email) checkParams.set("email", user.email);
+
+    fetch(`/api/alumni-registration/check?${checkParams.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
         if (data.success && data.registered && data.registration) {
           setExistingReg(data.registration);
         }
-      } catch (err) {
-        if (!cancelled) console.warn("Failed to check existing alumni registration:", err);
-      } finally {
-        if (!cancelled) setCheckingExisting(false);
-      }
-    })();
-    return () => { cancelled = true; };
-
+      })
+      .catch((err) => console.warn("Failed to check existing alumni registration:", err))
+      .finally(() => setCheckingExisting(false));
   }, [user]);
 
   const validate = (): boolean => {
@@ -116,10 +108,6 @@ export default function AlumniRegistrationPage() {
     if (!validate()) return;
     if (!user) {
       setErrors({ submit: "Please log in with Google to register." });
-      return;
-    }
-    if (!user.providerData.some((provider) => provider.providerId === "google.com")) {
-      setErrors({ submit: "Only Google authentication is allowed for alumni registration." });
       return;
     }
 
@@ -249,20 +237,6 @@ export default function AlumniRegistrationPage() {
             </Link>
           </div>
         </motion.div>
-      </div>
-    );
-  }
-
-  // ── 1.5 Require Google authentication, not another Firebase provider ──────
-  if (user && !user.providerData.some((provider) => provider.providerId === "google.com")) {
-    return (
-      <div className="min-h-screen bg-[#0B0B0E] py-16 px-4 flex items-center justify-center">
-        <div className="relative z-10 max-w-md w-full bg-[#131318] border border-red-500/30 rounded-2xl p-8 text-center space-y-5 shadow-2xl">
-          <div className="text-4xl">🔐</div>
-          <h1 className="text-2xl font-black text-white">Google Sign-in Required</h1>
-          <p className="text-gray-400 text-sm">Please sign out and sign in with Google before registering as an alumnus.</p>
-          <button onClick={() => login()} className="w-full bg-[#F3C87A] text-[#0B0B0E] font-bold py-3 rounded-xl">Continue with Google</button>
-        </div>
       </div>
     );
   }

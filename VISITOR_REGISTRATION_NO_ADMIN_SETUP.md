@@ -1,33 +1,20 @@
-# Sparkz 2K26 — Visitor Registration Authentication & Server Setup
+# Visitor Registration — Firebase Client Setup
 
-Visitor-pass registration now requires a Google-authenticated Firebase account.
+Visitor Registration no longer requires `FIREBASE_SERVICE_ACCOUNT_JSON`.
 
-The public visitor flow is:
+The visitor payment endpoint verifies the Razorpay signature and the actual Razorpay order/payment server-side, then saves the visitor document through the Firebase Firestore REST API using the signed-in user's Firebase ID token. Firestore Security Rules remain the authorization boundary.
 
-Google sign-in → exactly one confirmed paid departmental event → ID proof upload → configured visitor-pass payment → server-side payment verification → `visitor_registrations`.
+The Visitor Registration page continues to use the existing Firebase client SDK for eligibility checks and admin pages.
 
-The public registration is finalized by the server API. Firestore rules keep direct client creation restricted to admins.
+## Existing environment variables still used by Visitor Registration
 
-## Visitor-pass transaction amount
-
-The visitor-pass fee is controlled by the admin configuration document:
-
-`eventSettings/visitorPass.fee`
-
-The value shown in the UI, Razorpay order, saved registration, and confirmation email must come from this configuration. A test value such as ₹1 is valid when the admin has configured ₹1; it is not hard-coded by the application.
-
-## Required production variables
-
-- `FIREBASE_SERVICE_ACCOUNT_JSON` (or the existing supported Firebase Admin credential variable)
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
-- `NEXT_PUBLIC_RAZORPAY_KEY_ID`
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` for confirmation email
-- Existing Google Drive OAuth variables for visitor proof uploads
-- Existing `NEXT_PUBLIC_FIREBASE_*` variables for the client Firebase application
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` (for confirmation email)
+- Existing Google Drive OAuth variables for proof uploads
 
-Never commit service-account JSON, private keys, Razorpay secrets, SMTP passwords, or Google OAuth refresh tokens to the repository.
+## Important
 
-## Alumni registration
-
-Alumni registration also requires Google authentication. The server verifies the Firebase ID token and requires the Google provider before creating an `alumni_registrations` document.
+This change only removes the Firebase Admin dependency from the Visitor Registration submission/status/email/proof-view flow used by the Visitor Registration UI. Other existing Sparkz features, especially the separate payment reconciliation system, may still use Firebase Admin and may still require its existing server credentials.

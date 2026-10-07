@@ -27,7 +27,7 @@ interface FormState {
 // Dynamic Rules generator
 const getRulesText = (fee: number) => [
   "You must be referred by a current student or faculty member of Carmel College of Engineering & Technology.",
-  "You must be registered for exactly one confirmed paid Sparkz 2K26 departmental event.",
+  "You must be registered in at least onne Sparkz 2K26 departmental event.",
   "You must upload and carry your valid College ID card for entry verification.",
   `Your visitor pass is valid for 08 & 09 Oct, granting access to Abheri & Proshow. The registration fee is ₹${fee}.`,
   "Visitor passes are non-transferable. Your details will be verified at the gate.",
@@ -118,33 +118,27 @@ export default function VisitorRegistrationPage() {
   const [result, setResult] = useState<{ success: boolean; emailSent?: boolean; regId?: string; paymentId?: string } | null>(null);
 
   // Visitor Pass Fee, Registration Status & Vacancy
-  const [passFee, setPassFee] = useState<number>(0);
+  const [passFee, setPassFee] = useState<number>(250);
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(true);
   const [totalCapacity, setTotalCapacity] = useState<number>(300);
   const [remainingTickets, setRemainingTickets] = useState<number>(300);
   const [isSoldOut, setIsSoldOut] = useState<boolean>(false);
   const [statusLoaded, setStatusLoaded] = useState<boolean>(false);
-  const [statusError, setStatusError] = useState<string>("");
 
   // Fetch dynamic status & fee
   useEffect(() => {
-    fetch("/api/visitor-registration/status", { cache: "no-store" })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) {
-          throw new Error(data?.error || "Unable to load visitor pass settings.");
+    fetch("/api/visitor-registration/status")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          if (typeof data.fee === "number") setPassFee(data.fee);
+          if (typeof data.registrationOpen === "boolean") setRegistrationOpen(data.registrationOpen);
+          if (typeof data.totalCapacity === "number") setTotalCapacity(data.totalCapacity);
+          if (typeof data.remainingTickets === "number") setRemainingTickets(data.remainingTickets);
+          if (typeof data.isSoldOut === "boolean") setIsSoldOut(data.isSoldOut);
         }
-        if (typeof data.fee === "number") setPassFee(data.fee);
-        if (typeof data.registrationOpen === "boolean") setRegistrationOpen(data.registrationOpen);
-        if (typeof data.totalCapacity === "number") setTotalCapacity(data.totalCapacity);
-        if (typeof data.remainingTickets === "number") setRemainingTickets(data.remainingTickets);
-        if (typeof data.isSoldOut === "boolean") setIsSoldOut(data.isSoldOut);
-        setStatusError("");
       })
-      .catch((e: unknown) => {
-        console.warn("Failed to fetch visitor fee/status:", e);
-        setStatusError(e instanceof Error ? e.message : "Unable to load visitor pass settings.");
-      })
+      .catch((e: unknown) => console.warn("Failed to fetch visitor fee/status:", e))
       .finally(() => setStatusLoaded(true));
   }, []);
 
@@ -169,7 +163,7 @@ export default function VisitorRegistrationPage() {
           where("userId", "==", user.uid)
         );
         const snap = await getDocs(q);
-        const paidDocs = snap.docs.filter((d) => {
+        const paidDoc = snap.docs.find((d) => {
           const data = d.data();
           const pStatus = String(data.paymentStatus || "").toLowerCase().trim();
           const rStatus = String(data.status || "").toLowerCase().trim();
@@ -177,14 +171,13 @@ export default function VisitorRegistrationPage() {
             (pStatus === "paid" || rStatus === "paid") &&
             pStatus !== "pending" &&
             rStatus !== "pending" &&
-            pStatus !== "free" &&
-            rStatus !== "free"
+            pStatus !== "free"
           );
         });
 
-        if (paidDocs.length === 1) {
+        if (paidDoc) {
           setHasPaidEvent(true);
-          const first = paidDocs[0].data();
+          const first = paidDoc.data();
           setPaidEventName(first.eventTitle || first.eventName || "Sparkz Departmental Event");
         } else if (isAdmin) {
           // Allow admins to access the registration form for testing
@@ -267,10 +260,13 @@ export default function VisitorRegistrationPage() {
   const safeParseJson = async (res: Response, fallbackMessage: string): Promise<any> => {
     const rawText = await res.text();
     let data: any = null;
-    try {
-      data = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      data = null;
+    const trimmed = rawText.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = null;
+      }
     }
 
     if (!res.ok) {
@@ -278,7 +274,7 @@ export default function VisitorRegistrationPage() {
         throw new Error("Uploaded file is too large for the server. Please select a smaller photo or document (under 4MB).");
       }
       if (res.status === 404) {
-        throw new Error("Endpoint not found (HTTP 404). Please refresh your browser and try again.");
+        throw new Error(`Endpoint not found (HTTP 404). Please refresh your browser and try again.`);
       }
       if (res.status >= 500) {
         throw new Error(data?.error || data?.message || `Server error (HTTP ${res.status}). Please try again in a few moments.`);
@@ -286,7 +282,10 @@ export default function VisitorRegistrationPage() {
       throw new Error(data?.error || data?.message || fallbackMessage);
     }
 
-    if (!data) throw new Error(fallbackMessage);
+    if (!data) {
+      throw new Error(fallbackMessage);
+    }
+
     return data;
   };
 
@@ -314,13 +313,7 @@ export default function VisitorRegistrationPage() {
     if (form.phone) fd.append("userPhone", form.phone);
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
 
-    const uploadToken = user ? await user.getIdToken(true) : "";
-    if (!uploadToken) throw new Error("Google authentication is required before uploading your ID proof.");
-    const res = await fetch("/api/visitor-registration/upload-proof", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${uploadToken}` },
-      body: fd,
-    });
+    const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
     const data = await safeParseJson(res, "Failed to upload ID proof. Please check your connection and retry.");
     if (!data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
@@ -331,9 +324,8 @@ export default function VisitorRegistrationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    if (!user) { setErrors({ submit: "You must be logged in with Google to register." }); return; }
-    if (!user.providerData.some((provider) => provider.providerId === "google.com")) { setErrors({ submit: "Visitor pass registration requires Google authentication." }); return; }
-    if (!hasPaidEvent) { setErrors({ submit: "You must be registered for exactly one confirmed paid departmental event." }); return; }
+    if (!user) { setErrors({ submit: "You must be logged in to register." }); return; }
+    if (!hasPaidEvent) { setErrors({ submit: "You must have at least one confirmed paid departmental event registration." }); return; }
 
     setSubmitting(true);
     setSubmittingStatus("Preparing ID proof document...");
@@ -341,60 +333,6 @@ export default function VisitorRegistrationPage() {
     try {
       const idToken = await user.getIdToken(true);
       const { fileId: collegeIdFileId, fileUrl: collegeIdFileUrl } = await uploadFile(collegeIdFile!, "college_id");
-
-      // Admins can create a direct visitor pass without a Razorpay charge.
-      // The server still verifies the authenticated Google account and admin role.
-      if (isAdmin) {
-        setSubmittingStatus("Creating admin visitor pass...");
-        const adminSubRes = await fetch("/api/visitor-registration/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({
-            ...form,
-            collegeIdFileId,
-            collegeIdFileUrl,
-            userId: user.uid,
-            userEmail: user.email,
-          }),
-        });
-        const adminSubData = await safeParseJson(adminSubRes, "Failed to create the admin visitor pass.");
-        if (!adminSubData.success) {
-          throw new Error(adminSubData.error || "Failed to create the admin visitor pass.");
-        }
-
-        const registrationId: string = adminSubData.id;
-        let emailSent = false;
-        try {
-          const emailRes = await fetch("/api/visitor-registration/send-confirmation-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: user.email,
-              name: form.name,
-              college: form.college,
-              department: form.department,
-              yearOfStudy: form.yearOfStudy,
-              referringType: form.referringType,
-              referringName: form.referringName,
-              registrationId,
-              amountPaid: "Admin Direct Pass",
-              paymentId: "",
-              passValidity: "08 & 09 Oct",
-              collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
-            }),
-          });
-          const emailData = await safeParseJson(emailRes, "Confirmation email error");
-          emailSent = emailData.success === true;
-        } catch (emErr) {
-          console.warn("Admin visitor confirmation email failed (non-fatal):", emErr);
-        }
-
-        setResult({ success: true, emailSent, regId: registrationId });
-        setStep("done");
-        setSubmitting(false);
-        setSubmittingStatus("");
-        return;
-      }
 
       // ── Razorpay Payment ─────────────────────────────────────────────────
       setSubmittingStatus(`Initializing payment gateway (₹${passFee})...`);
@@ -406,7 +344,7 @@ export default function VisitorRegistrationPage() {
       // Create order via API
       const orderRes = await fetch("/api/razorpay/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: passFee,
           notes: {
@@ -592,7 +530,7 @@ export default function VisitorRegistrationPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Fee Paid:</span>
-              <span className="text-green-400 font-bold">{result.paymentId ? `₹${passFee} (Confirmed)` : "Admin Direct Pass (No payment)"}</span>
+              <span className="text-green-400 font-bold">₹250 (Confirmed)</span>
             </div>
             {result.paymentId && (
               <div className="flex justify-between">
@@ -722,16 +660,6 @@ export default function VisitorRegistrationPage() {
               </svg>
               Continue with Google
             </button>
-          </motion.div>
-        )}
-
-        {user && !user.providerData.some((provider) => provider.providerId === "google.com") && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="bg-[#131318] border border-red-500/30 rounded-2xl p-8 text-center space-y-5">
-            <div className="text-4xl">🔐</div>
-            <h2 className="text-xl font-bold text-white">Google Sign-in Required</h2>
-            <p className="text-gray-400 text-sm">Please sign in with Google to register for a visitor pass.</p>
-            <button onClick={login} className="inline-flex items-center justify-center bg-white text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-gray-100 transition-all mx-auto">Continue with Google</button>
           </motion.div>
         )}
 
@@ -1040,21 +968,15 @@ export default function VisitorRegistrationPage() {
                 ID documents are stored securely and are only accessible to authorized administrators. After successful payment &amp; registration, your confirmation email will be sent automatically.
               </div>
 
-              {statusError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">{statusError}</div>
-              )}
-
               {errors.submit && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">{errors.submit}</div>
               )}
 
-              <button type="submit" disabled={submitting || !statusLoaded || !!statusError || passFee < 1}
+              <button type="submit" disabled={submitting}
                 className="w-full bg-[#F3C87A] hover:bg-[#e6b960] disabled:opacity-60 disabled:cursor-not-allowed text-[#0B0B0E] font-bold py-4 rounded-xl transition-all duration-200 transform hover:-translate-y-0.5 text-sm uppercase tracking-widest shadow-lg">
                 {submitting
                   ? (submittingStatus || "Processing... Please wait")
-                  : !statusLoaded
-                    ? "Loading transaction details..."
-                    : `Pay ₹${passFee} & Grab Your Ticket`}
+                  : `Pay ₹${passFee} & Grab Your Ticket`}
               </button>
             </form>
           </motion.div>

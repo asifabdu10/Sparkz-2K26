@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
-import { getAdminAuth } from "@/utils/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,28 +17,10 @@ function getDriveClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("Authorization") || "";
-    const idToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-    if (!idToken) {
-      return NextResponse.json({ success: false, error: "Google authentication is required." }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await getAdminAuth().verifyIdToken(idToken);
-    } catch (authErr) {
-      console.error("[visitor-upload] Firebase token verification failed:", authErr);
-      return NextResponse.json({ success: false, error: "Invalid or expired Google login session." }, { status: 401 });
-    }
-
-    if (String(decoded.firebase?.sign_in_provider || "").toLowerCase() !== "google.com") {
-      return NextResponse.json({ success: false, error: "Google authentication is required." }, { status: 403 });
-    }
-
     const formData = await request.formData();
     const file = formData.get("file");
     const proofType = formData.get("proofType");
-    const userId = decoded.uid;
+    const userId = (formData.get("userId") as string) || "";
     const userName = (formData.get("userName") as string) || "";
     const userPhone = (formData.get("userPhone") as string) || "";
     const qualifyingEvent = (formData.get("qualifyingEvent") as string) || "";

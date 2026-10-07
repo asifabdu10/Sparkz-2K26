@@ -543,15 +543,15 @@ service cloud.firestore {
     // =========================================================
     //
     // Separate collection — never mixed with event registrations.
-    // Google-authenticated users can create their own registration via the secure server API.
+    // Public can create their own registration (via server API).
     // Only admins can read all records.
     // Proof documents are on Google Drive, admin-only via API.
     // =========================================================
 
     match /visitor_registrations/{regId} {
 
-      // Visitor users must use Google authentication and create through the secure server API.
-      // The server verifies the confirmed paid departmental event eligibility and payment.
+      // User creates must go through server API (/api/visitor-registration/submit)
+      // which verifies confirmed paid departmental event registration.
       // Direct client creation is only permitted for admins.
       allow create: if isAdmin();
 
@@ -571,13 +571,13 @@ service cloud.firestore {
     // =========================================================
     //
     // Completely separate from visitor_registrations.
-    // Alumni users must use Google authentication and create through the secure server API.
+    // Alumni can create without authentication.
     // Only admins can read all records.
     // =========================================================
 
     match /alumni_registrations/{regId} {
 
-      // All Google-authenticated alumni registrations must go through secure server API (/api/alumni-registration/submit)
+      // All public registrations must go through secure server API (/api/alumni-registration/submit)
       // Direct client creation is restricted to admins.
       allow create: if isAdmin();
 

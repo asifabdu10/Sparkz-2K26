@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
+function getAdminDb() {
+  if (!getApps().length) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
+    initializeApp({ credential: cert(serviceAccount) });
+  }
+  return getFirestore();
+}
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -25,7 +33,7 @@ export async function POST(request: NextRequest) {
       referringType,
       referringName,
       registrationId,
-      amountPaid = "",
+      amountPaid = "₹250",
       paymentId = "",
       passValidity = "08 & 09 Oct",
       collegeIdFileUrl,
@@ -188,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationId) {
       try {
-        const db = getAdminFirestore();
+        const db = getAdminDb();
         await db.collection("visitor_registrations").doc(registrationId).update({
           emailStatus: "sent",
           emailSentAt: FieldValue.serverTimestamp(),
@@ -207,7 +215,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getAdminFirestore();
+        const db = getAdminDb();
         await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
           emailStatus: "failed",
           emailError: err?.message || "Failed to send confirmation email.",
