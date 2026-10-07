@@ -32,7 +32,7 @@ const departmentOptions = [
 ];
 
 // Passout year options from 2018 to 2025
-const yearOptions = ["2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"];
+const yearOptions = ["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"];
 
 export default function AlumniRegistrationPage() {
   const { user, loading: authLoading, login } = useAuth();
@@ -383,11 +383,10 @@ export default function AlumniRegistrationPage() {
             </div>
             <div className="flex justify-between items-center pt-1 border-t border-gray-800/80">
               <span className="text-gray-400 text-xs">Email Confirmation</span>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                existingReg.emailStatus === "sent"
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${existingReg.emailStatus === "sent"
                   ? "bg-green-500/20 text-green-300 border border-green-500/30"
                   : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-              }`}>
+                }`}>
                 {existingReg.emailStatus === "sent" ? "Delivered" : "Pending"}
               </span>
             </div>
