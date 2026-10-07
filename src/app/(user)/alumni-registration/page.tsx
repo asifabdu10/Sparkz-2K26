@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Check, X, Loader2, Upload, FileText } from "lucide-react";
 
-type ReferringType = "student" | "faculty" | "";
+type ReferringType = "student" | "faculty";
 
 interface AlumniFormState {
   department: string;
@@ -27,14 +27,15 @@ interface ExistingAlumniReg {
   email: string;
   status?: string;
   emailStatus?: string;
-  alumniIdFileId?: string;
-  alumniIdFileUrl?: string;
   referringType?: string;
   referringName?: string;
   referringDepartment?: string;
   referringYear?: string;
   referringIdFileId?: string;
   referringIdFileUrl?: string;
+  collegeIdFileId?: string;
+  collegeIdFileUrl?: string;
+  idProofUrl?: string;
   createdAt?: { seconds: number } | null;
 }
 
@@ -69,18 +70,21 @@ function FileInput({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
-      <p className="text-xs text-gray-500 mb-2">{hint}</p>
+      <label className="block text-sm font-semibold text-white mb-1 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="text-[11px] text-[#F3C87A] font-normal">Required</span>
+      </label>
+      <p className="text-xs text-gray-400 mb-2.5">{hint}</p>
       <div
         onClick={() => inputRef.current?.click()}
         className={`cursor-pointer border-2 border-dashed ${
-          errors[errorKey] ? "border-red-500" : "border-[rgba(212,163,89,0.3)]"
-        } rounded-xl p-4 text-center hover:border-[#F3C87A] transition-colors bg-[#0E0E12]`}
+          errors[errorKey] ? "border-red-500 bg-red-950/10" : "border-[rgba(212,163,89,0.35)] bg-[#101016]"
+        } rounded-xl p-4 text-center hover:border-[#F3C87A] hover:bg-[#15151e] transition-all`}
       >
         {file ? (
           <div className="flex items-center justify-center gap-2 text-green-400">
-            <span className="font-bold">&#x2713;</span>
-            <span className="text-sm truncate max-w-[220px] text-white">{file.name}</span>
+            <span className="font-bold text-base">&#x2713;</span>
+            <span className="text-sm truncate max-w-[220px] text-white font-medium">{file.name}</span>
             <span className="text-xs text-gray-400">
               ({(file.size / (1024 * 1024)).toFixed(2)} MB)
             </span>
@@ -98,11 +102,14 @@ function FileInput({
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-1">
-            <Upload className="w-5 h-5 text-[#F3C87A] mb-1.5" />
-            <p className="text-sm text-gray-400">
-              Click to select <span className="text-[#F3C87A] font-semibold">{label}</span>
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="w-10 h-10 rounded-full bg-[#F3C87A]/15 border border-[#F3C87A]/30 flex items-center justify-center mb-2">
+              <Upload className="w-5 h-5 text-[#F3C87A]" />
+            </div>
+            <p className="text-sm text-gray-200 font-semibold">
+              Click to select and upload <span className="text-[#F3C87A]">College ID Card</span>
             </p>
+            <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP or PDF (max 5 MB)</p>
           </div>
         )}
         <input
@@ -122,7 +129,7 @@ function FileInput({
           }}
         />
       </div>
-      {errors[errorKey] && <p className="text-red-400 text-xs mt-1">{errors[errorKey]}</p>}
+      {errors[errorKey] && <p className="text-red-400 text-xs mt-1.5 font-medium">{errors[errorKey]}</p>}
     </div>
   );
 }
@@ -133,15 +140,13 @@ export default function AlumniRegistrationPage() {
     department: "",
     passedOutYear: "",
     contact: "",
-    referringType: "",
+    referringType: "student",
     referringName: "",
     referringDepartment: "",
     referringYear: "",
   });
 
-  const [alumniIdFile, setAlumniIdFile] = useState<File | null>(null);
   const [referringIdFile, setReferringIdFile] = useState<File | null>(null);
-  const alumniIdRef = useRef<HTMLInputElement | null>(null);
   const referringIdRef = useRef<HTMLInputElement | null>(null);
 
   const [existingReg, setExistingReg] = useState<ExistingAlumniReg | null>(null);
@@ -204,9 +209,6 @@ export default function AlumniRegistrationPage() {
     if (!form.passedOutYear || isNaN(Number(form.passedOutYear))) e.passedOutYear = "Passed out year is required.";
     if (!/^\d{10}$/.test(form.contact.trim())) e.contact = "Enter a valid 10-digit contact number.";
 
-    // Alumni ID card validation
-    if (!alumniIdFile) e.alumniId = "Your Alumni / College ID card photo or PDF is required.";
-
     // Referring Person validation
     if (!form.referringType) e.referringType = "Please select who is referring you (Student or Faculty).";
     if (!form.referringName.trim()) e.referringName = "Referring person's name is required.";
@@ -215,8 +217,8 @@ export default function AlumniRegistrationPage() {
       e.referringYear = "Referring student's year of study is required.";
     }
 
-    // Referring Person ID card validation
-    if (!referringIdFile) e.referringId = "Referring person's ID card photo or PDF is required.";
+    // Referring Person College ID card validation
+    if (!referringIdFile) e.referringId = "Referring person's College ID card is required.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -255,7 +257,7 @@ export default function AlumniRegistrationPage() {
     }
 
     setSubmitting(true);
-    setSubmittingStatus("Uploading your Alumni ID card...");
+    setSubmittingStatus("Uploading referring person's College ID card...");
     try {
       let token = "";
       try {
@@ -268,21 +270,14 @@ export default function AlumniRegistrationPage() {
         throw new Error("Unable to authenticate with Google. Please log in again.");
       }
 
-      // 1. Upload Alumni's own ID card
-      const { fileId: alumniIdFileId, fileUrl: alumniIdFileUrl } = await uploadFile(
-        alumniIdFile!,
-        "alumni_id"
-      );
-
-      // 2. Upload Referring Person's ID card (separate Drive folder)
-      setSubmittingStatus("Uploading referring person ID card...");
+      // 1. Upload Referring Person's College ID card (stored in separate Drive folder)
       const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(
         referringIdFile!,
         "referring_id",
         form.referringName
       );
 
-      // 3. Submit registration with both ID proofs and referring details
+      // 2. Submit alumni registration with referral info and ID proof
       setSubmittingStatus("Submitting alumni registration...");
       const res = await fetch("/api/alumni-registration/submit", {
         method: "POST",
@@ -294,8 +289,6 @@ export default function AlumniRegistrationPage() {
           department: form.department,
           passedOutYear: form.passedOutYear,
           contact: form.contact.trim(),
-          alumniIdFileId,
-          alumniIdFileUrl,
           referringType: form.referringType,
           referringName: form.referringName.trim(),
           referringDepartment: form.referringDepartment.trim(),
@@ -574,16 +567,14 @@ export default function AlumniRegistrationPage() {
                     </span>
                   </div>
                 )}
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-gray-400 text-xs">College ID Proof</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    ✓ Verified on File
+                  </span>
+                </div>
               </div>
             )}
-
-            {/* ID Proof Verification */}
-            <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between">
-              <span className="text-gray-400 text-xs">ID Cards Uploaded</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                ✓ Alumni &amp; Referring ID on File
-              </span>
-            </div>
 
             <div className="flex justify-between items-center pt-1 border-t border-gray-800/80">
               <span className="text-gray-400 text-xs">Email Confirmation</span>
@@ -632,7 +623,7 @@ export default function AlumniRegistrationPage() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Registration Successful!</h2>
           <p className="text-gray-400 mb-4">
-            Your alumni registration and ID documents have been uploaded securely. Welcome back!
+            Your alumni registration has been submitted and the referring person&apos;s College ID card was uploaded securely. Welcome back!
           </p>
           {result.emailSent ? (
             <p className="text-sm text-green-400 mb-6">
@@ -776,23 +767,10 @@ export default function AlumniRegistrationPage() {
                     <p className="text-red-400 text-xs mt-1">{errors.contact}</p>
                   )}
                 </div>
-
-                {/* Alumni's Own ID Card Upload */}
-                <div className="pt-2">
-                  <FileInput
-                    label="Your Alumni / College ID Card *"
-                    hint="Upload your Carmel ID or Alumni proof (JPG, PNG, WEBP or PDF — max 5 MB)"
-                    file={alumniIdFile}
-                    setFile={setAlumniIdFile}
-                    inputRef={alumniIdRef}
-                    errorKey="alumniId"
-                    errors={errors}
-                  />
-                </div>
               </div>
             </div>
 
-            {/* ── SECTION 2: Referring Person Details & ID Card ────────────── */}
+            {/* ── SECTION 2: Referring Person Details & College ID Card ──────── */}
             <div>
               <h3 className="text-[#F3C87A] font-bold text-xs uppercase tracking-widest mb-4 border-b border-[rgba(212,163,89,0.15)] pb-2 flex items-center justify-between">
                 <span>2. Referring Person Details</span>
@@ -801,7 +779,8 @@ export default function AlumniRegistrationPage() {
                 </span>
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-4 bg-[#0B0B0E]/60 border border-[rgba(212,163,89,0.15)] rounded-xl p-4">
+                {/* Selector */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Who is Referring You? *
@@ -816,7 +795,7 @@ export default function AlumniRegistrationPage() {
                         }
                         className={`py-3 px-4 rounded-xl border font-semibold capitalize text-sm transition-all ${
                           form.referringType === type
-                            ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E] shadow-md"
+                            ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E] shadow-md font-bold"
                             : "border-[rgba(212,163,89,0.3)] text-gray-300 hover:border-[#F3C87A] hover:text-[#F3C87A] bg-[#181824]"
                         }`}
                       >
@@ -829,104 +808,85 @@ export default function AlumniRegistrationPage() {
                   )}
                 </div>
 
-                <AnimatePresence>
-                  {form.referringType && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4 bg-[#0B0B0E]/60 border border-[rgba(212,163,89,0.15)] rounded-xl p-4"
-                    >
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          {form.referringType === "student" ? "Student" : "Faculty"} Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Referring person's full name"
-                          value={form.referringName}
-                          onChange={(e) =>
-                            setForm({ ...form, referringName: e.target.value })
-                          }
-                          className={inputClass("referringName")}
-                        />
-                        {errors.referringName && (
-                          <p className="text-red-400 text-xs mt-1">
-                            {errors.referringName}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                          {form.referringType === "student" ? "Student" : "Faculty"} Department *
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Computer Engineering"
-                          value={form.referringDepartment}
-                          onChange={(e) =>
-                            setForm({ ...form, referringDepartment: e.target.value })
-                          }
-                          className={inputClass("referringDepartment")}
-                        />
-                        {errors.referringDepartment && (
-                          <p className="text-red-400 text-xs mt-1">
-                            {errors.referringDepartment}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Year of study — only for student */}
-                      {form.referringType === "student" && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-1">
-                            Student&apos;s Year of Study *
-                          </label>
-                          <select
-                            value={form.referringYear}
-                            onChange={(e) =>
-                              setForm({ ...form, referringYear: e.target.value })
-                            }
-                            className={inputClass("referringYear")}
-                          >
-                            <option value="">Select year of study</option>
-                            {REFERRING_YEAR_OPTIONS.map((y) => (
-                              <option key={y} value={y}>
-                                {y}
-                              </option>
-                            ))}
-                          </select>
-                          {errors.referringYear && (
-                            <p className="text-red-400 text-xs mt-1">
-                              {errors.referringYear}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Referring Person's ID Card Upload */}
-                      <div className="pt-2">
-                        <FileInput
-                          label={`Referring ${
-                            form.referringType === "student" ? "Student" : "Faculty"
-                          }'s ID Card *`}
-                          hint="Upload photo or scan of their Carmel ID card (JPG, PNG, WEBP or PDF — max 5 MB)"
-                          file={referringIdFile}
-                          setFile={setReferringIdFile}
-                          inputRef={referringIdRef}
-                          errorKey="referringId"
-                          errors={errors}
-                        />
-                      </div>
-                    </motion.div>
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Referring {form.referringType === "student" ? "Student" : "Faculty"} Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Their full name"
+                    value={form.referringName}
+                    onChange={(e) => setForm({ ...form, referringName: e.target.value })}
+                    className={inputClass("referringName")}
+                  />
+                  {errors.referringName && (
+                    <p className="text-red-400 text-xs mt-1">{errors.referringName}</p>
                   )}
-                </AnimatePresence>
+                </div>
+
+                {/* Department */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Referring {form.referringType === "student" ? "Student" : "Faculty"} Department *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Computer Engineering"
+                    value={form.referringDepartment}
+                    onChange={(e) => setForm({ ...form, referringDepartment: e.target.value })}
+                    className={inputClass("referringDepartment")}
+                  />
+                  {errors.referringDepartment && (
+                    <p className="text-red-400 text-xs mt-1">{errors.referringDepartment}</p>
+                  )}
+                </div>
+
+                {/* Year of study — only for student */}
+                {form.referringType === "student" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Student&apos;s Year of Study *
+                    </label>
+                    <select
+                      value={form.referringYear}
+                      onChange={(e) => setForm({ ...form, referringYear: e.target.value })}
+                      className={inputClass("referringYear")}
+                    >
+                      <option value="">Select year of study</option>
+                      {REFERRING_YEAR_OPTIONS.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.referringYear && (
+                      <p className="text-red-400 text-xs mt-1">{errors.referringYear}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Referring Person's College ID Card Upload ───────────── */}
+                <div className="pt-2 border-t border-[rgba(212,163,89,0.15)]">
+                  <FileInput
+                    label={`Referring ${
+                      form.referringType === "student" ? "Student" : "Faculty"
+                    }'s College ID Card *`}
+                    hint={`Upload photo or scan of referring ${
+                      form.referringType === "student" ? "student" : "faculty"
+                    }'s Carmel College ID card (JPG, PNG, WEBP or PDF — max 5 MB)`}
+                    file={referringIdFile}
+                    setFile={setReferringIdFile}
+                    inputRef={referringIdRef}
+                    errorKey="referringId"
+                    errors={errors}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
-              🔒 <strong>Privacy Note:</strong> All uploaded ID cards are stored securely in dedicated, restricted Google Drive folders and are only accessible by authorized event administrators.
+              🔒 <strong>Note:</strong> The referring person&apos;s College ID card is stored securely in a dedicated Google Drive folder and is only accessible by authorized event administrators.
             </div>
 
             {errors.submit && (

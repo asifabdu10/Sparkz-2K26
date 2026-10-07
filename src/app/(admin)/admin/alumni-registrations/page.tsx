@@ -578,8 +578,7 @@ export default function AlumniRegistrationsAdmin() {
       "Referring Name": reg.referringName || "N/A",
       "Referring Department": reg.referringDepartment || "N/A",
       "Referring Year": reg.referringYear || "N/A",
-      "Alumni ID Proof Link": reg.alumniIdFileUrl || (reg.alumniIdFileId ? `https://drive.google.com/file/d/${reg.alumniIdFileId}/view` : "N/A"),
-      "Referring ID Proof Link": reg.referringIdFileUrl || (reg.referringIdFileId ? `https://drive.google.com/file/d/${reg.referringIdFileId}/view` : "N/A"),
+      "College ID Proof Link": reg.referringIdFileUrl || reg.idProofUrl || (reg.referringIdFileId ? `https://drive.google.com/file/d/${reg.referringIdFileId}/view` : "N/A"),
       "Status": reg.status === "deregistered" ? "Deregistered" : "Registered",
       "Email Status": reg.emailStatus || "N/A",
       "Created At": formatDate(reg.createdAt),
@@ -818,7 +817,7 @@ export default function AlumniRegistrationsAdmin() {
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Contact</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Email</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Referring Person</th>
-                  <th className="px-4 py-4 font-semibold whitespace-nowrap">ID Proofs</th>
+                  <th className="px-4 py-4 font-semibold whitespace-nowrap">College ID Proof</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Registration Status</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Email Status</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Date</th>
@@ -886,11 +885,35 @@ export default function AlumniRegistrationsAdmin() {
                         )}
                       </td>
 
-                      {/* ID Proofs */}
+                      {/* Referring Person College ID Proof */}
                       <td className="px-4 py-4">
                         <div className="flex flex-col gap-1.5">
-                          {/* Alumni ID */}
-                          {reg.alumniIdFileUrl || reg.alumniIdFileId ? (
+                          {reg.referringIdFileUrl || reg.referringIdFileId || reg.idProofUrl ? (
+                            <button
+                              onClick={() =>
+                                handleViewProof(
+                                  reg.referringIdFileId,
+                                  reg.referringIdFileUrl || reg.idProofUrl,
+                                  `College ID (${reg.referringName || "Referring Person"})`
+                                )
+                              }
+                              disabled={proofLoading === (reg.referringIdFileId || "view")}
+                              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-sky-500/10 border border-sky-500/30 text-sky-300 hover:bg-sky-500/20 font-medium transition-colors w-fit"
+                              title="View Referring Person's College ID Proof"
+                            >
+                              {proofLoading === (reg.referringIdFileId || "view") ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <ExternalLink size={12} />
+                              )}
+                              <span>View College ID</span>
+                            </button>
+                          ) : (
+                            <span className="text-gray-500 text-xs italic">Not Uploaded</span>
+                          )}
+
+                          {/* Legacy Alumni ID (if present in older test records) */}
+                          {(reg.alumniIdFileUrl || reg.alumniIdFileId) && (
                             <button
                               onClick={() =>
                                 handleViewProof(
@@ -900,43 +923,12 @@ export default function AlumniRegistrationsAdmin() {
                                 )
                               }
                               disabled={proofLoading === reg.alumniIdFileId}
-                              className="inline-flex items-center gap-1 text-xs text-[#F3C87A] hover:underline hover:text-[#e6b960] font-medium"
-                              title="View Alumni ID Proof"
+                              className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200 hover:underline w-fit"
+                              title="View Legacy Alumni ID"
                             >
-                              {proofLoading === reg.alumniIdFileId ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <ExternalLink size={12} />
-                              )}
-                              <span>Alumni ID</span>
+                              <ExternalLink size={10} />
+                              <span>(Legacy) Alumni ID</span>
                             </button>
-                          ) : (
-                            <span className="text-gray-500 text-xs italic">No Alumni ID</span>
-                          )}
-
-                          {/* Referring Person ID */}
-                          {reg.referringIdFileUrl || reg.referringIdFileId ? (
-                            <button
-                              onClick={() =>
-                                handleViewProof(
-                                  reg.referringIdFileId,
-                                  reg.referringIdFileUrl,
-                                  `Referring ID (${reg.referringName || "Referee"})`
-                                )
-                              }
-                              disabled={proofLoading === reg.referringIdFileId}
-                              className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline hover:text-sky-300 font-medium"
-                              title="View Referring Person ID Proof"
-                            >
-                              {proofLoading === reg.referringIdFileId ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <ExternalLink size={12} />
-                              )}
-                              <span>Referring ID</span>
-                            </button>
-                          ) : (
-                            <span className="text-gray-500 text-xs italic">No Ref ID</span>
                           )}
                         </div>
                       </td>
@@ -1263,10 +1255,29 @@ export default function AlumniRegistrationsAdmin() {
               {/* Uploaded Documents Quick Access */}
               <div className="pt-2 border-t border-gray-700/60">
                 <label className="block text-xs font-medium text-gray-400 mb-2">
-                  Uploaded ID Proofs
+                  Uploaded College ID Proof
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {editingReg.alumniIdFileUrl || editingReg.alumniIdFileId ? (
+                <div className="flex flex-wrap gap-2 items-center">
+                  {editingReg.referringIdFileUrl || editingReg.referringIdFileId || editingReg.idProofUrl ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleViewProof(
+                          editingReg.referringIdFileId,
+                          editingReg.referringIdFileUrl || editingReg.idProofUrl,
+                          `Referring ID (${editingReg.referringName || "Referee"})`
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30 hover:bg-sky-500/30 transition-colors"
+                    >
+                      <ExternalLink size={13} />
+                      View College ID Proof
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic">No College ID uploaded</span>
+                  )}
+
+                  {(editingReg.alumniIdFileUrl || editingReg.alumniIdFileId) && (
                     <button
                       type="button"
                       onClick={() =>
@@ -1276,32 +1287,11 @@ export default function AlumniRegistrationsAdmin() {
                           `Alumni ID (${editingReg.name})`
                         )
                       }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F3C87A]/20 text-[#F3C87A] border border-[#F3C87A]/30 hover:bg-[#F3C87A]/30 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium text-gray-400 hover:text-gray-200 hover:underline"
                     >
-                      <ExternalLink size={13} />
-                      View Alumni ID
+                      <ExternalLink size={11} />
+                      (Legacy) Alumni ID
                     </button>
-                  ) : (
-                    <span className="text-xs text-gray-500 italic">No Alumni ID file</span>
-                  )}
-
-                  {editingReg.referringIdFileUrl || editingReg.referringIdFileId ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleViewProof(
-                          editingReg.referringIdFileId,
-                          editingReg.referringIdFileUrl,
-                          `Referring ID (${editingReg.referringName || "Referee"})`
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30 hover:bg-sky-500/30 transition-colors"
-                    >
-                      <ExternalLink size={13} />
-                      View Referring ID
-                    </button>
-                  ) : (
-                    <span className="text-xs text-gray-500 italic">No Referring ID file</span>
                   )}
                 </div>
               </div>

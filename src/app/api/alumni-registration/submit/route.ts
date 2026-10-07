@@ -173,15 +173,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate Alumni's own ID proof
-    const cleanAlumniFileId = String(alumniIdFileId || "").trim();
-    if (!cleanAlumniFileId) {
-      return NextResponse.json(
-        { success: false, error: "Please upload your Alumni / College ID card." },
-        { status: 400 }
-      );
-    }
-
     // Validate Referring Person details
     const cleanRefType = String(referringType || "").trim().toLowerCase();
     if (!["student", "faculty"].includes(cleanRefType)) {
@@ -215,11 +206,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate Referring Person's ID proof
+    // Validate Referring Person's College ID proof (Required)
     const cleanRefFileId = String(referringIdFileId || "").trim();
     if (!cleanRefFileId) {
       return NextResponse.json(
-        { success: false, error: "Please upload the referring person's ID card." },
+        { success: false, error: "Please upload the referring person's College ID card." },
         { status: 400 }
       );
     }
@@ -255,10 +246,6 @@ export async function POST(request: NextRequest) {
     // Name is stored in Firebase as the email used for login as requested
     const candidateName = verifiedEmail;
 
-    const finalAlumniUrl =
-      String(alumniIdFileUrl || "").trim() ||
-      `https://drive.google.com/file/d/${cleanAlumniFileId}/view`;
-
     const finalRefUrl =
       String(referringIdFileUrl || "").trim() ||
       `https://drive.google.com/file/d/${cleanRefFileId}/view`;
@@ -271,15 +258,15 @@ export async function POST(request: NextRequest) {
       department: trimmedDept,
       passedOutYear: yearNum,
       contact: contactStr,
-      alumniIdFileId: cleanAlumniFileId,
-      alumniIdFileUrl: finalAlumniUrl,
-      idProofUrl: finalAlumniUrl,
       referringType: cleanRefType,
       referringName: cleanRefName,
       referringDepartment: cleanRefDept,
       referringYear: cleanRefType === "student" ? cleanRefYear : null,
       referringIdFileId: cleanRefFileId,
       referringIdFileUrl: finalRefUrl,
+      collegeIdFileId: cleanRefFileId,
+      collegeIdFileUrl: finalRefUrl,
+      idProofUrl: finalRefUrl,
       status: "registered",
       emailStatus: "pending",
       createdAt: FieldValue.serverTimestamp(),
@@ -297,10 +284,10 @@ export async function POST(request: NextRequest) {
           alumniDepartment: trimmedDept,
           alumniPassedOutYear: yearNum,
           alumniContact: contactStr,
-          alumniIdFileUrl: finalAlumniUrl,
           referringName: cleanRefName,
           referringDepartment: cleanRefDept,
           referringType: cleanRefType,
+          referringIdFileUrl: finalRefUrl,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
