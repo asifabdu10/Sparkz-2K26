@@ -1,66 +1,83 @@
 import { NextResponse } from "next/server";
+import { getAdminFirestore } from "@/utils/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
-
-function parseFirestoreValue(value: any): any {
-  if (!value || typeof value !== "object") return value;
-  if ("integerValue" in value) return Number(value.integerValue);
-  if ("doubleValue" in value) return Number(value.doubleValue);
-  if ("booleanValue" in value) return Boolean(value.booleanValue);
-  if ("stringValue" in value) return String(value.stringValue);
-  if ("timestampValue" in value) return value.timestampValue;
-  if ("nullValue" in value) return null;
-  if ("referenceValue" in value) return value.referenceValue;
-  if ("arrayValue" in value) return (value.arrayValue.values || []).map(parseFirestoreValue);
-  if ("mapValue" in value) return parseFirestoreFields(value.mapValue.fields || {});
-  return value;
-}
-
-function parseFirestoreFields(fields: Record<string, any>) {
-  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, parseFirestoreValue(value)]));
-}
+export const maxDuration = 60;
 
 export async function GET() {
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sparkz2k26-557bd";
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
-
-  let registrationOpen = true;
-  let totalCapacity = 300;
-  let fee = 250;
-  let remainingTickets = totalCapacity;
-
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/eventSettings/visitorPass${apiKey ? `?key=${encodeURIComponent(apiKey)}` : ""}`;
-    const response = await fetch(url, { cache: "no-store" });
+    const db = getAdminFirestore();
 
-    if (response.ok) {
-      const document = await response.json();
-      const data = parseFirestoreFields(document.fields || {});
 
-      if (typeof data.registrationOpen === "boolean") registrationOpen = data.registrationOpen;
-      if (typeof data.totalCapacity === "number" && data.totalCapacity > 0) totalCapacity = data.totalCapacity;
-      if (typeof data.fee === "number" && data.fee >= 0) fee = data.fee;
-      if (typeof data.remainingTickets === "number" && data.remainingTickets >= 0) {
-        remainingTickets = data.remainingTickets;
-      } else {
-        remainingTickets = totalCapacity;
+    // 1. Fetch settings from eventSettings/visitorPass
+    let registrationOpen = true;
+    let totalCapacity = 300;
+    let fee = 250;
+
+    try {
+      const settingsSnap = await db.collection("eventSettings").doc("visitorPass").get();
+      if (settingsSnap.exists) {
+        const data = settingsSnap.data();
+        if (typeof data?.registrationOpen === "boolean") {
+          registrationOpen = data.registrationOpen;
+        }
+        if (typeof data?.totalCapacity === "number" && data.totalCapacity > 0) {
+          totalCapacity = data.totalCapacity;
+        }
+        if (typeof data?.fee === "number" && data.fee >= 0) {
+          fee = data.fee;
+        }
       }
+    } catch (settErr) {
+      console.warn("Could not read visitorPass settings:", settErr);
     }
-  } catch (error) {
-    console.warn("Could not read public visitorPass settings:", error);
+
+    // 2. Count active (approved/non-revoked) registrations
+    let activeCount = 0;
+    try {
+      const activeSnap = await db
+        .collection("visitor_registrations")
+        .where("approvalStatus", "==", "approved")
+        .count()
+        .get();
+      activeCount = activeSnap.data().count;
+    } catch {
+      const snap = await db
+        .collection("visitor_registrations")
+        .where("approvalStatus", "==", "approved")
+        .get();
+      activeCount = snap.size;
+    }
+
+    const remainingTickets = Math.max(0, totalCapacity - activeCount);
+    const isSoldOut = remainingTickets <= 0;
+
+    return NextResponse.json(
+      {
+        success: true,
+        registrationOpen,
+        totalCapacity,
+        activeCount,
+        remainingTickets,
+        isSoldOut,
+        fee,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error("Error fetching visitor pass status:", error);
+    return NextResponse.json({
+      success: false,
+      registrationOpen: true,
+      totalCapacity: 300,
+      activeCount: 0,
+      remainingTickets: 300,
+      isSoldOut: false,
+      fee: 250,
+    });
   }
-
-  remainingTickets = Math.max(0, Math.min(totalCapacity, remainingTickets));
-
-  return NextResponse.json({
-    success: true,
-    registrationOpen,
-    totalCapacity,
-    activeCount: Math.max(0, totalCapacity - remainingTickets),
-    remainingTickets,
-    isSoldOut: remainingTickets <= 0,
-    fee,
-  }, {
-    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-  });
 }

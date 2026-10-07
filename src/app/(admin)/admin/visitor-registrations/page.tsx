@@ -14,7 +14,7 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/utils/firebase";
+import { db, auth } from "@/utils/firebase";
 import { useAuth } from "@/context/AuthContext";
 import {
   Download,
@@ -307,11 +307,36 @@ export default function VisitorRegistrationsAdmin() {
     return "";
   };
 
-  const handleViewProof = (fileId: string, label: string) => {
+  const handleViewProof = async (fileId: string, label: string) => {
     if (!fileId) return;
-    const url = `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    toastSuccess(`Opened ${label}`);
+    setProofLoading(fileId);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toastError("Not authenticated");
+        return;
+      }
+      const token = await currentUser.getIdToken(true);
+      const res = await fetch(
+        `/api/visitor-registration/view-proof?fileId=${encodeURIComponent(fileId)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!res.ok) {
+        toastError("Failed to load proof file");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      toastSuccess(`Opened ${label}`);
+    } catch (err) {
+      console.error("View proof error:", err);
+      toastError("Failed to open proof file");
+    } finally {
+      setProofLoading(null);
+    }
   };
 
   // Deregister / Revoke Pass

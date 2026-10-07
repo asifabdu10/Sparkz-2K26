@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,6 +15,7 @@ function escapeHtml(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  let registrationIdToUpdate = "";
   try {
     const body = await request.json();
     const {
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
       collegeIdFileUrl,
       collegeIdFileId,
     } = body;
+    registrationIdToUpdate = registrationId || "";
 
     const idProofLink =
       collegeIdFileUrl ||
@@ -185,11 +188,37 @@ export async function POST(request: NextRequest) {
       html,
     });
 
+    if (registrationId) {
+      try {
+        const db = getAdminFirestore();
+        await db.collection("visitor_registrations").doc(registrationId).update({
+          emailStatus: "sent",
+          emailSentAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        console.error("Failed to update visitor registration emailStatus in db:", dbErr);
+      }
+    }
+
     console.log("Visitor confirmation email sent:", info.messageId);
     return NextResponse.json({ success: true, message: "Confirmation email sent.", id: info.messageId });
   } catch (error: unknown) {
     const err = error as { message?: string };
     console.error("Visitor email error:", error);
+
+    if (registrationIdToUpdate) {
+      try {
+        const db = getAdminFirestore();
+        await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
+          emailStatus: "failed",
+          emailError: err?.message || "Failed to send confirmation email.",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      } catch (dbErr) {
+        console.error("Failed to update visitor registration emailStatus to failed:", dbErr);
+      }
+    }
 
     return NextResponse.json({ success: false, error: err?.message || "Failed to send confirmation email." }, { status: 500 });
   }

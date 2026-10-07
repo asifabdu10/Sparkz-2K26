@@ -550,61 +550,16 @@ service cloud.firestore {
 
     match /visitor_registrations/{regId} {
 
-      // Super/Admin users may create direct/admin passes.
-      // Regular authenticated users create their own visitor pass only after
-      // the server has verified the Razorpay payment. The paid departmental
-      // registration is checked here as an additional Firestore-side guard,
-      // so Visitor Registration does not require Firebase Admin credentials.
-      allow create: if
-        isAdmin()
-        ||
-        (
-          isAuthenticated()
-          && request.resource.data.userId == request.auth.uid
-          && request.resource.data.approvalStatus == "approved"
-          && request.resource.data.paymentStatus == "paid"
-          && request.resource.data.amountPaid is number
-          && request.resource.data.amountPaid > 0
-          && request.resource.data.collegeIdFileId is string
-          && request.resource.data.collegeIdFileId.size() > 0
-          && request.resource.data.referringIdFileId is string
-          && request.resource.data.referringIdFileId.size() > 0
-          && request.resource.data.referringType in ["student", "faculty"]
-          && request.resource.data.referringName is string
-          && request.resource.data.referringName.size() > 1
-          && request.resource.data.razorpayPaymentId is string
-          && request.resource.data.razorpayPaymentId.size() > 0
-          && request.resource.data.razorpayOrderId is string
-          && request.resource.data.razorpayOrderId.size() > 0
-          && request.resource.data.qualifyingRegistrationId is string
-          && request.resource.data.qualifyingRegistrationId.size() > 0
-          && get(/databases/$(database)/documents/registrations/$(request.resource.data.qualifyingRegistrationId)).data.userId == request.auth.uid
-          && (
-            get(/databases/$(database)/documents/registrations/$(request.resource.data.qualifyingRegistrationId)).data.paymentStatus == "paid"
-            ||
-            get(/databases/$(database)/documents/registrations/$(request.resource.data.qualifyingRegistrationId)).data.status == "paid"
-          )
-        );
+      // User creates must go through server API (/api/visitor-registration/submit)
+      // which verifies confirmed paid departmental event registration.
+      // Direct client creation is only permitted for admins.
+      allow create: if isAdmin();
 
       // Admins can read all; authenticated users can read their own.
       allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
 
-      // Admins can update any visitor record. A visitor may only update the
-      // email-delivery fields on their own record after registration.
-      allow update: if
-        isAdmin()
-        ||
-        (
-          isAuthenticated()
-          && resource.data.userId == request.auth.uid
-          && request.resource.data.userId == resource.data.userId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "emailStatus",
-            "emailSentAt",
-            "emailError",
-            "updatedAt"
-          ])
-        );
+      // Only admins can update (e.g. set emailStatus).
+      allow update: if isAdmin();
 
       // Only Super Admin can delete visitor registrations.
       allow delete: if isSuperAdmin();
