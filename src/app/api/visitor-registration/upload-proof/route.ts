@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

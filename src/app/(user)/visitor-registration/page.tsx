@@ -6,6 +6,7 @@ import Script from "next/script";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
 import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot } from "firebase/firestore";
+import { compressImage } from "@/utils/imageUtils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ReferringType = "student" | "faculty" | "";
@@ -59,6 +60,7 @@ function FileInput({
           <div className="flex items-center justify-center gap-2 text-green-400">
             <span>&#x2713;</span>
             <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+            <span className="text-xs text-gray-400 font-mono">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setFile(null); if (inputRef.current) inputRef.current.value = ""; }}
@@ -254,17 +256,66 @@ export default function VisitorRegistrationPage() {
     });
   };
 
+  // Safe parser to prevent "Unexpected token '<', '<!DOCTYPE '..." syntax errors
+  const safeParseJson = async (res: Response, fallbackMessage: string): Promise<any> => {
+    const rawText = await res.text();
+    let data: any = null;
+    const trimmed = rawText.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!res.ok) {
+      if (res.status === 413) {
+        throw new Error("Uploaded file is too large for the server. Please select a smaller photo or document (under 4MB).");
+      }
+      if (res.status === 404) {
+        throw new Error(`Endpoint not found (HTTP 404). Please refresh your browser and try again.`);
+      }
+      if (res.status >= 500) {
+        throw new Error(data?.error || data?.message || `Server error (HTTP ${res.status}). Please try again in a few moments.`);
+      }
+      throw new Error(data?.error || data?.message || fallbackMessage);
+    }
+
+    if (!data) {
+      throw new Error(fallbackMessage);
+    }
+
+    return data;
+  };
+
   const uploadFile = async (file: File, proofType: string): Promise<{ fileId: string; fileUrl: string }> => {
+    let fileToUpload = file;
+
+    // Automatically optimize and compress images in browser before upload (< 1MB)
+    if (file.type.startsWith("image/")) {
+      try {
+        setSubmittingStatus("Optimizing ID proof image...");
+        fileToUpload = await compressImage(file);
+      } catch (cErr) {
+        console.warn("Client image compression fallback:", cErr);
+      }
+    } else if (file.size > 4.5 * 1024 * 1024) {
+      throw new Error("PDF file must be under 4MB. Please compress your PDF before uploading.");
+    }
+
+    setSubmittingStatus("Uploading ID proof to secure cloud storage...");
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", fileToUpload);
     fd.append("proofType", proofType);
     if (user?.uid) fd.append("userId", user.uid);
     if (form.name) fd.append("userName", form.name);
     if (form.phone) fd.append("userPhone", form.phone);
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
+
     const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
-    const data = await res.json();
-    if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
+    const data = await safeParseJson(res, "Failed to upload ID proof. Please check your connection and retry.");
+    if (!data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
     const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
     return { fileId, fileUrl };
@@ -277,7 +328,7 @@ export default function VisitorRegistrationPage() {
     if (!hasPaidEvent) { setErrors({ submit: "You must have at least one confirmed paid departmental event registration." }); return; }
 
     setSubmitting(true);
-    setSubmittingStatus("Uploading ID proof document...");
+    setSubmittingStatus("Preparing ID proof document...");
 
     try {
       const idToken = await user.getIdToken(true);
@@ -304,8 +355,8 @@ export default function VisitorRegistrationPage() {
           },
         }),
       });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.order_id) {
+      const orderData = await safeParseJson(orderRes, "Failed to create payment order. Please try again.");
+      if (!orderData.order_id) {
         throw new Error(orderData.error || "Failed to create payment order. Please try again.");
       }
 
@@ -355,7 +406,7 @@ export default function VisitorRegistrationPage() {
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
               body: JSON.stringify(submitPayload),
             });
-            const subData = await subRes.json();
+            const subData = await safeParseJson(subRes, "Failed to finalize visitor registration after payment.");
             if (!subData.success) {
               throw new Error(subData.error || "Failed to finalize visitor registration after payment.");
             }
@@ -384,7 +435,8 @@ export default function VisitorRegistrationPage() {
                   collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
                 }),
               });
-              emailSent = (await emailRes.json()).success === true;
+              const emailData = await safeParseJson(emailRes, "Confirmation email error");
+              emailSent = emailData.success === true;
             } catch (emErr) {
               console.warn("Email sending failed (non-fatal):", emErr);
             }
