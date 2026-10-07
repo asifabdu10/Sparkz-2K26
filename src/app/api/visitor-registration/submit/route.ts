@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFirestore, getAdminAuth, FieldValue } from "@/utils/server/firebaseAdmin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+function initAdmin() {
+  if (!getApps().length) {
+    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
+    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+      raw = raw.slice(1, -1);
+    }
+    try {
+      const serviceAccount = JSON.parse(raw);
+      initializeApp({ credential: cert(serviceAccount) });
+    } catch (e) {
+      console.error("Firebase Admin initialization error:", e);
+    }
+  }
+}
+
+function getAdminDb() {
+  initAdmin();
+  return getFirestore();
+}
+
+function getAdminAuth() {
+  initAdmin();
+  return getAuth();
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +81,7 @@ export async function POST(request: NextRequest) {
 
 
     // ── 2. Check user role ─────────────────────────────────────────────────
-    const db = getAdminFirestore();
+    const db = getAdminDb();
     const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"];
     let paidEventName = "";
     let isAdmin = false;
