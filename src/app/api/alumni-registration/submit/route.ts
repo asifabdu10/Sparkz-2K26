@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+import { getAdminAuth, getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
 const ALLOWED_DEPARTMENTS = [
   "Civil Engineering",
@@ -9,31 +7,6 @@ const ALLOWED_DEPARTMENTS = [
   "Mechanical Engineering",
   "Electrical Engineering",
 ] as const;
-
-function initAdmin() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error in alumni submit:", e);
-    }
-  }
-}
-
-function getAdminDb() {
-  initAdmin();
-  return getFirestore();
-}
-
-function getAdminAuth() {
-  initAdmin();
-  return getAuth();
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,6 +27,13 @@ export async function POST(request: NextRequest) {
 
     try {
       const decoded = await getAdminAuth().verifyIdToken(idToken);
+      const provider = String(decoded.firebase?.sign_in_provider || "").toLowerCase();
+      if (provider !== "google.com") {
+        return NextResponse.json(
+          { success: false, error: "Only Google authentication is allowed for alumni registration. Please sign in with Google." },
+          { status: 403 }
+        );
+      }
       verifiedUid = decoded.uid;
       verifiedEmail = (decoded.email || "").toLowerCase().trim();
       googleDisplayName = (decoded.name || "").trim();
@@ -72,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getAdminDb();
+    const db = getAdminFirestore();
 
     // ── 2. Check if Alumni Registration is Open & Capacity Available ───
     try {

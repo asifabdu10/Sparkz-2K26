@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import { NextRequest } from "next/server";
+import { getAdminAuth, getAdminFirestore } from "@/utils/server/firebaseAdmin";
 
 function getRazorpayClient() {
   const key_id = (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim().replace(/^['"]|['"]$/g, "");
@@ -19,13 +20,40 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const amountRupees = Number(body.amount);
+    let amountRupees = Number(body.amount);
     const receipt: string = body.receipt || `rcpt_${Date.now()}`;
     const currency: string = body.currency || "INR";
-    const notes = body.notes || {};
-    const registrationId = String(body.registrationId || notes.registrationId || "").trim();
-    const eventId = String(body.eventId || notes.eventId || "").trim();
-    const userId = String(body.userId || notes.userId || "").trim();
+    let notes = body.notes || {};
+
+    // Visitor-pass orders must use the authoritative admin-configured fee and
+    // must originate from a Google-authenticated Firebase session. Other
+    // Razorpay consumers keep their existing amount behavior.
+    if (notes?.type === "visitor_registration") {
+      const authHeader = request.headers.get("Authorization") || "";
+      const idToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+      if (!idToken) {
+        return Response.json({ error: "Google authentication is required for visitor-pass payment." }, { status: 401 });
+      }
+      try {
+        const decoded = await getAdminAuth().verifyIdToken(idToken);
+        if (String(decoded.firebase?.sign_in_provider || "").toLowerCase() !== "google.com") {
+          return Response.json({ error: "Visitor-pass payment requires Google authentication." }, { status: 403 });
+        }
+        const settingsSnap = await getAdminFirestore().collection("eventSettings").doc("visitorPass").get();
+        const configuredFee = settingsSnap.exists ? settingsSnap.data()?.fee : undefined;
+        if (typeof configuredFee !== "number" || !Number.isFinite(configuredFee) || configuredFee < 1) {
+          return Response.json({ error: "Visitor pass transaction amount is not configured correctly." }, { status: 503 });
+        }
+        amountRupees = configuredFee;
+        notes = { ...notes, userId: decoded.uid };
+      } catch (authErr) {
+        console.error("[create-order] Visitor Google authentication/configuration failed:", authErr);
+        return Response.json({ error: "Unable to initialize the visitor-pass payment. Please try again." }, { status: 503 });
+      }
+    }
+    const registrationId = String(notes.registrationId || body.registrationId || "").trim();
+    const eventId = String(notes.eventId || body.eventId || "").trim();
+    const userId = String(notes.userId || body.userId || "").trim();
 
     // Validate amount — minimum 1 rupee (100 paise)
     if (!amountRupees || amountRupees < 1) {

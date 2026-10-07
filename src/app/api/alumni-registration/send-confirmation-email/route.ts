@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
-function getAdminDb() {
-  if (!getApps().length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
-    initializeApp({ credential: cert(serviceAccount) });
-  }
-  return getFirestore();
-}
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -39,7 +31,7 @@ export async function POST(request: NextRequest) {
       console.error("Missing SMTP_PASS for alumni email delivery.");
       if (registrationIdToUpdate) {
         try {
-          const db = getAdminDb();
+          const db = getAdminFirestore();
           await db.collection("alumni_registrations").doc(registrationIdToUpdate).update({
             emailStatus: "failed",
             emailError: "Email service is not configured (missing SMTP_PASS).",
@@ -95,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getAdminDb();
+        const db = getAdminFirestore();
         await db.collection("alumni_registrations").doc(registrationIdToUpdate).update({
           emailStatus: "sent",
           emailSentAt: FieldValue.serverTimestamp(),
@@ -113,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getAdminDb();
+        const db = getAdminFirestore();
         await db.collection("alumni_registrations").doc(registrationIdToUpdate).update({
           emailStatus: "failed",
           emailError: err?.message || "Failed to send confirmation email.",

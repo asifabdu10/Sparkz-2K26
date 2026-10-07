@@ -1,8 +1,10 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth, type Auth } from "firebase-admin/auth";
 
 let adminApp: App | null = null;
 let adminDb: Firestore | null = null;
+let adminAuth: Auth | null = null;
 
 function parseServiceAccount(): Record<string, any> {
   let raw = (
@@ -49,11 +51,19 @@ export function getAdminApp(): App {
 }
 
 export function getAdminFirestore(): Firestore {
+  getAdminApp();
   if (!adminDb) {
-    getAdminApp();
     adminDb = getFirestore();
   }
   return adminDb;
+}
+
+export function getAdminAuth(): Auth {
+  const app = getAdminApp();
+  if (!adminAuth) {
+    adminAuth = getAuth(app);
+  }
+  return adminAuth;
 }
 
 export { FieldValue };

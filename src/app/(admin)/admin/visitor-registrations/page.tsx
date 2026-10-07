@@ -582,7 +582,7 @@ export default function VisitorRegistrationsAdmin() {
       "Department": reg.department,
       "Visitor Year": reg.yearOfStudy || "N/A",
       "Pass Validity": reg.passValidity || "08 & 09 Oct",
-      "Fee Paid": reg.amountPaid !== undefined ? `₹${reg.amountPaid}` : (reg.fee !== undefined ? `₹${reg.fee}` : "₹250"),
+      "Fee Paid": reg.amountPaid !== undefined ? `₹${reg.amountPaid}` : (reg.fee !== undefined ? `₹${reg.fee}` : "N/A"),
       "Payment ID": reg.razorpayPaymentId || "N/A",
       "Referral Type": reg.referringType,
       "Referring Person":
@@ -1272,7 +1272,7 @@ export default function VisitorRegistrationsAdmin() {
                 <div>
                   <span className="text-gray-400 text-xs">Pass Fee / Payment:</span>
                   <div className="text-white font-medium">
-                    ₹{selectedReg.amountPaid !== undefined ? selectedReg.amountPaid : (selectedReg.fee !== undefined ? selectedReg.fee : 250)}{" "}
+                    ₹{selectedReg.amountPaid !== undefined ? selectedReg.amountPaid : (selectedReg.fee !== undefined ? selectedReg.fee : null)}{" "}
                     <span className="text-xs text-green-400">({selectedReg.paymentStatus || "Paid"})</span>
                   </div>
                   {selectedReg.razorpayPaymentId && (

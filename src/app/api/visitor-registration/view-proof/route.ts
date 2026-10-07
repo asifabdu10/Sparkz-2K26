@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminAuth, getAdminFirestore } from "@/utils/server/firebaseAdmin";
 import { google } from "googleapis";
-
-function getAdminServices() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error:", e);
-    }
-  }
-  return { auth: getAuth(), db: getFirestore() };
-}
 
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
@@ -37,30 +19,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const idToken = authHeader.slice(7).trim();
-    const { auth, db } = getAdminServices();
-
-    let uid = "";
-    let email = "";
-
+    let decodedToken;
     try {
-      const decodedToken = await auth.verifyIdToken(idToken);
-      uid = decodedToken.uid;
-      email = decodedToken.email || "";
+      decodedToken = await getAdminAuth().verifyIdToken(idToken);
     } catch (verifyErr) {
-      try {
-        const parts = idToken.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
-          uid = payload.user_id || payload.sub || "";
-          email = payload.email || "";
-        }
-      } catch {
-        return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
-      }
-      if (!uid) {
-        return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
-      }
+      console.error("[visitor-view-proof] Token verification failed:", verifyErr);
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
+
+    const uid = decodedToken.uid;
+    const email = decodedToken.email || "";
+    const db = getAdminFirestore();
     const userDoc = await db.collection("users").doc(uid).get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 403 });
@@ -68,7 +37,7 @@ export async function GET(request: NextRequest) {
     const userRole = userDoc.data()?.role;
     const superAdminEmails = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase());
     const isSuperAdmin = superAdminEmails.includes(email.toLowerCase()) || userRole === "superAdmin";
-    const isAdmin = isSuperAdmin || userRole === "admin" || userRole === "basicScienceAdmin";
+    const isAdmin = isSuperAdmin || userRole === "admin" || userRole === "basicScienceAdmin" || userRole === "abheriAdmin";
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden: admin access required" }, { status: 403 });

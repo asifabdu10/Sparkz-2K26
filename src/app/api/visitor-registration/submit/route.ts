@@ -1,125 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 import crypto from "crypto";
+import Razorpay from "razorpay";
+import { getAdminAuth, getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
-function initAdmin() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error:", e);
-    }
-  }
+const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"] as const;
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ success: false, error }, { status });
 }
 
-function getAdminDb() {
-  initAdmin();
-  return getFirestore();
-}
-
-function getAdminAuth() {
-  initAdmin();
-  return getAuth();
+function isPaidRegistration(data: Record<string, unknown>) {
+  const paymentStatus = String(data.paymentStatus || "").toLowerCase().trim();
+  const status = String(data.status || "").toLowerCase().trim();
+  return (
+    (paymentStatus === "paid" || status === "paid") &&
+    paymentStatus !== "pending" &&
+    status !== "pending" &&
+    paymentStatus !== "free" &&
+    status !== "free"
+  );
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // ── 1. Verify Firebase ID token ─────────────────────────────────────────
+    // 1. Require a valid Firebase ID token. The public visitor flow is Google-authenticated.
     const authHeader = request.headers.get("Authorization") || "";
-    const idToken = authHeader.replace("Bearer ", "").trim();
+    const idToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     if (!idToken) {
-      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+      return jsonError("Google authentication is required to register for a visitor pass. Please sign in with Google.", 401);
     }
 
-    let uid: string = "";
-    let userEmail: string = "";
-
+    let decodedToken;
     try {
-      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
-      uid = decodedToken.uid;
-      userEmail = decodedToken.email || "";
-    } catch (verifyErr) {
-      console.warn("getAdminAuth().verifyIdToken failed, attempting JWT decode fallback:", verifyErr);
-      try {
-        const parts = idToken.split(".");
-        if (parts.length !== 3) {
-          throw new Error("Invalid JWT token format");
-        }
-        const payloadJson = Buffer.from(parts[1], "base64").toString("utf-8");
-        const payload = JSON.parse(payloadJson);
-
-        const now = Math.floor(Date.now() / 1000);
-        // Expiration check with 5 min grace period
-        if (payload.exp && payload.exp < now - 300) {
-          return NextResponse.json({ success: false, error: "Authentication token has expired. Please log in again." }, { status: 401 });
-        }
-
-        const expectedProject = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sparkz2k26-557bd";
-        if (payload.aud !== expectedProject && !payload.iss?.includes(expectedProject)) {
-          return NextResponse.json({ success: false, error: "Invalid authentication token audience." }, { status: 401 });
-        }
-
-        uid = payload.user_id || payload.sub;
-        userEmail = payload.email || "";
-        if (!uid) throw new Error("No user ID found in token");
-      } catch (fallbackErr) {
-        console.error("JWT fallback decode error:", fallbackErr);
-        return NextResponse.json({ success: false, error: "Invalid or expired authentication token." }, { status: 401 });
-      }
+      decodedToken = await getAdminAuth().verifyIdToken(idToken);
+    } catch (authErr) {
+      console.error("[visitor-submit] Firebase ID token verification failed:", authErr);
+      return jsonError("Your Google login session is invalid or expired. Please sign in with Google again.", 401);
     }
 
+    const signInProvider = String(decodedToken.firebase?.sign_in_provider || "").toLowerCase();
+    if (signInProvider !== "google.com") {
+      return jsonError("Visitor pass registration requires Google authentication. Please sign in with Google.", 403);
+    }
 
-    // ── 2. Check user role ─────────────────────────────────────────────────
-    const db = getAdminDb();
-    const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"];
-    let paidEventName = "";
+    const uid = decodedToken.uid;
+    const userEmail = String(decodedToken.email || "").trim().toLowerCase();
+    if (!uid || !userEmail) {
+      return jsonError("Unable to retrieve your verified Google account details. Please sign in again.", 400);
+    }
+
+    const db = getAdminFirestore();
+
+    // 2. Determine whether this is an administrator.
     let isAdmin = false;
-
     try {
-      const userDocSnap = await db.collection("users").doc(uid).get();
-      if (userDocSnap.exists) {
-        const userRole = (userDocSnap.data() as Record<string, unknown>)?.role as string | undefined;
-        if (userRole && ADMIN_ROLES.includes(userRole)) {
-          isAdmin = true;
-        }
-      }
+      const userSnap = await db.collection("users").doc(uid).get();
+      const role = userSnap.exists ? String(userSnap.data()?.role || "") : "";
+      isAdmin = (ADMIN_ROLES as readonly string[]).includes(role);
     } catch (roleErr) {
-      console.warn("Could not fetch user role, proceeding with standard check:", roleErr);
+      console.error("[visitor-submit] Failed to read user role:", roleErr);
+      // Do not grant an admin bypass when the role lookup fails.
     }
 
-    // ── 2.5 Check if Visitor Pass Registration is Open and Tickets Available ─
-    let registrationOpen = true;
-    let totalCapacity = 300;
-    try {
-      const settingsSnap = await db.collection("eventSettings").doc("visitorPass").get();
-      if (settingsSnap.exists) {
-        const sData = settingsSnap.data();
-        if (typeof sData?.registrationOpen === "boolean") {
-          registrationOpen = sData.registrationOpen;
-        }
-        if (typeof sData?.totalCapacity === "number" && sData.totalCapacity > 0) {
-          totalCapacity = sData.totalCapacity;
-        }
-      }
-    } catch (settErr) {
-      console.warn("Could not check eventSettings/visitorPass in submit:", settErr);
+    // 3. Read the authoritative visitor-pass settings.
+    const settingsSnap = await db.collection("eventSettings").doc("visitorPass").get();
+    const settings = settingsSnap.exists ? (settingsSnap.data() || {}) : {};
+    const registrationOpen = settings.registrationOpen !== false;
+    const totalCapacity =
+      typeof settings.totalCapacity === "number" && settings.totalCapacity > 0
+        ? settings.totalCapacity
+        : 300;
+
+    if (!isAdmin && !registrationOpen) {
+      return jsonError("Visitor pass registrations are currently closed by the administration.", 403);
     }
 
     if (!isAdmin) {
-      if (!registrationOpen) {
-        return NextResponse.json(
-          { success: false, error: "Visitor pass registrations are currently closed by the administration." },
-          { status: 403 }
-        );
-      }
-
       let activeCount = 0;
       try {
         const countSnap = await db
@@ -128,168 +84,188 @@ export async function POST(request: NextRequest) {
           .count()
           .get();
         activeCount = countSnap.data().count;
-      } catch {
-        const cSnap = await db
+      } catch (countErr) {
+        console.warn("[visitor-submit] Count aggregation failed; using document count:", countErr);
+        const snap = await db
           .collection("visitor_registrations")
           .where("approvalStatus", "==", "approved")
           .get();
-        activeCount = cSnap.size;
+        activeCount = snap.size;
       }
 
       if (activeCount >= totalCapacity) {
-        return NextResponse.json(
-          { success: false, error: `All ${totalCapacity} visitor passes are sold out. Registration is currently full.` },
-          { status: 403 }
-        );
+        return jsonError(`All ${totalCapacity} visitor passes are sold out. Registration is currently full.`, 403);
       }
     }
 
-    // ── 3. Verify paid departmental event registration ──────────────────────
+    // 4. Verify the visitor's current paid-event eligibility.
     const regsSnap = await db
       .collection("registrations")
       .where("userId", "==", uid)
       .get();
 
-    const paidDoc = regsSnap.docs.find((d) => {
-      const data = d.data();
-      const pStatus = String(data.paymentStatus || "").toLowerCase().trim();
-      const rStatus = String(data.status || "").toLowerCase().trim();
-      return (
-        (pStatus === "paid" || rStatus === "paid") &&
-        pStatus !== "pending" &&
-        rStatus !== "pending" &&
-        pStatus !== "free"
-      );
-    });
+    const paidDocs = regsSnap.docs.filter((doc) => isPaidRegistration(doc.data() as Record<string, unknown>));
 
-    if (paidDoc) {
-      const paidData = paidDoc.data();
-      paidEventName = paidData.eventTitle || paidData.eventName || "Sparkz Departmental Event";
-    } else if (isAdmin) {
-      paidEventName = "Sparkz Departmental Event";
+    let paidEventName = "";
+    if (isAdmin) {
+      paidEventName = "Admin Direct Pass";
+    } else if (paidDocs.length === 1) {
+      const paidData = paidDocs[0].data();
+      paidEventName = String(paidData.eventTitle || paidData.eventName || "Sparkz Departmental Event");
+    } else if (paidDocs.length === 0) {
+      return jsonError(
+        "You must be registered for exactly one confirmed paid SPARKZ 2K26 departmental event to apply for a visitor pass.",
+        403
+      );
     } else {
-      return NextResponse.json(
-        { success: false, error: "You must have at least one confirmed paid SPARKZ departmental event registration to get a visitor pass." },
-        { status: 403 }
+      return jsonError(
+        "Visitor pass eligibility requires exactly one confirmed paid SPARKZ 2K26 departmental event registration. Please contact the helpdesk if your registrations are duplicated.",
+        403
       );
     }
 
-    // ── 3. Parse & validate body ────────────────────────────────────────────
-    const body = await request.json();
-    const {
-      name, phone, college, department,
-      yearOfStudy,     // visitor's own year of study
-      referringType, referringName, referringDepartment,
-      referringYear,   // only for student referrals
-      collegeIdFileId, // single file — visitor's college ID
-      razorpayPaymentId,
-      razorpayOrderId,
-      razorpaySignature,
-    } = body;
+    // 5. Parse and validate request body.
+    let body: Record<string, unknown>;
+    try {
+      const parsed = await request.json();
+      body = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+    } catch {
+      return jsonError("Invalid registration request. Please refresh the page and try again.", 400);
+    }
 
-    if (!name || name.trim().length < 2)
-      return NextResponse.json({ success: false, error: "Full name is required." }, { status: 400 });
-    if (!phone || !/^\d{10}$/.test(String(phone).trim()))
-      return NextResponse.json({ success: false, error: "Valid 10-digit phone number is required." }, { status: 400 });
-    if (!college || college.trim().length < 2)
-      return NextResponse.json({ success: false, error: "College name is required." }, { status: 400 });
-    if (!department || department.trim().length < 2)
-      return NextResponse.json({ success: false, error: "Department is required." }, { status: 400 });
-    if (!yearOfStudy || yearOfStudy.trim().length < 1)
-      return NextResponse.json({ success: false, error: "Visitor's year of study is required." }, { status: 400 });
-    if (referringType !== "student" && referringType !== "faculty")
-      return NextResponse.json({ success: false, error: "Referring type must be student or faculty." }, { status: 400 });
-    if (!referringName || referringName.trim().length < 2)
-      return NextResponse.json({ success: false, error: "Referring person's name is required." }, { status: 400 });
-    if (!referringDepartment || referringDepartment.trim().length < 2)
-      return NextResponse.json({ success: false, error: "Referring person's department is required." }, { status: 400 });
-    if (referringType === "student" && (!referringYear || referringYear.trim().length < 2))
-      return NextResponse.json({ success: false, error: "Referring student's year of study is required." }, { status: 400 });
-    if (!collegeIdFileId)
-      return NextResponse.json({ success: false, error: "Visitor's college ID file is required." }, { status: 400 });
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const phone = String(body.phone ?? "").trim();
+    const college = typeof body.college === "string" ? body.college.trim() : "";
+    const department = typeof body.department === "string" ? body.department.trim() : "";
+    const yearOfStudy = typeof body.yearOfStudy === "string" ? body.yearOfStudy.trim() : "";
+    const referringType = body.referringType;
+    const referringName = typeof body.referringName === "string" ? body.referringName.trim() : "";
+    const referringDepartment = typeof body.referringDepartment === "string" ? body.referringDepartment.trim() : "";
+    const referringYear = typeof body.referringYear === "string" ? body.referringYear.trim() : "";
+    const collegeIdFileId = typeof body.collegeIdFileId === "string" ? body.collegeIdFileId.trim() : "";
+    const collegeIdFileUrl = typeof body.collegeIdFileUrl === "string" ? body.collegeIdFileUrl.trim() : "";
+    const razorpayPaymentId = typeof body.razorpayPaymentId === "string" ? body.razorpayPaymentId.trim() : "";
+    const razorpayOrderId = typeof body.razorpayOrderId === "string" ? body.razorpayOrderId.trim() : "";
+    const razorpaySignature = typeof body.razorpaySignature === "string" ? body.razorpaySignature.trim() : "";
 
-    // ── 4. Verify Razorpay Payment (₹250) for non-admins ───────────────────
+    if (name.length < 2) return jsonError("Full name is required.", 400);
+    if (!/^\d{10}$/.test(phone)) return jsonError("Valid 10-digit phone number is required.", 400);
+    if (college.length < 2) return jsonError("College name is required.", 400);
+    if (department.length < 2) return jsonError("Department is required.", 400);
+    if (!yearOfStudy) return jsonError("Visitor's year of study is required.", 400);
+    if (referringType !== "student" && referringType !== "faculty") {
+      return jsonError("Referring type must be student or faculty.", 400);
+    }
+    if (referringName.length < 2) return jsonError("Referring person's name is required.", 400);
+    if (referringDepartment.length < 2) return jsonError("Referring person's department is required.", 400);
+    if (referringType === "student" && referringYear.length < 2) {
+      return jsonError("Referring student's year of study is required.", 400);
+    }
+    if (!collegeIdFileId) return jsonError("Visitor's college ID file is required.", 400);
+
+    // 6. Read the authoritative configured fee. Never substitute a hard-coded test value.
+    const configuredFee = settings.fee;
+    if (typeof configuredFee !== "number" || !Number.isFinite(configuredFee) || configuredFee < 1) {
+      return jsonError("Visitor pass transaction amount is not configured correctly. Please contact the administration.", 503);
+    }
+    const currentFee = configuredFee;
+
+    // 7. Verify Razorpay for non-admin users.
     if (!isAdmin) {
       if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
-        return NextResponse.json(
-          { success: false, error: "Payment verification failed: Razorpay payment is required for visitor pass (₹250)." },
-          { status: 400 }
-        );
+        return jsonError("Payment verification failed: a completed Razorpay payment is required for the visitor pass.", 400);
       }
-      const keySecret = process.env.RAZORPAY_KEY_SECRET;
-      if (keySecret) {
-        const expectedSignature = crypto
-          .createHmac("sha256", keySecret)
-          .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-          .digest("hex");
-        if (expectedSignature !== razorpaySignature) {
-          return NextResponse.json(
-            { success: false, error: "Payment verification failed: invalid payment signature." },
-            { status: 400 }
-          );
+
+      const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim().replace(/^['"]|['"]$/g, "");
+      if (!keySecret) {
+        console.error("[visitor-submit] RAZORPAY_KEY_SECRET is not configured.");
+        return jsonError("Payment gateway configuration error. Please contact the administration.", 503);
+      }
+
+      const expectedSignature = crypto
+        .createHmac("sha256", keySecret)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest("hex");
+      const expectedBuffer = Buffer.from(expectedSignature, "utf8");
+      const receivedBuffer = Buffer.from(razorpaySignature, "utf8");
+
+      if (
+        expectedBuffer.length !== receivedBuffer.length ||
+        !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
+      ) {
+        console.error("[visitor-submit] Razorpay signature mismatch for order:", razorpayOrderId);
+        return jsonError("Payment verification failed: invalid Razorpay payment signature.", 400);
+      }
+
+      // Signature validity alone does not prove that the visitor paid the
+      // currently configured amount. Verify the real Razorpay order/payment.
+      try {
+        const keyId = (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "").trim().replace(/^['"]|['"]$/g, "");
+        if (!keyId) throw new Error("RAZORPAY_KEY_ID is not configured.");
+        const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+        const order = await razorpay.orders.fetch(razorpayOrderId);
+        if (Number(order.amount) !== Math.round(currentFee * 100) || String(order.currency || "INR") !== "INR") {
+          console.error("[visitor-submit] Razorpay order amount mismatch:", { orderId: razorpayOrderId, orderAmount: order.amount, configuredFee: currentFee });
+          return jsonError("Payment verification failed: the paid amount does not match the configured visitor-pass fee.", 400);
         }
+
+        const payment = await razorpay.payments.fetch(razorpayPaymentId);
+        if (payment.order_id && payment.order_id !== razorpayOrderId) {
+          return jsonError("Payment verification failed: payment/order mismatch.", 400);
+        }
+        if (String(payment.status || "").toLowerCase() !== "captured") {
+          return jsonError("Payment verification failed: the Razorpay payment is not captured yet.", 400);
+        }
+        if (Number(payment.amount) !== Math.round(currentFee * 100)) {
+          return jsonError("Payment verification failed: the paid amount does not match the configured visitor-pass fee.", 400);
+        }
+      } catch (rzpErr) {
+        console.error("[visitor-submit] Razorpay order/payment verification failed:", rzpErr);
+        return jsonError("Payment verification could not be completed. Please contact the helpdesk if the amount was deducted.", 502);
       }
     }
 
-    // ── 5. Check duplicate active registration (same uid) ───────────────────
+    // 8. Prevent duplicate active visitor passes for the same Google account.
     const existingSnap = await db
       .collection("visitor_registrations")
       .where("userId", "==", uid)
       .get();
-    const activeRegistration = existingSnap.docs.find(
-      (d) => d.data().approvalStatus !== "revoked"
-    );
+    const activeRegistration = existingSnap.docs.find((doc) => doc.data().approvalStatus !== "revoked");
     if (activeRegistration) {
-      return NextResponse.json(
-        { success: false, error: "You already have an active visitor pass registration." },
-        { status: 409 }
-      );
+      return jsonError("You already have an active visitor pass registration.", 409);
     }
 
-    // ── 6. Save to Firestore ────────────────────────────────────────────────
-    // ── Check dynamically configured visitor pass fee ───────────────────────
-    let currentFee = 250;
-    try {
-      const feeSnap = await db.collection("eventSettings").doc("visitorPass").get();
-      if (feeSnap.exists) {
-        const val = feeSnap.data()?.fee;
-        if (typeof val === "number" && val >= 0) {
-          currentFee = val;
-        }
-      }
-    } catch (feeErr) {
-      console.warn("Could not read visitorPass eventSettings:", feeErr);
-    }
-
+    // 9. Save registration.
     const docData: Record<string, unknown> = {
-      name: name.trim(),
-      phone: String(phone).trim(),
-      email: userEmail.toLowerCase(),
+      name,
+      phone,
+      email: userEmail,
       userId: uid,
-      college: college.trim(),
-      department: department.trim(),
-      yearOfStudy: yearOfStudy.trim(),
+      college,
+      department,
+      yearOfStudy,
       referringType,
-      referringName: referringName.trim(),
-      referringDepartment: referringDepartment.trim(),
-      collegeIdFileId: collegeIdFileId.trim(),
-      collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
-      idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
+      referringName,
+      referringDepartment,
+      collegeIdFileId,
+      collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
+      idProofUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
       qualifyingPaidEvent: paidEventName,
       fee: currentFee,
-      amountPaid: currentFee,
+      amountPaid: isAdmin ? 0 : currentFee,
       paymentStatus: "paid",
-      razorpayPaymentId: razorpayPaymentId || null,
-      razorpayOrderId: razorpayOrderId || null,
+      razorpayPaymentId: isAdmin ? `admin_granted_${Date.now()}` : razorpayPaymentId,
+      razorpayOrderId: isAdmin ? `admin_order_${Date.now()}` : razorpayOrderId,
       passValidity: "08 & 09 Oct",
       approvalStatus: "approved",
       emailStatus: "pending",
+      createdByAdmin: isAdmin,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
 
     if (referringType === "student" && referringYear) {
-      docData.referringYear = referringYear.trim();
+      docData.referringYear = referringYear;
     }
 
     const docRef = await db.collection("visitor_registrations").add(docData);
@@ -300,11 +276,8 @@ export async function POST(request: NextRequest) {
       message: "Visitor registration saved successfully.",
     });
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    console.error("Visitor registration submit error:", error);
-    return NextResponse.json(
-      { success: false, error: err?.message || "Failed to save visitor registration." },
-      { status: 500 }
-    );
+    console.error("[visitor-submit] Unhandled visitor registration error:", error);
+    const message = error instanceof Error ? error.message : "Failed to save visitor registration.";
+    return jsonError(message, 500);
   }
 }
