@@ -1,14 +1,20 @@
 "use client";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, Upload, FileText } from "lucide-react";
+
+type ReferringType = "student" | "faculty" | "";
 
 interface AlumniFormState {
   department: string;
   passedOutYear: string;
   contact: string;
+  referringType: ReferringType;
+  referringName: string;
+  referringDepartment: string;
+  referringYear: string;
 }
 
 interface ExistingAlumniReg {
@@ -21,6 +27,14 @@ interface ExistingAlumniReg {
   email: string;
   status?: string;
   emailStatus?: string;
+  alumniIdFileId?: string;
+  alumniIdFileUrl?: string;
+  referringType?: string;
+  referringName?: string;
+  referringDepartment?: string;
+  referringYear?: string;
+  referringIdFileId?: string;
+  referringIdFileUrl?: string;
   createdAt?: { seconds: number } | null;
 }
 
@@ -33,6 +47,85 @@ const departmentOptions = [
 
 // Passout year options from 2018 to 2025
 const yearOptions = ["2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018"];
+const REFERRING_YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
+
+// ─── FileInput component ──────────────────────────────────────────────────────
+function FileInput({
+  label,
+  hint,
+  file,
+  setFile,
+  inputRef,
+  errorKey,
+  errors,
+}: {
+  label: string;
+  hint: string;
+  file: File | null;
+  setFile: (f: File | null) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  errorKey: string;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
+      <p className="text-xs text-gray-500 mb-2">{hint}</p>
+      <div
+        onClick={() => inputRef.current?.click()}
+        className={`cursor-pointer border-2 border-dashed ${
+          errors[errorKey] ? "border-red-500" : "border-[rgba(212,163,89,0.3)]"
+        } rounded-xl p-4 text-center hover:border-[#F3C87A] transition-colors bg-[#0E0E12]`}
+      >
+        {file ? (
+          <div className="flex items-center justify-center gap-2 text-green-400">
+            <span className="font-bold">&#x2713;</span>
+            <span className="text-sm truncate max-w-[220px] text-white">{file.name}</span>
+            <span className="text-xs text-gray-400">
+              ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFile(null);
+                if (inputRef.current) inputRef.current.value = "";
+              }}
+              className="text-red-400 hover:text-red-300 ml-2 text-xs p-1"
+              title="Remove file"
+            >
+              &#x2715;
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-1">
+            <Upload className="w-5 h-5 text-[#F3C87A] mb-1.5" />
+            <p className="text-sm text-gray-400">
+              Click to select <span className="text-[#F3C87A] font-semibold">{label}</span>
+            </p>
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const selected = e.target.files?.[0];
+            if (selected) {
+              if (selected.size > 5 * 1024 * 1024) {
+                alert("File size exceeds 5MB limit. Please select a smaller file.");
+                return;
+              }
+              setFile(selected);
+            }
+          }}
+        />
+      </div>
+      {errors[errorKey] && <p className="text-red-400 text-xs mt-1">{errors[errorKey]}</p>}
+    </div>
+  );
+}
 
 export default function AlumniRegistrationPage() {
   const { user, loading: authLoading, login } = useAuth();
@@ -40,7 +133,17 @@ export default function AlumniRegistrationPage() {
     department: "",
     passedOutYear: "",
     contact: "",
+    referringType: "",
+    referringName: "",
+    referringDepartment: "",
+    referringYear: "",
   });
+
+  const [alumniIdFile, setAlumniIdFile] = useState<File | null>(null);
+  const [referringIdFile, setReferringIdFile] = useState<File | null>(null);
+  const alumniIdRef = useRef<HTMLInputElement | null>(null);
+  const referringIdRef = useRef<HTMLInputElement | null>(null);
+
   const [existingReg, setExistingReg] = useState<ExistingAlumniReg | null>(null);
   const [checkingExisting, setCheckingExisting] = useState<boolean>(true);
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(true);
@@ -49,6 +152,7 @@ export default function AlumniRegistrationPage() {
   const [isFull, setIsFull] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submittingStatus, setSubmittingStatus] = useState<string>("");
   const [result, setResult] = useState<{ success: boolean; emailSent?: boolean; id?: string } | null>(null);
 
   // Check registration status & check if current user is already registered as alumni
@@ -99,8 +203,47 @@ export default function AlumniRegistrationPage() {
     if (!form.department.trim()) e.department = "Department is required.";
     if (!form.passedOutYear || isNaN(Number(form.passedOutYear))) e.passedOutYear = "Passed out year is required.";
     if (!/^\d{10}$/.test(form.contact.trim())) e.contact = "Enter a valid 10-digit contact number.";
+
+    // Alumni ID card validation
+    if (!alumniIdFile) e.alumniId = "Your Alumni / College ID card photo or PDF is required.";
+
+    // Referring Person validation
+    if (!form.referringType) e.referringType = "Please select who is referring you (Student or Faculty).";
+    if (!form.referringName.trim()) e.referringName = "Referring person's name is required.";
+    if (!form.referringDepartment.trim()) e.referringDepartment = "Referring person's department is required.";
+    if (form.referringType === "student" && !form.referringYear) {
+      e.referringYear = "Referring student's year of study is required.";
+    }
+
+    // Referring Person ID card validation
+    if (!referringIdFile) e.referringId = "Referring person's ID card photo or PDF is required.";
+
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const uploadFile = async (
+    file: File,
+    proofType: "alumni_id" | "referring_id",
+    referringName?: string
+  ): Promise<{ fileId: string; fileUrl: string }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("proofType", proofType);
+    if (user?.uid) fd.append("userId", user.uid);
+    if (user?.email) fd.append("userName", user.email);
+    if (form.contact) fd.append("userPhone", form.contact);
+    if (referringName) fd.append("referringName", referringName);
+
+    const res = await fetch("/api/alumni-registration/upload-proof", {
+      method: "POST",
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
+    const fileId: string = data.fileId;
+    const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
+    return { fileId, fileUrl };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,6 +255,7 @@ export default function AlumniRegistrationPage() {
     }
 
     setSubmitting(true);
+    setSubmittingStatus("Uploading your Alumni ID card...");
     try {
       let token = "";
       try {
@@ -124,6 +268,22 @@ export default function AlumniRegistrationPage() {
         throw new Error("Unable to authenticate with Google. Please log in again.");
       }
 
+      // 1. Upload Alumni's own ID card
+      const { fileId: alumniIdFileId, fileUrl: alumniIdFileUrl } = await uploadFile(
+        alumniIdFile!,
+        "alumni_id"
+      );
+
+      // 2. Upload Referring Person's ID card (separate Drive folder)
+      setSubmittingStatus("Uploading referring person ID card...");
+      const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(
+        referringIdFile!,
+        "referring_id",
+        form.referringName
+      );
+
+      // 3. Submit registration with both ID proofs and referring details
+      setSubmittingStatus("Submitting alumni registration...");
       const res = await fetch("/api/alumni-registration/submit", {
         method: "POST",
         headers: {
@@ -134,6 +294,14 @@ export default function AlumniRegistrationPage() {
           department: form.department,
           passedOutYear: form.passedOutYear,
           contact: form.contact.trim(),
+          alumniIdFileId,
+          alumniIdFileUrl,
+          referringType: form.referringType,
+          referringName: form.referringName.trim(),
+          referringDepartment: form.referringDepartment.trim(),
+          referringYear: form.referringType === "student" ? form.referringYear : "",
+          referringIdFileId,
+          referringIdFileUrl,
         }),
       });
 
@@ -153,6 +321,8 @@ export default function AlumniRegistrationPage() {
             department: form.department,
             passedOutYear: form.passedOutYear,
             contact: form.contact.trim(),
+            referringName: form.referringName.trim(),
+            referringType: form.referringType,
           }),
         });
         emailSent = (await emailRes.json()).success === true;
@@ -166,6 +336,7 @@ export default function AlumniRegistrationPage() {
       setErrors({ submit: e?.message || "Registration failed. Please try again." });
     } finally {
       setSubmitting(false);
+      setSubmittingStatus("");
     }
   };
 
@@ -340,8 +511,11 @@ export default function AlumniRegistrationPage() {
         <div className="pointer-events-none fixed left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
         <div className="pointer-events-none fixed right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
 
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-          className="relative z-10 max-w-lg w-full bg-[#131318] border border-[rgba(212,163,89,0.3)] rounded-2xl p-8 text-center space-y-6 shadow-2xl">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 max-w-lg w-full bg-[#131318] border border-[rgba(212,163,89,0.3)] rounded-2xl p-8 text-center space-y-6 shadow-2xl"
+        >
           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-4xl shadow-inner">
             🎓
           </div>
@@ -381,23 +555,61 @@ export default function AlumniRegistrationPage() {
               <span className="text-gray-400 text-xs">Contact</span>
               <span className="text-white font-mono text-xs">{existingReg.contact}</span>
             </div>
+
+            {/* Referring Person Details */}
+            {existingReg.referringName && (
+              <div className="pt-2 border-t border-gray-800/80 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-xs">Referred By</span>
+                  <span className="text-white font-semibold text-xs">
+                    {existingReg.referringName} ({existingReg.referringType === "faculty" ? "Faculty" : "Student"})
+                  </span>
+                </div>
+                {existingReg.referringDepartment && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-xs">Referring Dept</span>
+                    <span className="text-gray-300 text-xs">
+                      {existingReg.referringDepartment}
+                      {existingReg.referringYear ? ` • ${existingReg.referringYear}` : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ID Proof Verification */}
+            <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between">
+              <span className="text-gray-400 text-xs">ID Cards Uploaded</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                ✓ Alumni &amp; Referring ID on File
+              </span>
+            </div>
+
             <div className="flex justify-between items-center pt-1 border-t border-gray-800/80">
               <span className="text-gray-400 text-xs">Email Confirmation</span>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                existingReg.emailStatus === "sent"
-                  ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-              }`}>
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                  existingReg.emailStatus === "sent"
+                    ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                }`}
+              >
                 {existingReg.emailStatus === "sent" ? "Delivered" : "Pending"}
               </span>
             </div>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
-            <Link href="/" className="inline-flex items-center justify-center flex-1 bg-[#F3C87A] text-[#0B0B0E] font-bold py-3 rounded-xl hover:bg-[#e6b960] transition-colors text-sm">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center flex-1 bg-[#F3C87A] text-[#0B0B0E] font-bold py-3 rounded-xl hover:bg-[#e6b960] transition-colors text-sm"
+            >
               Back to Home
             </Link>
-            <Link href="/events" className="inline-flex items-center justify-center flex-1 bg-[#1f1f2c] border border-gray-700 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors text-sm">
+            <Link
+              href="/events"
+              className="inline-flex items-center justify-center flex-1 bg-[#1f1f2c] border border-gray-700 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors text-sm"
+            >
               Explore Events
             </Link>
           </div>
@@ -410,17 +622,31 @@ export default function AlumniRegistrationPage() {
   if (result?.success) {
     return (
       <div className="min-h-screen bg-[#0B0B0E] flex items-center justify-center px-4">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full bg-[#131318] border border-[rgba(212,163,89,0.3)] rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">&#x1F393;</div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-[#131318] border border-[rgba(212,163,89,0.3)] rounded-2xl p-8 text-center"
+        >
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+            🎓
+          </div>
           <h2 className="text-2xl font-bold text-white mb-2">Registration Successful!</h2>
-          <p className="text-gray-400 mb-4">Your alumni registration for Sparkz 2K26 has been submitted. Welcome back!</p>
+          <p className="text-gray-400 mb-4">
+            Your alumni registration and ID documents have been uploaded securely. Welcome back!
+          </p>
           {result.emailSent ? (
-            <p className="text-sm text-green-400 mb-6">A confirmation email has been sent to your Google account ({user.email}).</p>
+            <p className="text-sm text-green-400 mb-6">
+              A confirmation email has been sent to your Google account ({user.email}).
+            </p>
           ) : (
-            <p className="text-sm text-yellow-400 mb-6">Registration saved securely with account {user.email}.</p>
+            <p className="text-sm text-yellow-400 mb-6">
+              Registration saved securely with account {user.email}.
+            </p>
           )}
-          <Link href="/" className="inline-flex items-center gap-2 bg-[#F3C87A] text-[#0B0B0E] font-bold px-6 py-3 rounded-full hover:bg-[#e6b960] transition-colors">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 bg-[#F3C87A] text-[#0B0B0E] font-bold px-6 py-3 rounded-full hover:bg-[#e6b960] transition-colors"
+          >
             Back to Home
           </Link>
         </motion.div>
@@ -434,23 +660,37 @@ export default function AlumniRegistrationPage() {
       <div className="pointer-events-none fixed left-[-10%] top-[20%] h-96 w-96 rounded-full bg-[#3A270D]/45 blur-[140px]" />
       <div className="pointer-events-none fixed right-[-5%] top-[30%] h-96 w-96 rounded-full bg-[#3A270D]/35 blur-[150px]" />
       <div className="relative z-10 max-w-lg mx-auto">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-[#F3C87A] text-sm mb-6 hover:underline">Back to Home</Link>
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[#F3C87A] text-sm mb-6 hover:underline"
+          >
+            Back to Home
+          </Link>
           <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,163,89,0.25)] bg-[#131318]/80 px-4 py-2 text-[13px] font-bold uppercase tracking-widest text-[#F3C87A] backdrop-blur mb-4">
-            <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />Sparkz 2K26
+            <span className="h-2 w-2 rounded-full bg-[#F3C87A] animate-pulse" />
+            Sparkz 2K26
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">Alumni Registration</h1>
           <p className="text-gray-400 text-sm">Register as a passed-out alumnus of Carmel College</p>
           {totalCapacity > 0 && (
             <p className="text-xs text-[#F3C87A] mt-2 font-medium">
-              Limited to {totalCapacity} attendees &bull; {Math.max(0, totalCapacity - activeCount)} spots left
+              Limited to {totalCapacity} attendees &bull;{" "}
+              {Math.max(0, totalCapacity - activeCount)} spots left
             </p>
           )}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl p-6 md:p-8">
-
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-[#131318] border border-[rgba(212,163,89,0.2)] rounded-2xl p-6 md:p-8"
+        >
           {/* ── Verified Google Account Identity Card ────────────────────── */}
           <div className="bg-[#181824] border border-[rgba(212,163,89,0.25)] rounded-xl p-3.5 mb-6 flex items-center justify-between gap-3 shadow-inner">
             <div className="flex items-center gap-3 min-w-0">
@@ -467,16 +707,19 @@ export default function AlumniRegistrationPage() {
             </span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ── SECTION 1: Alumni Details ─────────────────────────────────── */}
             <div>
               <h3 className="text-[#F3C87A] font-bold text-xs uppercase tracking-widest mb-4 border-b border-[rgba(212,163,89,0.15)] pb-2">
-                Alumni Details
+                1. Alumni Details
               </h3>
 
               <div className="space-y-4">
                 {/* Department Dropdown */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Department *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Department *
+                  </label>
                   <select
                     value={form.department}
                     onChange={(e) => setForm({ ...form, department: e.target.value })}
@@ -484,15 +727,21 @@ export default function AlumniRegistrationPage() {
                   >
                     <option value="">Select department</option>
                     {departmentOptions.map((dept) => (
-                      <option key={dept} value={dept}>{dept}</option>
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
                     ))}
                   </select>
-                  {errors.department && <p className="text-red-400 text-xs mt-1">{errors.department}</p>}
+                  {errors.department && (
+                    <p className="text-red-400 text-xs mt-1">{errors.department}</p>
+                  )}
                 </div>
 
                 {/* Passed Out Year Dropdown */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Passed Out Year *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Passed Out Year *
+                  </label>
                   <select
                     value={form.passedOutYear}
                     onChange={(e) => setForm({ ...form, passedOutYear: e.target.value })}
@@ -500,15 +749,21 @@ export default function AlumniRegistrationPage() {
                   >
                     <option value="">Select year</option>
                     {yearOptions.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
                   </select>
-                  {errors.passedOutYear && <p className="text-red-400 text-xs mt-1">{errors.passedOutYear}</p>}
+                  {errors.passedOutYear && (
+                    <p className="text-red-400 text-xs mt-1">{errors.passedOutYear}</p>
+                  )}
                 </div>
 
                 {/* Contact Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Contact Number *</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Contact Number *
+                  </label>
                   <input
                     type="tel"
                     placeholder="10-digit mobile number"
@@ -517,9 +772,161 @@ export default function AlumniRegistrationPage() {
                     className={inputClass("contact")}
                     maxLength={10}
                   />
-                  {errors.contact && <p className="text-red-400 text-xs mt-1">{errors.contact}</p>}
+                  {errors.contact && (
+                    <p className="text-red-400 text-xs mt-1">{errors.contact}</p>
+                  )}
+                </div>
+
+                {/* Alumni's Own ID Card Upload */}
+                <div className="pt-2">
+                  <FileInput
+                    label="Your Alumni / College ID Card *"
+                    hint="Upload your Carmel ID or Alumni proof (JPG, PNG, WEBP or PDF — max 5 MB)"
+                    file={alumniIdFile}
+                    setFile={setAlumniIdFile}
+                    inputRef={alumniIdRef}
+                    errorKey="alumniId"
+                    errors={errors}
+                  />
                 </div>
               </div>
+            </div>
+
+            {/* ── SECTION 2: Referring Person Details & ID Card ────────────── */}
+            <div>
+              <h3 className="text-[#F3C87A] font-bold text-xs uppercase tracking-widest mb-4 border-b border-[rgba(212,163,89,0.15)] pb-2 flex items-center justify-between">
+                <span>2. Referring Person Details</span>
+                <span className="text-[10px] text-gray-400 normal-case font-normal">
+                  Current Student or Faculty of Carmel
+                </span>
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Who is Referring You? *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["student", "faculty"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() =>
+                          setForm({ ...form, referringType: type, referringYear: "" })
+                        }
+                        className={`py-3 px-4 rounded-xl border font-semibold capitalize text-sm transition-all ${
+                          form.referringType === type
+                            ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E] shadow-md"
+                            : "border-[rgba(212,163,89,0.3)] text-gray-300 hover:border-[#F3C87A] hover:text-[#F3C87A] bg-[#181824]"
+                        }`}
+                      >
+                        {type === "student" ? "🎓 Current Student" : "👨‍🏫 Current Faculty"}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.referringType && (
+                    <p className="text-red-400 text-xs mt-1.5">{errors.referringType}</p>
+                  )}
+                </div>
+
+                <AnimatePresence>
+                  {form.referringType && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-4 bg-[#0B0B0E]/60 border border-[rgba(212,163,89,0.15)] rounded-xl p-4"
+                    >
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          {form.referringType === "student" ? "Student" : "Faculty"} Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Referring person's full name"
+                          value={form.referringName}
+                          onChange={(e) =>
+                            setForm({ ...form, referringName: e.target.value })
+                          }
+                          className={inputClass("referringName")}
+                        />
+                        {errors.referringName && (
+                          <p className="text-red-400 text-xs mt-1">
+                            {errors.referringName}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                          {form.referringType === "student" ? "Student" : "Faculty"} Department *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Computer Engineering"
+                          value={form.referringDepartment}
+                          onChange={(e) =>
+                            setForm({ ...form, referringDepartment: e.target.value })
+                          }
+                          className={inputClass("referringDepartment")}
+                        />
+                        {errors.referringDepartment && (
+                          <p className="text-red-400 text-xs mt-1">
+                            {errors.referringDepartment}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Year of study — only for student */}
+                      {form.referringType === "student" && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">
+                            Student&apos;s Year of Study *
+                          </label>
+                          <select
+                            value={form.referringYear}
+                            onChange={(e) =>
+                              setForm({ ...form, referringYear: e.target.value })
+                            }
+                            className={inputClass("referringYear")}
+                          >
+                            <option value="">Select year of study</option>
+                            {REFERRING_YEAR_OPTIONS.map((y) => (
+                              <option key={y} value={y}>
+                                {y}
+                              </option>
+                            ))}
+                          </select>
+                          {errors.referringYear && (
+                            <p className="text-red-400 text-xs mt-1">
+                              {errors.referringYear}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Referring Person's ID Card Upload */}
+                      <div className="pt-2">
+                        <FileInput
+                          label={`Referring ${
+                            form.referringType === "student" ? "Student" : "Faculty"
+                          }'s ID Card *`}
+                          hint="Upload photo or scan of their Carmel ID card (JPG, PNG, WEBP or PDF — max 5 MB)"
+                          file={referringIdFile}
+                          setFile={setReferringIdFile}
+                          inputRef={referringIdRef}
+                          errorKey="referringId"
+                          errors={errors}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
+              🔒 <strong>Privacy Note:</strong> All uploaded ID cards are stored securely in dedicated, restricted Google Drive folders and are only accessible by authorized event administrators.
             </div>
 
             {errors.submit && (
@@ -531,9 +938,16 @@ export default function AlumniRegistrationPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-[#F3C87A] hover:bg-[#e6b960] disabled:opacity-60 disabled:cursor-not-allowed text-[#0B0B0E] font-bold py-3.5 rounded-xl transition-all duration-200 transform hover:-translate-y-0.5 text-sm uppercase tracking-widest shadow-lg"
+              className="w-full bg-[#F3C87A] hover:bg-[#e6b960] disabled:opacity-60 disabled:cursor-not-allowed text-[#0B0B0E] font-bold py-3.5 rounded-xl transition-all duration-200 transform hover:-translate-y-0.5 text-sm uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
             >
-              {submitting ? "Submitting Registration..." : "Complete Alumni Registration"}
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{submittingStatus || "Submitting Registration..."}</span>
+                </>
+              ) : (
+                "Complete Alumni Registration"
+              )}
             </button>
           </form>
         </motion.div>

@@ -17,6 +17,8 @@ import {
   Check,
   X,
   RefreshCw,
+  ExternalLink,
+  Eye,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -26,6 +28,7 @@ import {
 } from "@/utils/firestoreCache";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/utils/firebase";
 
 const DEPARTMENT_OPTIONS = [
   "Civil Engineering",
@@ -35,6 +38,7 @@ const DEPARTMENT_OPTIONS = [
 ] as const;
 
 const YEAR_OPTIONS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
+const REFERRING_YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 
 interface AlumniRegistration {
   id: string;
@@ -47,6 +51,15 @@ interface AlumniRegistration {
   email: string;
   status?: "registered" | "deregistered";
   emailStatus?: string;
+  alumniIdFileId?: string;
+  alumniIdFileUrl?: string;
+  idProofUrl?: string;
+  referringType?: "student" | "faculty" | string;
+  referringName?: string;
+  referringDepartment?: string;
+  referringYear?: string;
+  referringIdFileId?: string;
+  referringIdFileUrl?: string;
   createdAt: { seconds: number; nanoseconds: number } | null;
 }
 
@@ -54,6 +67,7 @@ export default function AlumniRegistrationsAdmin() {
   const { user, userData } = useAuth();
   const [registrations, setRegistrations] = useState<AlumniRegistration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [proofLoading, setProofLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [deregisteringId, setDeregisteringId] = useState<string | null>(null);
@@ -81,6 +95,10 @@ export default function AlumniRegistrationsAdmin() {
     status: "registered" | "deregistered";
     emailStatus: string;
     batch: string;
+    referringType: "student" | "faculty";
+    referringName: string;
+    referringDepartment: string;
+    referringYear: string;
   }>({
     name: "",
     department: "Computer Engineering",
@@ -90,6 +108,10 @@ export default function AlumniRegistrationsAdmin() {
     status: "registered",
     emailStatus: "pending",
     batch: "",
+    referringType: "student",
+    referringName: "",
+    referringDepartment: "",
+    referringYear: "",
   });
 
   const defaultSuperAdminEmails = ["asifabdulla1234@gmail.com", "joeljoy1237@gmail.com"];
@@ -260,6 +282,8 @@ export default function AlumniRegistrationsAdmin() {
           passedOutYear: reg.passedOutYear,
           contact: reg.contact,
           registrationId: reg.id,
+          referringName: reg.referringName,
+          referringType: reg.referringType,
         }),
       });
       const data = await res.json();
@@ -328,6 +352,42 @@ export default function AlumniRegistrationsAdmin() {
     }
   };
 
+  const handleViewProof = async (fileId?: string, fileUrl?: string, label = "Proof Document") => {
+    if (fileUrl) {
+      window.open(fileUrl, "_blank");
+      return;
+    }
+    if (!fileId) {
+      toastError("No proof document ID available.");
+      return;
+    }
+    setProofLoading(fileId);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        window.open(`https://drive.google.com/file/d/${fileId}/view`, "_blank");
+        return;
+      }
+      const token = await currentUser.getIdToken(true);
+      const res = await fetch(
+        `/api/alumni-registration/view-proof?fileId=${encodeURIComponent(fileId)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        window.open(`https://drive.google.com/file/d/${fileId}/view`, "_blank");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      toastSuccess(`Opened ${label}`);
+    } catch {
+      window.open(`https://drive.google.com/file/d/${fileId}/view`, "_blank");
+    } finally {
+      setProofLoading(null);
+    }
+  };
+
   const handleOpenEdit = (reg: AlumniRegistration) => {
     setEditingReg(reg);
     setEditForm({
@@ -339,6 +399,10 @@ export default function AlumniRegistrationsAdmin() {
       status: reg.status === "deregistered" ? "deregistered" : "registered",
       emailStatus: reg.emailStatus || "pending",
       batch: reg.batch || "",
+      referringType: (reg.referringType === "faculty" ? "faculty" : "student"),
+      referringName: reg.referringName || "",
+      referringDepartment: reg.referringDepartment || "",
+      referringYear: reg.referringYear || "",
     });
   };
 
@@ -386,6 +450,10 @@ export default function AlumniRegistrationsAdmin() {
           status: editForm.status,
           emailStatus: editForm.emailStatus,
           batch: editForm.batch.trim(),
+          referringType: editForm.referringType,
+          referringName: editForm.referringName.trim(),
+          referringDepartment: editForm.referringDepartment.trim(),
+          referringYear: editForm.referringYear.trim(),
           adminEmail: user?.email,
           firebaseIdToken: token,
         }),
@@ -408,6 +476,10 @@ export default function AlumniRegistrationsAdmin() {
                 status: editForm.status,
                 emailStatus: editForm.emailStatus,
                 batch: editForm.batch.trim(),
+                referringType: editForm.referringType,
+                referringName: editForm.referringName.trim(),
+                referringDepartment: editForm.referringDepartment.trim(),
+                referringYear: editForm.referringYear.trim(),
               }
             : r
         )
@@ -421,6 +493,10 @@ export default function AlumniRegistrationsAdmin() {
         status: editForm.status,
         emailStatus: editForm.emailStatus,
         batch: editForm.batch.trim(),
+        referringType: editForm.referringType,
+        referringName: editForm.referringName.trim(),
+        referringDepartment: editForm.referringDepartment.trim(),
+        referringYear: editForm.referringYear.trim(),
       });
 
       toastSuccess(`Updated details for ${editForm.name.trim()}`);
@@ -498,6 +574,12 @@ export default function AlumniRegistrationsAdmin() {
       "Passed Out Year": reg.passedOutYear,
       "Contact": reg.contact,
       "Email": reg.email,
+      "Referring Type": reg.referringType ? (reg.referringType === "faculty" ? "Faculty" : "Student") : "N/A",
+      "Referring Name": reg.referringName || "N/A",
+      "Referring Department": reg.referringDepartment || "N/A",
+      "Referring Year": reg.referringYear || "N/A",
+      "Alumni ID Proof Link": reg.alumniIdFileUrl || (reg.alumniIdFileId ? `https://drive.google.com/file/d/${reg.alumniIdFileId}/view` : "N/A"),
+      "Referring ID Proof Link": reg.referringIdFileUrl || (reg.referringIdFileId ? `https://drive.google.com/file/d/${reg.referringIdFileId}/view` : "N/A"),
       "Status": reg.status === "deregistered" ? "Deregistered" : "Registered",
       "Email Status": reg.emailStatus || "N/A",
       "Created At": formatDate(reg.createdAt),
@@ -735,6 +817,8 @@ export default function AlumniRegistrationsAdmin() {
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Passed Out Year</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Contact</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Email</th>
+                  <th className="px-4 py-4 font-semibold whitespace-nowrap">Referring Person</th>
+                  <th className="px-4 py-4 font-semibold whitespace-nowrap">ID Proofs</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Registration Status</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Email Status</th>
                   <th className="px-4 py-4 font-semibold whitespace-nowrap">Date</th>
@@ -744,7 +828,7 @@ export default function AlumniRegistrationsAdmin() {
               <tbody className="divide-y divide-gray-700">
                 {filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-8 text-center text-gray-400">
+                    <td colSpan={12} className="px-6 py-8 text-center text-gray-400">
                       No alumni registrations found.
                     </td>
                   </tr>
@@ -771,6 +855,92 @@ export default function AlumniRegistrationsAdmin() {
                       </td>
                       <td className="px-4 py-4 text-gray-300 font-mono text-xs">{reg.contact}</td>
                       <td className="px-4 py-4 text-gray-300 text-xs">{reg.email}</td>
+
+                      {/* Referring Person */}
+                      <td className="px-4 py-4">
+                        {reg.referringName ? (
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                  reg.referringType === "faculty"
+                                    ? "bg-purple-500/20 text-purple-300"
+                                    : "bg-blue-500/20 text-blue-300"
+                                }`}
+                              >
+                                {reg.referringType === "faculty" ? "Faculty" : "Student"}
+                              </span>
+                              <span className="text-white text-xs font-semibold">
+                                {reg.referringName}
+                              </span>
+                            </div>
+                            {reg.referringDepartment && (
+                              <div className="text-gray-400 text-xs mt-0.5">
+                                {reg.referringDepartment}
+                                {reg.referringYear ? ` • ${reg.referringYear}` : ""}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-xs italic">N/A</span>
+                        )}
+                      </td>
+
+                      {/* ID Proofs */}
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col gap-1.5">
+                          {/* Alumni ID */}
+                          {reg.alumniIdFileUrl || reg.alumniIdFileId ? (
+                            <button
+                              onClick={() =>
+                                handleViewProof(
+                                  reg.alumniIdFileId,
+                                  reg.alumniIdFileUrl,
+                                  `Alumni ID (${reg.name})`
+                                )
+                              }
+                              disabled={proofLoading === reg.alumniIdFileId}
+                              className="inline-flex items-center gap-1 text-xs text-[#F3C87A] hover:underline hover:text-[#e6b960] font-medium"
+                              title="View Alumni ID Proof"
+                            >
+                              {proofLoading === reg.alumniIdFileId ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <ExternalLink size={12} />
+                              )}
+                              <span>Alumni ID</span>
+                            </button>
+                          ) : (
+                            <span className="text-gray-500 text-xs italic">No Alumni ID</span>
+                          )}
+
+                          {/* Referring Person ID */}
+                          {reg.referringIdFileUrl || reg.referringIdFileId ? (
+                            <button
+                              onClick={() =>
+                                handleViewProof(
+                                  reg.referringIdFileId,
+                                  reg.referringIdFileUrl,
+                                  `Referring ID (${reg.referringName || "Referee"})`
+                                )
+                              }
+                              disabled={proofLoading === reg.referringIdFileId}
+                              className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline hover:text-sky-300 font-medium"
+                              title="View Referring Person ID Proof"
+                            >
+                              {proofLoading === reg.referringIdFileId ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <ExternalLink size={12} />
+                              )}
+                              <span>Referring ID</span>
+                            </button>
+                          ) : (
+                            <span className="text-gray-500 text-xs italic">No Ref ID</span>
+                          )}
+                        </div>
+                      </td>
+
                       <td className="px-4 py-4">
                         {reg.status === "deregistered" ? (
                           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold bg-red-500/20 text-red-300 border border-red-500/30">
@@ -1008,6 +1178,132 @@ export default function AlumniRegistrationsAdmin() {
                   onChange={(e) => setEditForm({ ...editForm, batch: e.target.value })}
                   className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
                 />
+              </div>
+
+              {/* Referring Person Details in Modal */}
+              <div className="pt-2 border-t border-gray-700/60 space-y-3">
+                <h3 className="text-xs font-bold text-[#F3C87A] uppercase tracking-wider">
+                  Referring Person Details
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Referring Type *
+                    </label>
+                    <select
+                      value={editForm.referringType}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          referringType: e.target.value as "student" | "faculty",
+                        })
+                      }
+                      className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                    >
+                      <option value="student">Student</option>
+                      <option value="faculty">Faculty</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Referring Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Referee full name"
+                      value={editForm.referringName}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, referringName: e.target.value })
+                      }
+                      className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Referring Department
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Computer Engineering"
+                      value={editForm.referringDepartment}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, referringDepartment: e.target.value })
+                      }
+                      className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                    />
+                  </div>
+                  {editForm.referringType === "student" && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                        Student&apos;s Year of Study
+                      </label>
+                      <select
+                        value={editForm.referringYear}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, referringYear: e.target.value })
+                        }
+                        className="w-full bg-[#131318] border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F3C87A]"
+                      >
+                        <option value="">Select year</option>
+                        {REFERRING_YEAR_OPTIONS.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Uploaded Documents Quick Access */}
+              <div className="pt-2 border-t border-gray-700/60">
+                <label className="block text-xs font-medium text-gray-400 mb-2">
+                  Uploaded ID Proofs
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {editingReg.alumniIdFileUrl || editingReg.alumniIdFileId ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleViewProof(
+                          editingReg.alumniIdFileId,
+                          editingReg.alumniIdFileUrl,
+                          `Alumni ID (${editingReg.name})`
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F3C87A]/20 text-[#F3C87A] border border-[#F3C87A]/30 hover:bg-[#F3C87A]/30 transition-colors"
+                    >
+                      <ExternalLink size={13} />
+                      View Alumni ID
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic">No Alumni ID file</span>
+                  )}
+
+                  {editingReg.referringIdFileUrl || editingReg.referringIdFileId ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleViewProof(
+                          editingReg.referringIdFileId,
+                          editingReg.referringIdFileUrl,
+                          `Referring ID (${editingReg.referringName || "Referee"})`
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30 hover:bg-sky-500/30 transition-colors"
+                    >
+                      <ExternalLink size={13} />
+                      View Referring ID
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic">No Referring ID file</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-700/80">
