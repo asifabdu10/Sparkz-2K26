@@ -54,7 +54,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const db = getAdminFirestore();
+    let db: ReturnType<typeof getAdminFirestore>;
+    try {
+      db = getAdminFirestore();
+    } catch (adminInitErr: any) {
+      console.error("Visitor registration: Firebase Admin initialization failed:", adminInitErr);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            adminInitErr?.message ||
+            "Server Firebase configuration is missing. Please contact the administrator.",
+        },
+        { status: 503 }
+      );
+    }
 
     // ── 2. Check user role / admin status ───────────────────────────────────
     const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"];
@@ -216,7 +230,14 @@ export async function POST(request: NextRequest) {
         );
       }
       const keySecret = process.env.RAZORPAY_KEY_SECRET;
-      if (keySecret) {
+      if (!keySecret) {
+        return NextResponse.json(
+          { success: false, error: "Payment verification is unavailable because the server Razorpay secret is not configured." },
+          { status: 503 }
+        );
+      }
+
+      {
         const expectedSignature = crypto
           .createHmac("sha256", keySecret)
           .update(`${razorpayOrderId}|${razorpayPaymentId}`)
