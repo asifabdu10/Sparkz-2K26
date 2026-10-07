@@ -1,24 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminFirestore, getAdminAuth } from "@/utils/server/firebaseAdmin";
 import { google } from "googleapis";
 
-function getAdminServices() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error:", e);
-    }
-  }
-  return { auth: getAuth(), db: getFirestore() };
-}
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
@@ -37,7 +22,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const idToken = authHeader.slice(7).trim();
-    const { auth, db } = getAdminServices();
+    const auth = getAdminAuth();
+    const db = getAdminFirestore();
+
 
     let uid = "";
     let email = "";

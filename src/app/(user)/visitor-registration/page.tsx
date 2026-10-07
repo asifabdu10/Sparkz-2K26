@@ -10,8 +10,10 @@ import { compressImage } from "@/utils/imageUtils";
 
 async function parseJsonResponse(res: Response, endpointLabel: string) {
   const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any = null;
   try {
-    return JSON.parse(text);
+    data = JSON.parse(text);
   } catch {
     if (res.status === 413) {
       throw new Error("Uploaded file is too large for the server. Please upload an image under 4MB.");
@@ -19,9 +21,20 @@ async function parseJsonResponse(res: Response, endpointLabel: string) {
     if (res.status === 504 || res.status === 408) {
       throw new Error("Upload connection timed out. Please check your internet connection and try again.");
     }
-    throw new Error(`${endpointLabel} failed (HTTP ${res.status}: ${res.statusText || "Server response error"}). Please try again.`);
+    const cleanSnippet = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
+    if (cleanSnippet && !cleanSnippet.toLowerCase().includes("doctype")) {
+      throw new Error(`${endpointLabel} failed: ${cleanSnippet}`);
+    }
+    throw new Error(`${endpointLabel} failed (HTTP ${res.status}: ${res.statusText || "Server error"}). Please try again.`);
   }
+
+  if (!res.ok || data?.success === false) {
+    throw new Error(data?.error || data?.message || `${endpointLabel} failed (HTTP ${res.status}).`);
+  }
+
+  return data;
 }
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ReferringType = "student" | "faculty" | "";

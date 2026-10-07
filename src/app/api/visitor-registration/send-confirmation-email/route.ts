@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
-function getAdminDb() {
-  if (!getApps().length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
-    initializeApp({ credential: cert(serviceAccount) });
-  }
-  return getFirestore();
-}
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -196,7 +190,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationId) {
       try {
-        const db = getAdminDb();
+        const db = getAdminFirestore();
         await db.collection("visitor_registrations").doc(registrationId).update({
           emailStatus: "sent",
           emailSentAt: FieldValue.serverTimestamp(),
@@ -215,7 +209,7 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getAdminDb();
+        const db = getAdminFirestore();
         await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
           emailStatus: "failed",
           emailError: err?.message || "Failed to send confirmation email.",
