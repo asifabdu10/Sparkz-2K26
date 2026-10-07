@@ -1,28 +1,12 @@
 import { NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminFirestore } from "@/utils/server/firebaseAdmin";
 
-function getAdminDb() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error in status route:", e);
-    }
-  }
-  return getFirestore();
-}
-
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const db = getAdminDb();
+    const db = getAdminFirestore();
 
     // 1. Fetch settings from eventSettings/visitorPass
     let registrationOpen = true;

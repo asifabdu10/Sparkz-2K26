@@ -11,8 +11,9 @@ import { compressImage } from "@/utils/imageUtils";
 // ─── Safe JSON Parser Helper ─────────────────────────────────────────────────
 async function parseJsonResponse<T = Record<string, any>>(res: Response, endpointLabel: string): Promise<T> {
   const text = await res.text();
+  let data: Record<string, any> = {};
   try {
-    return (text ? JSON.parse(text) : {}) as T;
+    data = text ? JSON.parse(text) : {};
   } catch {
     console.error(`Non-JSON response from ${endpointLabel}: HTTP ${res.status}`, text.slice(0, 300));
     if (res.status === 413) {
@@ -29,6 +30,12 @@ async function parseJsonResponse<T = Record<string, any>>(res: Response, endpoin
     }
     throw new Error(`Unexpected server response format (${res.status}). Please try again.`);
   }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `Server returned error (${res.status}) during ${endpointLabel}.`);
+  }
+
+  return data as T;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
