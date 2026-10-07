@@ -189,7 +189,17 @@ export default function RazorpayButton({
         window.clearTimeout(timeoutId);
       }
 
-      const orderData = await orderRes.json().catch(() => ({}));
+      const rawOrderResponse = await orderRes.text();
+      let orderData: Record<string, any> = {};
+      try {
+        orderData = rawOrderResponse ? JSON.parse(rawOrderResponse) : {};
+      } catch {
+        throw new Error(
+          orderRes.ok
+            ? "The payment server returned an unexpected response. Please try again."
+            : `Payment server error (${orderRes.status}). Please try again.`
+        );
+      }
 
       if (!orderRes.ok) {
         throw new Error(orderData.error || "Failed to create order");

@@ -27,7 +27,7 @@ export async function GET() {
     // 1. Fetch settings from eventSettings/visitorPass
     let registrationOpen = true;
     let totalCapacity = 300;
-    let fee = 250;
+    let fee = 1;
 
     try {
       const settingsSnap = await db.collection("eventSettings").doc("visitorPass").get();
@@ -92,7 +92,7 @@ export async function GET() {
       activeCount: 0,
       remainingTickets: 300,
       isSoldOut: false,
-      fee: 250,
+      fee: 1,
     });
   }
 }

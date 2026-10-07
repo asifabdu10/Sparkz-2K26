@@ -76,6 +76,25 @@ function FileInput({
   );
 }
 
+// API responses can be HTML when a deployment/proxy fails. Never call res.json() blindly.
+async function readApiJson<T = Record<string, any>>(res: Response): Promise<T> {
+  const text = await res.text();
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const status = `${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+    throw new Error(
+      res.ok
+        ? "The server returned an unexpected response. Please refresh and try again."
+        : `Server error (${status}). Please try again or contact the Sparkz helpdesk.`
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("The server returned invalid JSON. Please try again.");
+  }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function VisitorRegistrationPage() {
   const { user, userData, loading, login } = useAuth();
@@ -128,8 +147,8 @@ export default function VisitorRegistrationPage() {
 
   // Fetch dynamic status & fee
   useEffect(() => {
-    fetch("/api/visitor-registration/status")
-      .then((res) => res.json())
+    fetch("/api/visitor-registration/status", { cache: "no-store" })
+      .then((res) => readApiJson<{ success?: boolean; fee?: number; registrationOpen?: boolean; totalCapacity?: number; remainingTickets?: number; isSoldOut?: boolean }>(res))
       .then((data) => {
         if (data.success) {
           if (typeof data.fee === "number") setPassFee(data.fee);
@@ -268,7 +287,7 @@ export default function VisitorRegistrationPage() {
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
     if (refName) fd.append("referringName", refName);
     const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
-    const data = await res.json();
+    const data = await readApiJson<{ fileId?: string; fileUrl?: string; url?: string; error?: string }>(res);
     if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
     const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
@@ -310,7 +329,7 @@ export default function VisitorRegistrationPage() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
           body: JSON.stringify(submitPayload),
         });
-        const subData = await subRes.json();
+        const subData = await readApiJson<{ success?: boolean; id?: string; error?: string }>(subRes);
         if (!subData.success) {
           throw new Error(subData.error || "Failed to finalize visitor registration.");
         }
@@ -337,7 +356,7 @@ export default function VisitorRegistrationPage() {
               referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
             }),
           });
-          const emData = await emailRes.json();
+          const emData = await readApiJson<{ success?: boolean }>(emailRes);
           emailSent = emData?.success === true;
         } catch (emErr) {
           console.warn("Email sending failed (non-fatal):", emErr);
@@ -376,7 +395,7 @@ export default function VisitorRegistrationPage() {
           },
         }),
       });
-      const orderData = await orderRes.json();
+      const orderData = await readApiJson<{ success?: boolean; order_id?: string; amount?: number; currency?: string; key_id?: string; error?: string }>(orderRes);
       if (!orderRes.ok || !orderData.order_id) {
         throw new Error(orderData.error || "Failed to create payment order. Please try again.");
       }
@@ -429,7 +448,7 @@ export default function VisitorRegistrationPage() {
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
               body: JSON.stringify(submitPayload),
             });
-            const subData = await subRes.json();
+            const subData = await readApiJson<{ success?: boolean; id?: string; error?: string }>(subRes);
             if (!subData.success) {
               throw new Error(subData.error || "Failed to finalize visitor registration after payment.");
             }
@@ -459,7 +478,7 @@ export default function VisitorRegistrationPage() {
                   referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
                 }),
               });
-              emailSent = (await emailRes.json()).success === true;
+              emailSent = (await readApiJson<{ success?: boolean }>(emailRes)).success === true;
             } catch (emErr) {
               console.warn("Email sending failed (non-fatal):", emErr);
             }

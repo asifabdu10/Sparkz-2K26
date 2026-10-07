@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     if (!isAdminBypass) {
       if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
         return NextResponse.json(
-          { success: false, error: "Payment verification failed: Razorpay payment is required for visitor pass (₹250)." },
+          { success: false, error: "Payment verification failed: Razorpay payment is required for visitor pass." },
           { status: 400 }
         );
       }
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
 
     // ── 6. Save to Firestore ────────────────────────────────────────────────
     // ── Check dynamically configured visitor pass fee ───────────────────────
-    let currentFee = 250;
+    let currentFee = 1;
     try {
       const feeSnap = await db.collection("eventSettings").doc("visitorPass").get();
       if (feeSnap.exists) {
