@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -9,7 +13,7 @@ function getDriveClient() {
     process.env.GOOGLE_REDIRECT_URI
   );
   auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-  return google.drive({ version: "v3", auth });
+  return google.drive({ version: "v3", auth, timeout: 30000 });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,10 +36,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File size must be less than 5MB" }, { status: 400 });
     }
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
-    if (!allowedTypes.includes(file.type)) {
+    const fileType = (file.type || "").toLowerCase();
+    const isImage = fileType.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(file.name);
+    const isPdf = fileType === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (!isImage && !isPdf) {
       return NextResponse.json({ error: "Only JPG, PNG, WEBP, or PDF files are allowed" }, { status: 400 });
     }
+    const finalMimeType = file.type || (isPdf ? "application/pdf" : "image/jpeg");
 
     // Determine target Google Drive folder:
     let folderId = "";
@@ -84,7 +91,7 @@ export async function POST(request: NextRequest) {
         parents: [folderId],
       },
       media: {
-        mimeType: file.type,
+        mimeType: finalMimeType,
         body: Readable.from(buffer),
       },
       fields: "id,name,webViewLink",

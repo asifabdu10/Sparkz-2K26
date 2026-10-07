@@ -6,6 +6,30 @@ import Script from "next/script";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
 import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot } from "firebase/firestore";
+import { compressImage } from "@/utils/imageUtils";
+
+// ─── Safe JSON Parser Helper ─────────────────────────────────────────────────
+async function parseJsonResponse<T = Record<string, any>>(res: Response, endpointLabel: string): Promise<T> {
+  const text = await res.text();
+  try {
+    return (text ? JSON.parse(text) : {}) as T;
+  } catch {
+    console.error(`Non-JSON response from ${endpointLabel}: HTTP ${res.status}`, text.slice(0, 300));
+    if (res.status === 413) {
+      throw new Error("Uploaded file is too large for the server. Please select a smaller photo/image (under 4MB).");
+    }
+    if (res.status === 504 || res.status === 408) {
+      throw new Error("Server timed out while processing your request. Please check your internet connection and try again.");
+    }
+    if (res.status === 500) {
+      throw new Error(`Server error during ${endpointLabel}. Please try again in a few moments.`);
+    }
+    if (!res.ok) {
+      throw new Error(`Server returned error (${res.status}). Please try again.`);
+    }
+    throw new Error(`Unexpected server response format (${res.status}). Please try again.`);
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ReferringType = "student" | "faculty" | "";
@@ -39,26 +63,83 @@ const YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 
 // ─── FileInput component ──────────────────────────────────────────────────────
 function FileInput({
-  label, hint, file, setFile, inputRef, errorKey, errors,
+  label, hint, file, setFile, inputRef, errorKey, errors, setErrors,
 }: {
   label: string; hint: string; file: File | null;
   setFile: (f: File | null) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   errorKey: string; errors: Record<string, string>;
+  setErrors?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }) {
+  const [compressing, setCompressing] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+
+    if (setErrors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[errorKey];
+        return next;
+      });
+    }
+
+    if (selected.type === "application/pdf" || /\.pdf$/i.test(selected.name)) {
+      if (selected.size > 5 * 1024 * 1024) {
+        if (setErrors) {
+          setErrors((prev) => ({ ...prev, [errorKey]: "PDF file size must be less than 5MB." }));
+        }
+        if (inputRef.current) inputRef.current.value = "";
+        setFile(null);
+        return;
+      }
+      setFile(selected);
+      return;
+    }
+
+    // Automatically compress images client-side to ensure fast uploads & avoid payload limits
+    setCompressing(true);
+    try {
+      const compressed = await compressImage(selected);
+      setFile(compressed);
+    } catch (err) {
+      console.warn("Client compression error, using original file:", err);
+      setFile(selected);
+    } finally {
+      setCompressing(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${Math.round(bytes / 1024)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
       <p className="text-xs text-gray-500 mb-2">{hint}</p>
       <div
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !compressing && inputRef.current?.click()}
         className={`cursor-pointer border-2 border-dashed ${errors[errorKey] ? "border-red-500" : "border-[rgba(212,163,89,0.3)]"
           } rounded-xl p-4 text-center hover:border-[#F3C87A] transition-colors`}
       >
-        {file ? (
+        {compressing ? (
+          <div className="flex items-center justify-center gap-2 text-[#F3C87A] py-1">
+            <div className="w-4 h-4 border-2 border-[#F3C87A] border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-medium">Compressing &amp; preparing image...</span>
+          </div>
+        ) : file ? (
           <div className="flex items-center justify-center gap-2 text-green-400">
             <span>&#x2713;</span>
             <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+            <span className="text-xs text-gray-400">({formatFileSize(file.size)})</span>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setFile(null); if (inputRef.current) inputRef.current.value = ""; }}
@@ -69,30 +150,12 @@ function FileInput({
           <p className="text-sm text-gray-400">Click to upload <span className="text-[#F3C87A]">{label}</span></p>
         )}
         <input ref={inputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          disabled={compressing}
+          onChange={handleFileChange} />
       </div>
       {errors[errorKey] && <p className="text-red-400 text-xs mt-1">{errors[errorKey]}</p>}
     </div>
   );
-}
-
-// API responses can be HTML when a deployment/proxy fails. Never call res.json() blindly.
-async function readApiJson<T = Record<string, any>>(res: Response): Promise<T> {
-  const text = await res.text();
-  const contentType = res.headers.get("content-type") || "";
-  if (!contentType.toLowerCase().includes("application/json")) {
-    const status = `${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
-    throw new Error(
-      res.ok
-        ? "The server returned an unexpected response. Please refresh and try again."
-        : `Server error (${status}). Please try again or contact the Sparkz helpdesk.`
-    );
-  }
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error("The server returned invalid JSON. Please try again.");
-  }
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -147,8 +210,8 @@ export default function VisitorRegistrationPage() {
 
   // Fetch dynamic status & fee
   useEffect(() => {
-    fetch("/api/visitor-registration/status", { cache: "no-store" })
-      .then((res) => readApiJson<{ success?: boolean; fee?: number; registrationOpen?: boolean; totalCapacity?: number; remainingTickets?: number; isSoldOut?: boolean }>(res))
+    fetch("/api/visitor-registration/status")
+      .then((res) => parseJsonResponse<any>(res, "visitor status"))
       .then((data) => {
         if (data.success) {
           if (typeof data.fee === "number") setPassFee(data.fee);
@@ -278,8 +341,18 @@ export default function VisitorRegistrationPage() {
   };
 
   const uploadFile = async (file: File, proofType: string, refName?: string): Promise<{ fileId: string; fileUrl: string }> => {
+    // Extra safeguard: if image file was not yet compressed or is large, compress before upload
+    let fileToUpload = file;
+    if ((file.type.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(file.name)) && file.size > 800 * 1024) {
+      try {
+        fileToUpload = await compressImage(file);
+      } catch (e) {
+        console.warn("Upload fallback compression warning:", e);
+      }
+    }
+
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", fileToUpload);
     fd.append("proofType", proofType);
     if (user?.uid) fd.append("userId", user.uid);
     if (form.name) fd.append("userName", form.name);
@@ -287,7 +360,7 @@ export default function VisitorRegistrationPage() {
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
     if (refName) fd.append("referringName", refName);
     const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
-    const data = await readApiJson<{ fileId?: string; fileUrl?: string; url?: string; error?: string }>(res);
+    const data = await parseJsonResponse<{ success?: boolean; fileId?: string; fileUrl?: string; url?: string; error?: string }>(res, "document upload");
     if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
     const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
@@ -329,8 +402,8 @@ export default function VisitorRegistrationPage() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
           body: JSON.stringify(submitPayload),
         });
-        const subData = await readApiJson<{ success?: boolean; id?: string; error?: string }>(subRes);
-        if (!subData.success) {
+        const subData = await parseJsonResponse<{ success?: boolean; id?: string; error?: string }>(subRes, "admin visitor registration");
+        if (!subData.success || !subData.id) {
           throw new Error(subData.error || "Failed to finalize visitor registration.");
         }
 
@@ -356,7 +429,7 @@ export default function VisitorRegistrationPage() {
               referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
             }),
           });
-          const emData = await readApiJson<{ success?: boolean }>(emailRes);
+          const emData = await parseJsonResponse<{ success?: boolean }>(emailRes, "admin confirmation email");
           emailSent = emData?.success === true;
         } catch (emErr) {
           console.warn("Email sending failed (non-fatal):", emErr);
@@ -395,7 +468,7 @@ export default function VisitorRegistrationPage() {
           },
         }),
       });
-      const orderData = await readApiJson<{ success?: boolean; order_id?: string; amount?: number; currency?: string; key_id?: string; error?: string }>(orderRes);
+      const orderData = await parseJsonResponse<{ success?: boolean; order_id?: string; error?: string }>(orderRes, "create payment order");
       if (!orderRes.ok || !orderData.order_id) {
         throw new Error(orderData.error || "Failed to create payment order. Please try again.");
       }
@@ -448,8 +521,8 @@ export default function VisitorRegistrationPage() {
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
               body: JSON.stringify(submitPayload),
             });
-            const subData = await readApiJson<{ success?: boolean; id?: string; error?: string }>(subRes);
-            if (!subData.success) {
+            const subData = await parseJsonResponse<{ success?: boolean; id?: string; error?: string }>(subRes, "visitor registration");
+            if (!subData.success || !subData.id) {
               throw new Error(subData.error || "Failed to finalize visitor registration after payment.");
             }
 
@@ -478,7 +551,8 @@ export default function VisitorRegistrationPage() {
                   referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
                 }),
               });
-              emailSent = (await readApiJson<{ success?: boolean }>(emailRes)).success === true;
+              const emData = await parseJsonResponse<{ success?: boolean }>(emailRes, "confirmation email");
+              emailSent = emData?.success === true;
             } catch (emErr) {
               console.warn("Email sending failed (non-fatal):", emErr);
             }
@@ -928,6 +1002,7 @@ export default function VisitorRegistrationPage() {
                     hint="JPG, PNG, WEBP or PDF — max 5 MB"
                     file={collegeIdFile} setFile={setCollegeIdFile}
                     inputRef={collegeIdRef} errorKey="collegeId" errors={errors}
+                    setErrors={setErrors}
                   />
                 </div>
               </div>
@@ -1018,6 +1093,7 @@ export default function VisitorRegistrationPage() {
                             inputRef={referringIdRef}
                             errorKey="referringId"
                             errors={errors}
+                            setErrors={setErrors}
                           />
                         </div>
                       </div>
