@@ -16,14 +16,8 @@ import {
   ShieldAlert,
   Check,
   X,
-  RefreshCw,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import {
-  getAdminAlumniRegistrations,
-  updateCachedAdminAlumni,
-  removeCachedAdminAlumni,
-} from "@/utils/firestoreCache";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -109,10 +103,12 @@ export default function AlumniRegistrationsAdmin() {
     fetchRegistrationStatus();
   }, []);
 
-  const fetchRegistrations = async (forceRefresh = false) => {
+  const fetchRegistrations = async () => {
     try {
-      setLoading(true);
-      const data = (await getAdminAlumniRegistrations(forceRefresh)) as AlumniRegistration[];
+      const q = query(collection(db, "alumni_registrations"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      const data: AlumniRegistration[] = [];
+      snap.forEach((d) => data.push({ id: d.id, ...d.data() } as AlumniRegistration));
       setRegistrations(data);
     } catch (error) {
       console.error("Error fetching alumni registrations:", error);
@@ -305,19 +301,16 @@ export default function AlumniRegistrationsAdmin() {
 
       if (action === "delete") {
         setRegistrations((prev) => prev.filter((r) => r.id !== reg.id));
-        removeCachedAdminAlumni(reg.id);
         toastSuccess(`Deleted registration for ${reg.name}`);
       } else if (action === "restore") {
         setRegistrations((prev) =>
           prev.map((r) => (r.id === reg.id ? { ...r, status: "registered" } : r))
         );
-        updateCachedAdminAlumni(reg.id, { status: "registered" });
         toastSuccess(`Restored registration for ${reg.name}`);
       } else {
         setRegistrations((prev) =>
           prev.map((r) => (r.id === reg.id ? { ...r, status: "deregistered" } : r))
         );
-        updateCachedAdminAlumni(reg.id, { status: "deregistered" });
         toastSuccess(`Deregistered ${reg.name}`);
       }
     } catch (err: unknown) {
@@ -412,16 +405,6 @@ export default function AlumniRegistrationsAdmin() {
             : r
         )
       );
-      updateCachedAdminAlumni(editingReg.id, {
-        name: editForm.name.trim(),
-        department: editForm.department,
-        passedOutYear: editForm.passedOutYear,
-        contact: editForm.contact.trim(),
-        email: editForm.email.trim().toLowerCase(),
-        status: editForm.status,
-        emailStatus: editForm.emailStatus,
-        batch: editForm.batch.trim(),
-      });
 
       toastSuccess(`Updated details for ${editForm.name.trim()}`);
       setEditingReg(null);
@@ -536,15 +519,6 @@ export default function AlumniRegistrationsAdmin() {
               {bulkSending ? "Sending..." : `Send Pending Emails (${pendingCount})`}
             </button>
           )}
-          <button
-            onClick={() => fetchRegistrations(true)}
-            disabled={loading}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3.5 py-2 rounded-lg border border-gray-700 transition-colors text-sm font-semibold disabled:opacity-50"
-            title="Refresh list"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            <span>Refresh</span>
-          </button>
           <button
             onClick={handleExport}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-semibold"

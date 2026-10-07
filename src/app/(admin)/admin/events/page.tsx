@@ -16,13 +16,13 @@ import {
     Timestamp,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower, FiRefreshCw } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiEdit2, FiSave, FiX, FiUploadCloud, FiPower } from "react-icons/fi";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { departments, isBasicScienceDepartment } from "@/utils/constants/Constants";
 import { Event } from "@/utils/types/event";
 import { compressImage } from "@/utils/imageUtils";
 import Image from "next/image";
-import { getAllEvents, invalidateEventsCache, invalidateAdminRegistrationsCache } from "@/utils/firestoreCache";
+import { getAllEvents, invalidateEventsCache } from "@/utils/firestoreCache";
 
 
 export default function EventsManagement() {
@@ -178,8 +178,17 @@ export default function EventsManagement() {
                 const eventsList = all.filter(e => isBasicScienceDepartment(e.department));
                 setEvents(eventsList);
             } else if (userData?.role === 'admin' && userData?.department) {
-                const all = await getAllEvents(forceRefresh);
-                const eventsList = all.filter(e => e.department === userData.department);
+                const q = query(collection(db, "events"), where("department", "==", userData.department));
+                const querySnapshot = await getDocs(q);
+                const eventsList = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        imageUrl: data.imageUrl || data.image || "",
+                        bgImageUrl: data.bgImageUrl || data.bgImage || "",
+                    };
+                }) as Event[];
                 setEvents(eventsList);
             } else {
                 setEvents([]);
@@ -526,9 +535,6 @@ export default function EventsManagement() {
 
             await deleteDoc(doc(db, "events", id));
             invalidateEventsCache();
-            if (registrationsSnapshot.size > 0) {
-                invalidateAdminRegistrationsCache();
-            }
 
             // -----------------------------------------------------
             // 5. Update UI
@@ -859,14 +865,6 @@ export default function EventsManagement() {
                             </button>
                         </>
                     )}
-                    <button
-                        onClick={() => fetchEvents(true)}
-                        disabled={loading}
-                        className="w-full md:w-auto px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl flex justify-center items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50"
-                        title="Force reload events from server"
-                    >
-                        <FiRefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
-                    </button>
                 </div>
             </div>
 

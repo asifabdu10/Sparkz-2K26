@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-function getSafeAdminDb() {
-  try {
-    return getAdminFirestore();
-  } catch (err) {
-    console.warn("Firebase Admin unavailable in email route:", err);
-    return null;
+function getAdminDb() {
+  if (!getApps().length) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
+    initializeApp({ credential: cert(serviceAccount) });
   }
+  return getFirestore();
 }
 
 function escapeHtml(value: unknown) {
@@ -42,18 +38,12 @@ export async function POST(request: NextRequest) {
       passValidity = "08 & 09 Oct",
       collegeIdFileUrl,
       collegeIdFileId,
-      referringIdFileUrl,
-      referringIdFileId,
     } = body;
     registrationIdToUpdate = registrationId || "";
 
     const idProofLink =
       collegeIdFileUrl ||
       (collegeIdFileId ? `https://drive.google.com/file/d/${collegeIdFileId}/view` : "");
-
-    const referringProofLink =
-      referringIdFileUrl ||
-      (referringIdFileId ? `https://drive.google.com/file/d/${referringIdFileId}/view` : "");
 
     if (!email) return NextResponse.json({ success: false, error: "Email address is required." }, { status: 400 });
 
@@ -163,19 +153,6 @@ export async function POST(request: NextRequest) {
             </tr>`
                 : ""
             }
-            ${
-              referringProofLink
-                ? `
-            <tr>
-              <td style="padding:10px 0;font-weight:600;color:#64748b;">Referee ID Proof</td>
-              <td style="padding:10px 0;">
-                <a href="${escapeHtml(referringProofLink)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:bold;text-decoration:underline;">
-                  View Referee ID Proof &rarr;
-                </a>
-              </td>
-            </tr>`
-                : ""
-            }
           </table>
 
           ${
@@ -219,14 +196,12 @@ export async function POST(request: NextRequest) {
 
     if (registrationId) {
       try {
-        const db = getSafeAdminDb();
-        if (db) {
-          await db.collection("visitor_registrations").doc(registrationId).update({
-            emailStatus: "sent",
-            emailSentAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        const db = getAdminDb();
+        await db.collection("visitor_registrations").doc(registrationId).update({
+          emailStatus: "sent",
+          emailSentAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       } catch (dbErr) {
         console.error("Failed to update visitor registration emailStatus in db:", dbErr);
       }
@@ -240,14 +215,12 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getSafeAdminDb();
-        if (db) {
-          await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
-            emailStatus: "failed",
-            emailError: err?.message || "Failed to send confirmation email.",
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
+        const db = getAdminDb();
+        await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
+          emailStatus: "failed",
+          emailError: err?.message || "Failed to send confirmation email.",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       } catch (dbErr) {
         console.error("Failed to update visitor registration emailStatus to failed:", dbErr);
       }

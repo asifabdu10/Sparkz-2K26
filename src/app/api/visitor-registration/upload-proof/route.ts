@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -13,7 +9,7 @@ function getDriveClient() {
     process.env.GOOGLE_REDIRECT_URI
   );
   auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-  return google.drive({ version: "v3", auth, timeout: 30000 });
+  return google.drive({ version: "v3", auth });
 }
 
 export async function POST(request: NextRequest) {
@@ -36,31 +32,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File size must be less than 5MB" }, { status: 400 });
     }
 
-    const fileType = (file.type || "").toLowerCase();
-    const isImage = fileType.startsWith("image/") || /\.(jpg|jpeg|png|webp)$/i.test(file.name);
-    const isPdf = fileType === "application/pdf" || /\.pdf$/i.test(file.name);
-    if (!isImage && !isPdf) {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: "Only JPG, PNG, WEBP, or PDF files are allowed" }, { status: 400 });
     }
-    const finalMimeType = file.type || (isPdf ? "application/pdf" : "image/jpeg");
 
-    // Determine target Google Drive folder:
-    let folderId = "";
-    const referringName = (formData.get("referringName") as string) || "";
-    if (proofType === "referring_id") {
-      folderId =
-        process.env.GOOGLE_DRIVE_VISITOR_REFERRING_FOLDER_ID?.trim() ||
-        process.env.GOOGLE_DRIVE_VISITOR_PROOF_FOLDER_ID?.trim() ||
-        process.env.GOOGLE_DRIVE_EVENT_FOLDER_ID?.trim() ||
-        process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() ||
-        "";
-    } else {
-      folderId =
-        process.env.GOOGLE_DRIVE_VISITOR_PROOF_FOLDER_ID?.trim() ||
-        process.env.GOOGLE_DRIVE_EVENT_FOLDER_ID?.trim() ||
-        process.env.GOOGLE_DRIVE_FOLDER_ID?.trim() ||
-        "";
-    }
+    // Use dedicated visitor proof folder if configured, then event folder, then generic folder
+    const folderId =
+      process.env.GOOGLE_DRIVE_VISITOR_PROOF_FOLDER_ID?.trim() ||
+      process.env.GOOGLE_DRIVE_EVENT_FOLDER_ID?.trim() ||
+      process.env.GOOGLE_DRIVE_FOLDER_ID?.trim();
 
     if (!folderId) {
       return NextResponse.json({ error: "Google Drive folder not configured" }, { status: 500 });
@@ -71,27 +52,19 @@ export async function POST(request: NextRequest) {
 
     // Clean user identifiers for readable file naming
     const cleanName = userName ? userName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25) : "Visitor";
-    const cleanRefName = referringName ? referringName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25) : "ReferringPerson";
     const cleanPhone = userPhone ? userPhone.replace(/[^0-9]/g, "") : "";
     const cleanUid = userId ? userId.slice(-8) : "";
     const cleanOriginal = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-
-    const driveFileName =
-      proofType === "referring_id"
-        ? `Visitor_RefProof_${cleanRefName}_for_${cleanName}_${cleanPhone || cleanUid}_[${userId}]_${Date.now()}_${cleanOriginal}`
-        : `VisitorProof_${cleanName}_${cleanPhone || cleanUid}_[${userId}]_${Date.now()}_${cleanOriginal}`;
+    const driveFileName = `VisitorProof_${cleanName}_${cleanPhone || cleanUid}_[${userId}]_${Date.now()}_${cleanOriginal}`;
 
     const uploadedFile = await drive.files.create({
       requestBody: {
         name: driveFileName,
-        description:
-          proofType === "referring_id"
-            ? `Referring Person Carmel ID Card for Visitor: ${userName} | Ref Name: ${referringName} | Phone: ${userPhone} | UID: ${userId}`
-            : `Visitor College ID: ${userName} | Phone: ${userPhone} | UID: ${userId} | Event: ${qualifyingEvent}`,
+        description: `Visitor: ${userName} | Phone: ${userPhone} | UID: ${userId} | Event: ${qualifyingEvent}`,
         parents: [folderId],
       },
       media: {
-        mimeType: finalMimeType,
+        mimeType: file.type,
         body: Readable.from(buffer),
       },
       fields: "id,name,webViewLink",

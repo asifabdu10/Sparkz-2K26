@@ -38,12 +38,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import {
-  getAdminVisitorRegistrations,
-  updateCachedAdminVisitor,
-  removeCachedAdminVisitor,
-  addCachedAdminVisitor,
-} from "@/utils/firestoreCache";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 
 interface VisitorRegistration {
@@ -67,9 +61,6 @@ interface VisitorRegistration {
   facultyAadhaarFileId?: string;
   collegeIdFileId?: string;
   collegeIdFileUrl?: string;
-  referringIdFileId?: string;
-  referringIdFileUrl?: string;
-  referringCollegeId?: string;
   idProofUrl?: string;
   qualifyingPaidEvent?: string;
   fee?: number;
@@ -270,10 +261,13 @@ export default function VisitorRegistrationsAdmin() {
     }
   };
 
-  const fetchRegistrations = async (forceRefresh = false) => {
+  const fetchRegistrations = async () => {
     try {
       setRefreshing(true);
-      const data = (await getAdminVisitorRegistrations(forceRefresh)) as VisitorRegistration[];
+      const q = query(collection(db, "visitor_registrations"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      const data: VisitorRegistration[] = [];
+      snap.forEach((d) => data.push({ id: d.id, ...d.data() } as VisitorRegistration));
       setRegistrations(data);
     } catch (error) {
       console.error("Error fetching visitor registrations:", error);
@@ -298,13 +292,6 @@ export default function VisitorRegistrationsAdmin() {
       reg.studentCollegeIdFileId ||
       reg.facultyIdFileId;
     if (fileId) return `https://drive.google.com/file/d/${fileId}/view`;
-    return "";
-  };
-
-  const getReferringProofUrl = (reg: VisitorRegistration | null | undefined): string => {
-    if (!reg) return "";
-    if (reg.referringIdFileUrl) return reg.referringIdFileUrl;
-    if (reg.referringIdFileId) return `https://drive.google.com/file/d/${reg.referringIdFileId}/view`;
     return "";
   };
 
@@ -606,8 +593,7 @@ export default function VisitorRegistrationsAdmin() {
       "Referring Dept": reg.referringDepartment || "N/A",
       "Referring Year": reg.referringYear || "N/A",
       "Qualifying Paid Event": reg.qualifyingPaidEvent || "N/A",
-      "Visitor ID Proof URL": getProofUrl(reg) || "N/A",
-      "Referring Person ID Proof URL": getReferringProofUrl(reg) || "N/A",
+      "ID Proof URL": getProofUrl(reg) || "N/A",
       "Status": reg.approvalStatus === "revoked" ? "Revoked" : "Active",
       "Revoked Reason": reg.revokedReason || "N/A",
       "Revoked Date": reg.revokedAt ? formatDate(reg.revokedAt) : "N/A",
@@ -674,7 +660,7 @@ export default function VisitorRegistrationsAdmin() {
           </div>
 
           <button
-            onClick={() => fetchRegistrations(true)}
+            onClick={fetchRegistrations}
             disabled={refreshing}
             className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded-xl border border-gray-700 transition-colors disabled:opacity-50 text-sm font-medium"
             title="Refresh list"
@@ -1080,45 +1066,25 @@ export default function VisitorRegistrationsAdmin() {
                           <div className="text-gray-500 text-[11px]">Pass: Abheri & Proshow</div>
                         </td>
 
-                        {/* Proof Viewer */}
+                        {/* Proof Viewer (Like Abheri) */}
                         <td className="px-4 py-4 text-center">
-                          <div className="flex flex-col items-center gap-1.5">
-                            {(() => {
-                              const visitorUrl = getProofUrl(reg);
-                              return visitorUrl ? (
-                                <a
-                                  href={visitorUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-indigo-400 hover:text-indigo-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
-                                  title="Open Visitor ID Proof in Google Drive"
-                                >
-                                  <span>Visitor ID</span>
-                                  <ExternalLink size={11} />
-                                </a>
-                              ) : null;
-                            })()}
-
-                            {(() => {
-                              const refereeUrl = getReferringProofUrl(reg);
-                              return refereeUrl ? (
-                                <a
-                                  href={refereeUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sky-400 hover:text-sky-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
-                                  title="Open Referring Person's College ID Proof in Google Drive"
-                                >
-                                  <span>Referee ID</span>
-                                  <ExternalLink size={11} />
-                                </a>
-                              ) : null;
-                            })()}
-
-                            {!getProofUrl(reg) && !getReferringProofUrl(reg) && (
+                          {(() => {
+                            const proofUrl = getProofUrl(reg);
+                            return proofUrl ? (
+                              <a
+                                href={proofUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-400 hover:text-indigo-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
+                                title="Open uploaded ID in Google Drive"
+                              >
+                                <span>View Proof</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            ) : (
                               <span className="text-gray-500 text-xs italic">No ID uploaded</span>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Status */}
@@ -1333,51 +1299,27 @@ export default function VisitorRegistrationsAdmin() {
 
               <div className="bg-gray-800/40 p-3.5 rounded-xl border border-gray-700/60 space-y-2">
                 <div className="text-xs font-semibold text-[#F3C87A] uppercase tracking-wider">
-                  ID Proofs & Timestamps
+                  ID Proof & Timestamps
                 </div>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-gray-400 text-xs">Visitor College ID:</span>
-                    <div className="mt-1">
-                      {(() => {
-                        const proofUrl = getProofUrl(selectedReg);
-                        return proofUrl ? (
-                          <a
-                            href={proofUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
-                          >
-                            <ExternalLink size={14} />
-                            <span>View Visitor ID</span>
-                          </a>
-                        ) : (
-                          <span className="text-gray-500 text-xs">No visitor document</span>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-gray-400 text-xs">Referring Person&apos;s College ID:</span>
-                    <div className="mt-1">
-                      {(() => {
-                        const refUrl = getReferringProofUrl(selectedReg);
-                        return refUrl ? (
-                          <a
-                            href={refUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium transition-colors"
-                          >
-                            <ExternalLink size={14} />
-                            <span>View Referee College ID</span>
-                          </a>
-                        ) : (
-                          <span className="text-gray-500 text-xs">No referee document</span>
-                        );
-                      })()}
-                    </div>
+                <div>
+                  <span className="text-gray-400 text-xs">College ID Proof:</span>
+                  <div className="mt-1">
+                    {(() => {
+                      const proofUrl = getProofUrl(selectedReg);
+                      return proofUrl ? (
+                        <a
+                          href={proofUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
+                        >
+                          <ExternalLink size={14} />
+                          <span>View Proof Link</span>
+                        </a>
+                      ) : (
+                        <span className="text-gray-500 text-xs">No document uploaded</span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div>

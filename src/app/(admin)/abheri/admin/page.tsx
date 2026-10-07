@@ -16,17 +16,12 @@ import {
     FiLogOut,
     FiExternalLink,
     FiTrash2,
-    FiRefreshCw,
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import {
     toastError,
     toastSuccess,
 } from "@/utils/common/Toast";
-import {
-    getAdminAbheriRegistrations,
-    invalidateAdminAbheriCache,
-} from "@/utils/firestoreCache";
 
 interface AbheriRegistration {
     id: string;
@@ -131,11 +126,27 @@ export default function AbheriAdminPage() {
      * =========================================================
      */
 
-    const fetchRegistrations = async (forceRefresh = false) => {
+    const fetchRegistrations = async () => {
         try {
             setFetchLoading(true);
-            const list = await getAdminAbheriRegistrations(forceRefresh);
-            setRegistrations(list as AbheriRegistration[]);
+
+            const querySnapshot =
+                await getDocs(
+                    collection(
+                        db,
+                        "abheri_registrations"
+                    )
+                );
+
+            const list =
+                querySnapshot.docs.map(
+                    (registrationDoc) => ({
+                        id: registrationDoc.id,
+                        ...registrationDoc.data(),
+                    })
+                ) as AbheriRegistration[];
+
+            setRegistrations(list);
         } catch (error) {
             console.error(
                 "Error fetching Abheri registrations:",
@@ -278,7 +289,6 @@ export default function AbheriAdminPage() {
              */
 
             await batch.commit();
-            invalidateAdminAbheriCache();
 
 
             /*
@@ -458,26 +468,6 @@ export default function AbheriAdminPage() {
 
 
                     <div className="flex flex-wrap gap-4">
-
-
-                        {/* =========================================
-                            REFRESH BUTTON
-                        ========================================= */}
-
-                        <button
-                            onClick={() =>
-                                fetchRegistrations(true)
-                            }
-                            disabled={fetchLoading}
-                            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg transition-colors font-medium border border-gray-700 disabled:opacity-50"
-                            title="Force reload registrations from server"
-                        >
-
-                            <FiRefreshCw className={fetchLoading ? "animate-spin" : ""} />
-
-                            Refresh
-
-                        </button>
 
 
                         {/* =========================================

@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, orderBy, doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/utils/firebase";
-import { Loader2, Download, Printer, ExternalLink, Search, RefreshCw } from "lucide-react";
+import { Loader2, Download, Printer, ExternalLink, Search } from "lucide-react";
 import * as XLSX from "xlsx";
-import { getAdminAbheriRegistrations } from "@/utils/firestoreCache";
 import { toastError, toastSuccess } from "@/utils/common/Toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -111,10 +110,17 @@ export default function AbheriAdmin() {
     }
   };
 
-  const fetchRegistrations = async (forceRefresh = false) => {
+  const fetchRegistrations = async () => {
     try {
-      setLoading(true);
-      const data = (await getAdminAbheriRegistrations(forceRefresh)) as Registration[];
+      const q = query(
+        collection(db, "abheri_registrations"),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const data: Registration[] = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() } as Registration);
+      });
       setRegistrations(data);
     } catch (error) {
       console.error("Error fetching registrations:", error);
@@ -236,17 +242,6 @@ export default function AbheriAdmin() {
             )}
           </div>
 
-
-          {/* Refresh */}
-          <button
-            onClick={() => fetchRegistrations(true)}
-            disabled={loading}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3.5 py-2 rounded-lg border border-gray-700 transition-colors text-sm font-semibold disabled:opacity-50"
-            title="Refresh list"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            <span>Refresh</span>
-          </button>
 
           {/* Export Excel */}
           <button

@@ -1,26 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminFirestore, getAdminAuth, FieldValue } from "@/utils/server/firebaseAdmin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import crypto from "crypto";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+function initAdmin() {
+  if (!getApps().length) {
+    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
+    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+      raw = raw.slice(1, -1);
+    }
+    try {
+      const serviceAccount = JSON.parse(raw);
+      initializeApp({ credential: cert(serviceAccount) });
+    } catch (e) {
+      console.error("Firebase Admin initialization error:", e);
+    }
+  }
+}
+
+function getAdminDb() {
+  initAdmin();
+  return getFirestore();
+}
+
+function getAdminAuth() {
+  initAdmin();
+  return getAuth();
+}
 
 export async function POST(request: NextRequest) {
   try {
-    let db;
-    let adminAuth;
-    try {
-      db = getAdminFirestore();
-      adminAuth = getAdminAuth();
-    } catch (configErr) {
-      console.error("Firebase Admin configuration error in visitor submit route:", configErr);
-      return NextResponse.json(
-        { success: false, error: "Server configuration error. Please contact the administrator." },
-        { status: 500 }
-      );
-    }
-
     // ── 1. Verify Firebase ID token ─────────────────────────────────────────
     const authHeader = request.headers.get("Authorization") || "";
     const idToken = authHeader.replace("Bearer ", "").trim();
@@ -32,17 +42,17 @@ export async function POST(request: NextRequest) {
     let userEmail: string = "";
 
     try {
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
       uid = decodedToken.uid;
       userEmail = decodedToken.email || "";
     } catch (verifyErr) {
-      console.warn("adminAuth.verifyIdToken failed, attempting JWT decode fallback:", verifyErr);
+      console.warn("getAdminAuth().verifyIdToken failed, attempting JWT decode fallback:", verifyErr);
       try {
         const parts = idToken.split(".");
         if (parts.length !== 3) {
           throw new Error("Invalid JWT token format");
         }
-        const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
+        const payloadJson = Buffer.from(parts[1], "base64").toString("utf-8");
         const payload = JSON.parse(payloadJson);
 
         const now = Math.floor(Date.now() / 1000);
@@ -65,7 +75,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+
     // ── 2. Check user role ─────────────────────────────────────────────────
+    const db = getAdminDb();
     const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"];
     let paidEventName = "";
     let isAdmin = false;
@@ -169,9 +181,7 @@ export async function POST(request: NextRequest) {
       yearOfStudy,     // visitor's own year of study
       referringType, referringName, referringDepartment,
       referringYear,   // only for student referrals
-      referringCollegeId,
-      collegeIdFileId, // visitor's college ID
-      referringIdFileId, // referring person's college ID
+      collegeIdFileId, // single file — visitor's college ID
       razorpayPaymentId,
       razorpayOrderId,
       razorpaySignature,
@@ -197,12 +207,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Referring student's year of study is required." }, { status: 400 });
     if (!collegeIdFileId)
       return NextResponse.json({ success: false, error: "Visitor's college ID file is required." }, { status: 400 });
-    if (!referringIdFileId)
-      return NextResponse.json({ success: false, error: "Referring person's college ID card file is required." }, { status: 400 });
 
     // ── 4. Verify Razorpay Payment (₹250) for non-admins ───────────────────
-    const isAdminBypass = isAdmin || (razorpayPaymentId && String(razorpayPaymentId).startsWith("admin_granted"));
-    if (!isAdminBypass) {
+    if (!isAdmin) {
       if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
         return NextResponse.json(
           { success: false, error: "Payment verification failed: Razorpay payment is required for visitor pass (₹250)." },
@@ -265,15 +272,12 @@ export async function POST(request: NextRequest) {
       referringType,
       referringName: referringName.trim(),
       referringDepartment: referringDepartment.trim(),
-      referringCollegeId: referringCollegeId ? String(referringCollegeId).trim() : "",
-      collegeIdFileId: String(collegeIdFileId).trim(),
-      collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(collegeIdFileId).trim()}/view`,
-      referringIdFileId: String(referringIdFileId).trim(),
-      referringIdFileUrl: (body.referringIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(referringIdFileId).trim()}/view`,
-      idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(collegeIdFileId).trim()}/view`,
+      collegeIdFileId: collegeIdFileId.trim(),
+      collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
+      idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
       qualifyingPaidEvent: paidEventName,
       fee: currentFee,
-      amountPaid: isAdminBypass ? 0 : currentFee,
+      amountPaid: currentFee,
       paymentStatus: "paid",
       razorpayPaymentId: razorpayPaymentId || null,
       razorpayOrderId: razorpayOrderId || null,
