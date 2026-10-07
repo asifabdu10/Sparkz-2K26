@@ -6,35 +6,6 @@ import Script from "next/script";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
 import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot } from "firebase/firestore";
-import { compressImage } from "@/utils/imageUtils";
-
-async function parseJsonResponse(res: Response, endpointLabel: string) {
-  const text = await res.text();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let data: any = null;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    if (res.status === 413) {
-      throw new Error("Uploaded file is too large for the server. Please upload an image under 4MB.");
-    }
-    if (res.status === 504 || res.status === 408) {
-      throw new Error("Upload connection timed out. Please check your internet connection and try again.");
-    }
-    const cleanSnippet = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
-    if (cleanSnippet && !cleanSnippet.toLowerCase().includes("doctype")) {
-      throw new Error(`${endpointLabel} failed: ${cleanSnippet}`);
-    }
-    throw new Error(`${endpointLabel} failed (HTTP ${res.status}: ${res.statusText || "Server error"}). Please try again.`);
-  }
-
-  if (!res.ok || data?.success === false) {
-    throw new Error(data?.error || data?.message || `${endpointLabel} failed (HTTP ${res.status}).`);
-  }
-
-  return data;
-}
-
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ReferringType = "student" | "faculty" | "";
@@ -75,82 +46,30 @@ function FileInput({
   inputRef: React.RefObject<HTMLInputElement | null>;
   errorKey: string; errors: Record<string, string>;
 }) {
-  const [compressing, setCompressing] = useState(false);
-
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1 flex items-center justify-between">
-        <span>{label}</span>
-        {compressing && <span className="text-xs text-[#F3C87A] animate-pulse">Optimizing image size...</span>}
-      </label>
+      <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
       <p className="text-xs text-gray-500 mb-2">{hint}</p>
       <div
-        onClick={() => !compressing && inputRef.current?.click()}
-        className={`cursor-pointer border-2 border-dashed ${
-          errors[errorKey] ? "border-red-500 bg-red-950/10" : "border-[rgba(212,163,89,0.3)] bg-[#0E0E12]"
-        } rounded-xl p-4 text-center hover:border-[#F3C87A] transition-colors`}
+        onClick={() => inputRef.current?.click()}
+        className={`cursor-pointer border-2 border-dashed ${errors[errorKey] ? "border-red-500" : "border-[rgba(212,163,89,0.3)]"
+          } rounded-xl p-4 text-center hover:border-[#F3C87A] transition-colors`}
       >
-        {compressing ? (
-          <div className="flex items-center justify-center gap-2 text-[#F3C87A] py-1">
-            <span className="w-4 h-4 border-2 border-[#F3C87A] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-medium">Compressing image for fast upload...</span>
-          </div>
-        ) : file ? (
+        {file ? (
           <div className="flex items-center justify-center gap-2 text-green-400">
             <span>&#x2713;</span>
-            <span className="text-sm truncate max-w-[200px] text-white font-medium">{file.name}</span>
-            <span className="text-xs text-gray-400">
-              ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-            </span>
+            <span className="text-sm truncate max-w-[200px]">{file.name}</span>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFile(null);
-                if (inputRef.current) inputRef.current.value = "";
-              }}
-              className="text-red-400 hover:text-red-300 ml-2 text-xs p-1"
-              title="Remove file"
-            >
-              &#x2715;
-            </button>
+              onClick={(e) => { e.stopPropagation(); setFile(null); if (inputRef.current) inputRef.current.value = ""; }}
+              className="text-red-400 hover:text-red-300 ml-2 text-xs"
+            >&#x2715;</button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-1">
-            <p className="text-sm text-gray-300 font-medium">
-              Click to upload <span className="text-[#F3C87A]">{label}</span>
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">JPG, PNG, WEBP or PDF (max 10 MB - auto optimized)</p>
-          </div>
+          <p className="text-sm text-gray-400">Click to upload <span className="text-[#F3C87A]">{label}</span></p>
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
-          className="hidden"
-          onChange={async (e) => {
-            const selected = e.target.files?.[0];
-            if (!selected) return;
-            if (selected.size > 15 * 1024 * 1024) {
-              alert("File size exceeds 15MB limit. Please choose a smaller file.");
-              return;
-            }
-            if (selected.type.startsWith("image/")) {
-              try {
-                setCompressing(true);
-                const compressed = await compressImage(selected);
-                setFile(compressed);
-              } catch (cErr) {
-                console.warn("Image compression fallback to original:", cErr);
-                setFile(selected);
-              } finally {
-                setCompressing(false);
-              }
-            } else {
-              setFile(selected);
-            }
-          }}
-        />
+        <input ref={inputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf" className="hidden"
+          onChange={(e) => setFile(e.target.files?.[0] || null)} />
       </div>
       {errors[errorKey] && <p className="text-red-400 text-xs mt-1">{errors[errorKey]}</p>}
     </div>
@@ -190,8 +109,6 @@ export default function VisitorRegistrationPage() {
 
   const [collegeIdFile, setCollegeIdFile] = useState<File | null>(null);
   const collegeIdRef = useRef<HTMLInputElement>(null);
-  const [referringIdFile, setReferringIdFile] = useState<File | null>(null);
-  const referringIdRef = useRef<HTMLInputElement>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -321,7 +238,6 @@ export default function VisitorRegistrationPage() {
     if (!form.referringDepartment.trim()) e.referringDepartment = "Referring person's department is required.";
     if (form.referringType === "student" && !form.referringYear) e.referringYear = "Year of study is required.";
     if (!collegeIdFile) e.collegeId = "Your College ID photo/scan is required.";
-    if (!referringIdFile) e.referringId = "Referring person's College ID card is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -338,11 +254,7 @@ export default function VisitorRegistrationPage() {
     });
   };
 
-  const uploadFile = async (
-    file: File,
-    proofType: string,
-    referringName?: string
-  ): Promise<{ fileId: string; fileUrl: string }> => {
+  const uploadFile = async (file: File, proofType: string): Promise<{ fileId: string; fileUrl: string }> => {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("proofType", proofType);
@@ -350,15 +262,8 @@ export default function VisitorRegistrationPage() {
     if (form.name) fd.append("userName", form.name);
     if (form.phone) fd.append("userPhone", form.phone);
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
-    if (referringName) fd.append("referringName", referringName);
-
-    let res: Response;
-    try {
-      res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
-    } catch (networkErr: any) {
-      throw new Error("Network connection failed while uploading ID proof. Please check your internet and try again.");
-    }
-    const data = await parseJsonResponse(res, "ID proof upload");
+    const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
+    const data = await res.json();
     if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
     const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
@@ -372,79 +277,13 @@ export default function VisitorRegistrationPage() {
     if (!hasPaidEvent) { setErrors({ submit: "You must have at least one confirmed paid departmental event registration." }); return; }
 
     setSubmitting(true);
-    setSubmittingStatus("Uploading ID proof documents...");
+    setSubmittingStatus("Uploading ID proof document...");
 
     try {
       const idToken = await user.getIdToken(true);
       const { fileId: collegeIdFileId, fileUrl: collegeIdFileUrl } = await uploadFile(collegeIdFile!, "college_id");
-      const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(referringIdFile!, "referring_id", form.referringName);
 
-      // ── Admin Direct Bypass (Free testing without Razorpay) ───────────────
-      if (isAdmin) {
-        setSubmittingStatus("Admin verified! Finalizing visitor pass registration...");
-        const submitPayload = {
-          ...form,
-          collegeIdFileId,
-          collegeIdFileUrl,
-          referringIdFileId,
-          referringIdFileUrl,
-          userId: user.uid,
-          userEmail: user.email,
-          razorpayPaymentId: "admin_granted_" + Date.now(),
-          razorpayOrderId: "admin_order_" + Date.now(),
-          razorpaySignature: "admin_signature",
-        };
-
-        const subRes = await fetch("/api/visitor-registration/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify(submitPayload),
-        });
-        const subData = await parseJsonResponse(subRes, "Visitor pass registration");
-        if (!subData.success) {
-          throw new Error(subData.error || "Failed to finalize visitor registration.");
-        }
-
-        const registrationId: string = subData.id;
-        let emailSent = false;
-        try {
-          const emailRes = await fetch("/api/visitor-registration/send-confirmation-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: user.email,
-              name: form.name,
-              college: form.college,
-              department: form.department,
-              yearOfStudy: form.yearOfStudy,
-              referringType: form.referringType,
-              referringName: form.referringName,
-              registrationId,
-              amountPaid: `₹0 (Admin Direct Pass)`,
-              paymentId: "admin_granted",
-              passValidity: "08 & 09 Oct",
-              collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
-            }),
-          });
-          const emData = await parseJsonResponse(emailRes, "Confirmation email");
-          emailSent = emData?.success === true;
-        } catch (emErr) {
-          console.warn("Email sending failed (non-fatal):", emErr);
-        }
-
-        setResult({
-          success: true,
-          emailSent,
-          regId: registrationId,
-          paymentId: "admin_direct_grant",
-        });
-        setStep("done");
-        setSubmitting(false);
-        setSubmittingStatus("");
-        return;
-      }
-
-      // ── Razorpay Payment (Non-Admin Attendees) ───────────────────────────
+      // ── Razorpay Payment ─────────────────────────────────────────────────
       setSubmittingStatus(`Initializing payment gateway (₹${passFee})...`);
       const isLoaded = await ensureRazorpayLoaded();
       if (!isLoaded) {
@@ -452,30 +291,25 @@ export default function VisitorRegistrationPage() {
       }
 
       // Create order via API
-      let orderRes: Response;
-      try {
-        orderRes = await fetch("/api/razorpay/create-order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: passFee,
-            notes: {
-              type: "visitor_registration",
-              userId: user.uid,
-              name: form.name,
-              phone: form.phone,
-            },
-          }),
-        });
-      } catch (netErr: any) {
-        throw new Error("Unable to connect to payment server. Please check your internet connection and try again.");
-      }
-      const orderData = await parseJsonResponse(orderRes, "Payment initialization");
+      const orderRes = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: passFee,
+          notes: {
+            type: "visitor_registration",
+            userId: user.uid,
+            name: form.name,
+            phone: form.phone,
+          },
+        }),
+      });
+      const orderData = await orderRes.json();
       if (!orderRes.ok || !orderData.order_id) {
         throw new Error(orderData.error || "Failed to create payment order. Please try again.");
       }
 
-      const rzpKey = orderData.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+      const rzpKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
       if (!rzpKey) {
         throw new Error("Razorpay key is not configured.");
       }
@@ -505,12 +339,10 @@ export default function VisitorRegistrationPage() {
           setSubmittingStatus("Payment verified! Finalizing registration...");
 
           try {
-            const paymentSubmitPayload = {
+            const submitPayload = {
               ...form,
               collegeIdFileId,
               collegeIdFileUrl,
-              referringIdFileId,
-              referringIdFileUrl,
               userId: user.uid,
               userEmail: user.email,
               razorpayPaymentId: paymentResponse.razorpay_payment_id,
@@ -518,17 +350,12 @@ export default function VisitorRegistrationPage() {
               razorpaySignature: paymentResponse.razorpay_signature,
             };
 
-            let subRes: Response;
-            try {
-              subRes = await fetch("/api/visitor-registration/submit", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify(paymentSubmitPayload),
-              });
-            } catch (netErr: any) {
-              throw new Error("Network connection error finalizing registration. Your payment ID is " + paymentResponse.razorpay_payment_id + ". Please contact helpdesk.");
-            }
-            const subData = await parseJsonResponse(subRes, "Finalizing registration");
+            const subRes = await fetch("/api/visitor-registration/submit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+              body: JSON.stringify(submitPayload),
+            });
+            const subData = await subRes.json();
             if (!subData.success) {
               throw new Error(subData.error || "Failed to finalize visitor registration after payment.");
             }
@@ -1063,21 +890,6 @@ export default function VisitorRegistrationPage() {
                             {errors.referringYear && <p className="text-red-400 text-xs mt-1">{errors.referringYear}</p>}
                           </div>
                         )}
-
-                        {/* Referring Person's College ID Card Upload */}
-                        <div className="md:col-span-2 pt-2 border-t border-[rgba(212,163,89,0.15)]">
-                          <FileInput
-                            label={`Referring ${form.referringType === "student" ? "Student" : "Faculty"}'s College ID Card *`}
-                            hint={`Upload photo or scanned copy of referring ${
-                              form.referringType === "student" ? "student" : "faculty"
-                            }'s Carmel College ID card (JPG, PNG, WEBP or PDF — max 5 MB)`}
-                            file={referringIdFile}
-                            setFile={setReferringIdFile}
-                            inputRef={referringIdRef}
-                            errorKey="referringId"
-                            errors={errors}
-                          />
-                        </div>
                       </div>
                     </motion.div>
                   )}

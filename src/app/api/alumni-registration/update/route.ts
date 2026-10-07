@@ -22,10 +22,6 @@ export async function POST(request: NextRequest) {
       status,
       emailStatus,
       batch,
-      referringType,
-      referringName,
-      referringDepartment,
-      referringYear,
     } = body;
 
     if (!registrationId || typeof registrationId !== "string") {
@@ -156,19 +152,6 @@ export async function POST(request: NextRequest) {
 
     if (typeof batch === "string") {
       updatePayload.batch = batch.trim();
-    }
-
-    if (typeof referringType === "string" && ["student", "faculty"].includes(referringType.toLowerCase())) {
-      updatePayload.referringType = referringType.toLowerCase();
-    }
-    if (typeof referringName === "string") {
-      updatePayload.referringName = referringName.trim();
-    }
-    if (typeof referringDepartment === "string") {
-      updatePayload.referringDepartment = referringDepartment.trim();
-    }
-    if (typeof referringYear === "string") {
-      updatePayload.referringYear = referringYear.trim();
     }
 
     if (validStatus === "deregistered") {

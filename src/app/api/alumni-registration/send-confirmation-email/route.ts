@@ -24,17 +24,7 @@ export async function POST(request: NextRequest) {
   let registrationIdToUpdate = "";
   try {
     const body = await request.json();
-    const {
-      email,
-      name,
-      department,
-      passedOutYear,
-      batch,
-      contact,
-      registrationId,
-      referringName,
-      referringType,
-    } = body;
+    const { email, name, department, passedOutYear, batch, contact, registrationId } = body;
     registrationIdToUpdate = registrationId || "";
 
     if (!email) return NextResponse.json({ success: false, error: "Email address is required." }, { status: 400 });
@@ -85,7 +75,6 @@ export async function POST(request: NextRequest) {
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Passed Out Year</td><td>${escapeHtml(passedOutYear)}</td></tr>
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Contact</td><td>${escapeHtml(contact)}</td></tr>
             <tr><td style="padding:8px 0;font-weight:bold;color:#555;">Email</td><td>${escapeHtml(email)}</td></tr>
-            ${referringName ? `<tr><td style="padding:8px 0;font-weight:bold;color:#555;">Referred By</td><td>${escapeHtml(referringName)} (${referringType === "faculty" ? "Faculty" : "Student"})</td></tr>` : ""}
           </table>
           <div style="margin-top:25px;padding:15px;background:#fff8e7;border-left:4px solid #F3C87A;border-radius:4px;">
             <p style="margin:0;font-size:13px;color:#856404;">Please present this email or your Registration ID at the alumni desk.</p>

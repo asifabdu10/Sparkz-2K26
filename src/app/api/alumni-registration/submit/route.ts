@@ -127,21 +127,9 @@ export async function POST(request: NextRequest) {
       console.warn("Could not check eventSettings/alumni:", settErr);
     }
 
-    // ── 3. Input Validation for Department, Year, Contact, ID Cards & Referrals ──
+    // ── 3. Input Validation for Department, Year & Contact ────────────────
     const body = await request.json().catch(() => ({}));
-    const {
-      department,
-      passedOutYear,
-      contact,
-      alumniIdFileId,
-      alumniIdFileUrl,
-      referringType,
-      referringName,
-      referringDepartment,
-      referringYear,
-      referringIdFileId,
-      referringIdFileUrl,
-    } = body;
+    const { department, passedOutYear, contact } = body;
 
     const trimmedDept = typeof department === "string" ? department.trim() : "";
     if (!ALLOWED_DEPARTMENTS.includes(trimmedDept as (typeof ALLOWED_DEPARTMENTS)[number])) {
@@ -169,48 +157,6 @@ export async function POST(request: NextRequest) {
     if (!/^\d{10}$/.test(contactStr)) {
       return NextResponse.json(
         { success: false, error: "Valid 10-digit contact number is required." },
-        { status: 400 }
-      );
-    }
-
-    // Validate Referring Person details
-    const cleanRefType = String(referringType || "").trim().toLowerCase();
-    if (!["student", "faculty"].includes(cleanRefType)) {
-      return NextResponse.json(
-        { success: false, error: "Please select who is referring you (Student or Faculty)." },
-        { status: 400 }
-      );
-    }
-
-    const cleanRefName = String(referringName || "").trim();
-    if (!cleanRefName) {
-      return NextResponse.json(
-        { success: false, error: "Referring person's name is required." },
-        { status: 400 }
-      );
-    }
-
-    const cleanRefDept = String(referringDepartment || "").trim();
-    if (!cleanRefDept) {
-      return NextResponse.json(
-        { success: false, error: "Referring person's department is required." },
-        { status: 400 }
-      );
-    }
-
-    const cleanRefYear = String(referringYear || "").trim();
-    if (cleanRefType === "student" && !cleanRefYear) {
-      return NextResponse.json(
-        { success: false, error: "Referring student's year of study is required." },
-        { status: 400 }
-      );
-    }
-
-    // Validate Referring Person's College ID proof (Required)
-    const cleanRefFileId = String(referringIdFileId || "").trim();
-    if (!cleanRefFileId) {
-      return NextResponse.json(
-        { success: false, error: "Please upload the referring person's College ID card." },
         { status: 400 }
       );
     }
@@ -246,10 +192,6 @@ export async function POST(request: NextRequest) {
     // Name is stored in Firebase as the email used for login as requested
     const candidateName = verifiedEmail;
 
-    const finalRefUrl =
-      String(referringIdFileUrl || "").trim() ||
-      `https://drive.google.com/file/d/${cleanRefFileId}/view`;
-
     const docData: Record<string, unknown> = {
       userId: verifiedUid,
       name: candidateName, // Stored as the Google email used for login
@@ -258,15 +200,6 @@ export async function POST(request: NextRequest) {
       department: trimmedDept,
       passedOutYear: yearNum,
       contact: contactStr,
-      referringType: cleanRefType,
-      referringName: cleanRefName,
-      referringDepartment: cleanRefDept,
-      referringYear: cleanRefType === "student" ? cleanRefYear : null,
-      referringIdFileId: cleanRefFileId,
-      referringIdFileUrl: finalRefUrl,
-      collegeIdFileId: cleanRefFileId,
-      collegeIdFileUrl: finalRefUrl,
-      idProofUrl: finalRefUrl,
       status: "registered",
       emailStatus: "pending",
       createdAt: FieldValue.serverTimestamp(),
@@ -284,10 +217,6 @@ export async function POST(request: NextRequest) {
           alumniDepartment: trimmedDept,
           alumniPassedOutYear: yearNum,
           alumniContact: contactStr,
-          referringName: cleanRefName,
-          referringDepartment: cleanRefDept,
-          referringType: cleanRefType,
-          referringIdFileUrl: finalRefUrl,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
