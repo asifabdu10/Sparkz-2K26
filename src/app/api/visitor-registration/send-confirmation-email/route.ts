@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAdminFirestore, FieldValue } from "@/utils/server/firebaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function getAdminDb() {
-  if (!getApps().length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
-    initializeApp({ credential: cert(serviceAccount) });
+function getSafeAdminDb() {
+  try {
+    return getAdminFirestore();
+  } catch (err) {
+    console.warn("Firebase Admin unavailable in email route:", err);
+    return null;
   }
-  return getFirestore();
 }
 
 function escapeHtml(value: unknown) {
@@ -219,12 +219,14 @@ export async function POST(request: NextRequest) {
 
     if (registrationId) {
       try {
-        const db = getAdminDb();
-        await db.collection("visitor_registrations").doc(registrationId).update({
-          emailStatus: "sent",
-          emailSentAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        const db = getSafeAdminDb();
+        if (db) {
+          await db.collection("visitor_registrations").doc(registrationId).update({
+            emailStatus: "sent",
+            emailSentAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
       } catch (dbErr) {
         console.error("Failed to update visitor registration emailStatus in db:", dbErr);
       }
@@ -238,12 +240,14 @@ export async function POST(request: NextRequest) {
 
     if (registrationIdToUpdate) {
       try {
-        const db = getAdminDb();
-        await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
-          emailStatus: "failed",
-          emailError: err?.message || "Failed to send confirmation email.",
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        const db = getSafeAdminDb();
+        if (db) {
+          await db.collection("visitor_registrations").doc(registrationIdToUpdate).update({
+            emailStatus: "failed",
+            emailError: err?.message || "Failed to send confirmation email.",
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
       } catch (dbErr) {
         console.error("Failed to update visitor registration emailStatus to failed:", dbErr);
       }

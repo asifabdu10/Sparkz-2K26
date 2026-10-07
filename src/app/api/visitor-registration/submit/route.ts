@@ -1,40 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+import { getAdminFirestore, getAdminAuth, FieldValue } from "@/utils/server/firebaseAdmin";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function initAdmin() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error:", e);
-    }
-  }
-}
-
-function getAdminDb() {
-  initAdmin();
-  return getFirestore();
-}
-
-function getAdminAuth() {
-  initAdmin();
-  return getAuth();
-}
-
 export async function POST(request: NextRequest) {
   try {
+    let db;
+    let adminAuth;
+    try {
+      db = getAdminFirestore();
+      adminAuth = getAdminAuth();
+    } catch (configErr) {
+      console.error("Firebase Admin configuration error in visitor submit route:", configErr);
+      return NextResponse.json(
+        { success: false, error: "Server configuration error. Please contact the administrator." },
+        { status: 500 }
+      );
+    }
+
     // ── 1. Verify Firebase ID token ─────────────────────────────────────────
     const authHeader = request.headers.get("Authorization") || "";
     const idToken = authHeader.replace("Bearer ", "").trim();
@@ -46,11 +32,11 @@ export async function POST(request: NextRequest) {
     let userEmail: string = "";
 
     try {
-      const decodedToken = await getAdminAuth().verifyIdToken(idToken);
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
       uid = decodedToken.uid;
       userEmail = decodedToken.email || "";
     } catch (verifyErr) {
-      console.warn("getAdminAuth().verifyIdToken failed, attempting JWT decode fallback:", verifyErr);
+      console.warn("adminAuth.verifyIdToken failed, attempting JWT decode fallback:", verifyErr);
       try {
         const parts = idToken.split(".");
         if (parts.length !== 3) {
@@ -79,9 +65,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-
     // ── 2. Check user role ─────────────────────────────────────────────────
-    const db = getAdminDb();
     const ADMIN_ROLES = ["superAdmin", "admin", "abheriAdmin", "basicScienceAdmin"];
     let paidEventName = "";
     let isAdmin = false;

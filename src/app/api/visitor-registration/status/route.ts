@@ -1,33 +1,30 @@
 import { NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getAdminFirestore } from "@/utils/server/firebaseAdmin";
 
-function getAdminDb() {
-  if (!getApps().length) {
-    let raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}").trim();
-    if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
-      raw = raw.slice(1, -1);
-    }
-    try {
-      const serviceAccount = JSON.parse(raw);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Firebase Admin initialization error in status route:", e);
-    }
-  }
-  return getFirestore();
-}
-
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  try {
-    const db = getAdminDb();
+  let registrationOpen = true;
+  let totalCapacity = 300;
+  let fee = 1;
 
-    // 1. Fetch settings from eventSettings/visitorPass
-    let registrationOpen = true;
-    let totalCapacity = 300;
-    let fee = 1;
+  try {
+    let db;
+    try {
+      db = getAdminFirestore();
+    } catch (adminErr) {
+      console.warn("Firebase Admin unavailable in visitor status route, returning default status:", adminErr);
+      return NextResponse.json({
+        success: true,
+        registrationOpen,
+        totalCapacity,
+        activeCount: 0,
+        remainingTickets: 300,
+        isSoldOut: false,
+        fee,
+      });
+    }
 
     try {
       const settingsSnap = await db.collection("eventSettings").doc("visitorPass").get();

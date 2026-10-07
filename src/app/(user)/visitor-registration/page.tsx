@@ -5,14 +5,15 @@ import Link from "next/link";
 import Script from "next/script";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
-import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { compressImage } from "@/utils/imageUtils";
 
 // ─── Safe JSON Parser Helper ─────────────────────────────────────────────────
 async function parseJsonResponse<T = Record<string, any>>(res: Response, endpointLabel: string): Promise<T> {
   const text = await res.text();
+  let parsed: any;
   try {
-    return (text ? JSON.parse(text) : {}) as T;
+    parsed = text ? JSON.parse(text) : {};
   } catch {
     console.error(`Non-JSON response from ${endpointLabel}: HTTP ${res.status}`, text.slice(0, 300));
     if (res.status === 413) {
@@ -21,14 +22,17 @@ async function parseJsonResponse<T = Record<string, any>>(res: Response, endpoin
     if (res.status === 504 || res.status === 408) {
       throw new Error("Server timed out while processing your request. Please check your internet connection and try again.");
     }
-    if (res.status === 500) {
-      throw new Error(`Server error during ${endpointLabel}. Please try again in a few moments.`);
-    }
     if (!res.ok) {
-      throw new Error(`Server returned error (${res.status}). Please try again.`);
+      throw new Error(`Server returned error (${res.status}) during ${endpointLabel}. Please try again.`);
     }
     throw new Error(`Unexpected server response format (${res.status}). Please try again.`);
   }
+
+  if (!res.ok && parsed && typeof parsed === "object" && parsed.error) {
+    throw new Error(parsed.error);
+  }
+
+  return parsed as T;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -381,33 +385,65 @@ export default function VisitorRegistrationPage() {
       const { fileId: collegeIdFileId, fileUrl: collegeIdFileUrl } = await uploadFile(collegeIdFile!, "college_id");
       const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(referringIdFile!, "referring_id", form.referringName);
 
-      // ── Admin Direct Bypass (Free testing without Razorpay) ───────────────
+      // ── Admin Direct Registration (Direct Authenticated Firestore Write) ──
       if (isAdmin) {
-        setSubmittingStatus("Admin verified! Finalizing visitor pass registration...");
-        const submitPayload = {
-          ...form,
-          collegeIdFileId,
-          collegeIdFileUrl,
-          referringIdFileId,
-          referringIdFileUrl,
-          userId: user.uid,
-          userEmail: user.email,
-          razorpayPaymentId: "admin_granted_" + Date.now(),
-          razorpayOrderId: "admin_order_" + Date.now(),
-          razorpaySignature: "admin_signature",
-        };
+        setSubmittingStatus("Admin verified! Creating visitor pass...");
 
-        const subRes = await fetch("/api/visitor-registration/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify(submitPayload),
-        });
-        const subData = await parseJsonResponse<{ success?: boolean; id?: string; error?: string }>(subRes, "admin visitor registration");
-        if (!subData.success || !subData.id) {
-          throw new Error(subData.error || "Failed to finalize visitor registration.");
+        // Duplicate registration check
+        const existingQ = query(
+          collection(db, "visitor_registrations"),
+          where("userId", "==", user.uid)
+        );
+        const existingSnap = await getDocs(existingQ);
+        const activeExisting = existingSnap.docs.find((d) => d.data().approvalStatus !== "revoked");
+        if (activeExisting) {
+          throw new Error("An active visitor pass already exists for this account.");
         }
 
-        const registrationId: string = subData.id;
+        const adminPaymentId = `admin_granted_${Date.now()}`;
+        const adminOrderId = `admin_order_${Date.now()}`;
+        const cleanDriveUrl = (fileId: string, url?: string) =>
+          url?.trim() || `https://drive.google.com/file/d/${fileId}/view`;
+
+        const docData: Record<string, unknown> = {
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          email: (user.email || `${form.phone.trim()}@visitor.sparkz.in`).toLowerCase().trim(),
+          userId: user.uid,
+          college: form.college.trim(),
+          department: form.department.trim(),
+          yearOfStudy: form.yearOfStudy.trim(),
+          referringType: form.referringType,
+          referringName: form.referringName.trim(),
+          referringDepartment: form.referringDepartment.trim(),
+          referringCollegeId: form.referringCollegeId ? form.referringCollegeId.trim() : "",
+          collegeIdFileId,
+          collegeIdFileUrl: cleanDriveUrl(collegeIdFileId, collegeIdFileUrl),
+          referringIdFileId,
+          referringIdFileUrl: cleanDriveUrl(referringIdFileId, referringIdFileUrl),
+          idProofUrl: cleanDriveUrl(collegeIdFileId, collegeIdFileUrl),
+          qualifyingPaidEvent: paidEventName || "Sparkz Departmental Event",
+          fee: passFee,
+          amountPaid: 0,
+          paymentStatus: "paid",
+          razorpayPaymentId: adminPaymentId,
+          razorpayOrderId: adminOrderId,
+          passValidity: "08 & 09 Oct",
+          approvalStatus: "approved",
+          emailStatus: "pending",
+          createdByAdmin: true,
+          notes: `Direct Pass created by Admin (${userData?.role || "admin"})`,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
+        if (form.referringType === "student" && form.referringYear) {
+          docData.referringYear = form.referringYear.trim();
+        }
+
+        const docRef = await addDoc(collection(db, "visitor_registrations"), docData);
+        const registrationId = docRef.id;
+
         let emailSent = false;
         try {
           const emailRes = await fetch("/api/visitor-registration/send-confirmation-email", {
@@ -423,10 +459,10 @@ export default function VisitorRegistrationPage() {
               referringName: form.referringName,
               registrationId,
               amountPaid: `₹0 (Admin Direct Pass)`,
-              paymentId: "admin_granted",
+              paymentId: adminPaymentId,
               passValidity: "08 & 09 Oct",
-              collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
-              referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
+              collegeIdFileUrl: cleanDriveUrl(collegeIdFileId, collegeIdFileUrl),
+              referringIdFileUrl: cleanDriveUrl(referringIdFileId, referringIdFileUrl),
             }),
           });
           const emData = await parseJsonResponse<{ success?: boolean }>(emailRes, "admin confirmation email");
@@ -439,7 +475,7 @@ export default function VisitorRegistrationPage() {
           success: true,
           emailSent,
           regId: registrationId,
-          paymentId: "admin_direct_grant",
+          paymentId: adminPaymentId,
         });
         setStep("done");
         setSubmitting(false);
@@ -1107,14 +1143,16 @@ export default function VisitorRegistrationPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-white font-bold text-sm">Visitor Pass Registration Fee:</span>
-                    <span className="text-[#F3C87A] font-extrabold text-xl">₹{passFee}</span>
+                    <span className="text-[#F3C87A] font-extrabold text-xl">
+                      {isAdmin ? "₹0 (Admin Direct Pass)" : `₹${passFee}`}
+                    </span>
                   </div>
                   <p className="text-xs text-emerald-400 font-semibold mt-1">
                     ✓ Valid for 08 &amp; 09 Oct (Day 1: Abheri &bull; Day 2: Proshow)
                   </p>
                 </div>
                 <div className="text-xs text-gray-400 font-mono sm:text-right">
-                  Secure Online Payment
+                  {isAdmin ? "Admin Direct Registration" : "Secure Online Payment"}
                 </div>
               </div>
 
@@ -1130,7 +1168,9 @@ export default function VisitorRegistrationPage() {
                 className="w-full bg-[#F3C87A] hover:bg-[#e6b960] disabled:opacity-60 disabled:cursor-not-allowed text-[#0B0B0E] font-bold py-4 rounded-xl transition-all duration-200 transform hover:-translate-y-0.5 text-sm uppercase tracking-widest shadow-lg">
                 {submitting
                   ? (submittingStatus || "Processing... Please wait")
-                  : `Pay ₹${passFee} & Grab Your Ticket`}
+                  : isAdmin
+                    ? "Create Visitor Pass"
+                    : `Pay ₹${passFee} & Grab Your Ticket`}
               </button>
             </form>
           </motion.div>
