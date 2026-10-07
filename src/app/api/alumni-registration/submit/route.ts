@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     }
 
     const yearNum = Number(passedOutYear);
-    if (!Number.isInteger(yearNum) || yearNum < 2018 || yearNum > 2025) {
+    if (!Number.isInteger(yearNum) || yearNum < 2018 || yearNum > 2026) {
       return NextResponse.json(
         {
           success: false,
