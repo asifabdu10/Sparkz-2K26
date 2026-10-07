@@ -181,7 +181,8 @@ export async function POST(request: NextRequest) {
       yearOfStudy,     // visitor's own year of study
       referringType, referringName, referringDepartment,
       referringYear,   // only for student referrals
-      collegeIdFileId, // single file — visitor's college ID
+      collegeIdFileId, // visitor's college ID
+      referringIdFileId, // referring person's college ID
       razorpayPaymentId,
       razorpayOrderId,
       razorpaySignature,
@@ -207,6 +208,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Referring student's year of study is required." }, { status: 400 });
     if (!collegeIdFileId)
       return NextResponse.json({ success: false, error: "Visitor's college ID file is required." }, { status: 400 });
+    if (!referringIdFileId)
+      return NextResponse.json({ success: false, error: "Referring person's college ID file is required." }, { status: 400 });
 
     // ── 4. Verify Razorpay Payment (₹250) for non-admins ───────────────────
     if (!isAdmin) {
@@ -274,6 +277,8 @@ export async function POST(request: NextRequest) {
       referringDepartment: referringDepartment.trim(),
       collegeIdFileId: collegeIdFileId.trim(),
       collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
+      referringIdFileId: referringIdFileId.trim(),
+      referringIdFileUrl: (body.referringIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${referringIdFileId.trim()}/view`,
       idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
       qualifyingPaidEvent: paidEventName,
       fee: currentFee,

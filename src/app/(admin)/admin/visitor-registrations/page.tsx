@@ -67,6 +67,8 @@ interface VisitorRegistration {
   facultyAadhaarFileId?: string;
   collegeIdFileId?: string;
   collegeIdFileUrl?: string;
+  referringIdFileId?: string;
+  referringIdFileUrl?: string;
   idProofUrl?: string;
   qualifyingPaidEvent?: string;
   fee?: number;
@@ -295,6 +297,13 @@ export default function VisitorRegistrationsAdmin() {
       reg.studentCollegeIdFileId ||
       reg.facultyIdFileId;
     if (fileId) return `https://drive.google.com/file/d/${fileId}/view`;
+    return "";
+  };
+
+  const getReferringProofUrl = (reg: VisitorRegistration | null | undefined): string => {
+    if (!reg) return "";
+    if (reg.referringIdFileUrl) return reg.referringIdFileUrl;
+    if (reg.referringIdFileId) return `https://drive.google.com/file/d/${reg.referringIdFileId}/view`;
     return "";
   };
 
@@ -596,7 +605,8 @@ export default function VisitorRegistrationsAdmin() {
       "Referring Dept": reg.referringDepartment || "N/A",
       "Referring Year": reg.referringYear || "N/A",
       "Qualifying Paid Event": reg.qualifyingPaidEvent || "N/A",
-      "ID Proof URL": getProofUrl(reg) || "N/A",
+      "Visitor ID Proof URL": getProofUrl(reg) || "N/A",
+      "Referring Person ID Proof URL": getReferringProofUrl(reg) || "N/A",
       "Status": reg.approvalStatus === "revoked" ? "Revoked" : "Active",
       "Revoked Reason": reg.revokedReason || "N/A",
       "Revoked Date": reg.revokedAt ? formatDate(reg.revokedAt) : "N/A",
@@ -1069,25 +1079,45 @@ export default function VisitorRegistrationsAdmin() {
                           <div className="text-gray-500 text-[11px]">Pass: Abheri & Proshow</div>
                         </td>
 
-                        {/* Proof Viewer (Like Abheri) */}
+                        {/* Proof Viewer */}
                         <td className="px-4 py-4 text-center">
-                          {(() => {
-                            const proofUrl = getProofUrl(reg);
-                            return proofUrl ? (
-                              <a
-                                href={proofUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-indigo-400 hover:text-indigo-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
-                                title="Open uploaded ID in Google Drive"
-                              >
-                                <span>View Proof</span>
-                                <ExternalLink size={11} />
-                              </a>
-                            ) : (
+                          <div className="flex flex-col items-center gap-1.5">
+                            {(() => {
+                              const visitorUrl = getProofUrl(reg);
+                              return visitorUrl ? (
+                                <a
+                                  href={visitorUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-indigo-400 hover:text-indigo-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
+                                  title="Open Visitor ID Proof in Google Drive"
+                                >
+                                  <span>Visitor ID</span>
+                                  <ExternalLink size={11} />
+                                </a>
+                              ) : null;
+                            })()}
+
+                            {(() => {
+                              const refereeUrl = getReferringProofUrl(reg);
+                              return refereeUrl ? (
+                                <a
+                                  href={refereeUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sky-400 hover:text-sky-300 text-xs inline-flex items-center justify-center gap-1 hover:underline font-medium"
+                                  title="Open Referring Person's College ID Proof in Google Drive"
+                                >
+                                  <span>Referee ID</span>
+                                  <ExternalLink size={11} />
+                                </a>
+                              ) : null;
+                            })()}
+
+                            {!getProofUrl(reg) && !getReferringProofUrl(reg) && (
                               <span className="text-gray-500 text-xs italic">No ID uploaded</span>
-                            );
-                          })()}
+                            )}
+                          </div>
                         </td>
 
                         {/* Status */}
@@ -1302,27 +1332,51 @@ export default function VisitorRegistrationsAdmin() {
 
               <div className="bg-gray-800/40 p-3.5 rounded-xl border border-gray-700/60 space-y-2">
                 <div className="text-xs font-semibold text-[#F3C87A] uppercase tracking-wider">
-                  ID Proof & Timestamps
+                  ID Proofs & Timestamps
                 </div>
-                <div>
-                  <span className="text-gray-400 text-xs">College ID Proof:</span>
-                  <div className="mt-1">
-                    {(() => {
-                      const proofUrl = getProofUrl(selectedReg);
-                      return proofUrl ? (
-                        <a
-                          href={proofUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
-                        >
-                          <ExternalLink size={14} />
-                          <span>View Proof Link</span>
-                        </a>
-                      ) : (
-                        <span className="text-gray-500 text-xs">No document uploaded</span>
-                      );
-                    })()}
+                <div className="space-y-1.5">
+                  <div>
+                    <span className="text-gray-400 text-xs">Visitor College ID:</span>
+                    <div className="mt-0.5">
+                      {(() => {
+                        const proofUrl = getProofUrl(selectedReg);
+                        return proofUrl ? (
+                          <a
+                            href={proofUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
+                          >
+                            <ExternalLink size={14} />
+                            <span>View Visitor ID</span>
+                          </a>
+                        ) : (
+                          <span className="text-gray-500 text-xs">No visitor document</span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-gray-400 text-xs">Referring Person&apos;s College ID:</span>
+                    <div className="mt-0.5">
+                      {(() => {
+                        const refUrl = getReferringProofUrl(selectedReg);
+                        return refUrl ? (
+                          <a
+                            href={refUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium transition-colors"
+                          >
+                            <ExternalLink size={14} />
+                            <span>View Referee College ID</span>
+                          </a>
+                        ) : (
+                          <span className="text-gray-500 text-xs">No referee document</span>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
                 <div>
