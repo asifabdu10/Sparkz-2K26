@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -9,7 +12,11 @@ function getDriveClient() {
     process.env.GOOGLE_REDIRECT_URI
   );
   auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-  return google.drive({ version: "v3", auth });
+  return google.drive({
+    version: "v3",
+    auth,
+    timeout: 30000,
+  });
 }
 
 export async function POST(request: NextRequest) {

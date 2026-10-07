@@ -3,6 +3,22 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { compressImage } from "@/utils/imageUtils";
+
+async function parseJsonResponse(res: Response, endpointLabel: string) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (res.status === 413) {
+      throw new Error("Uploaded file is too large for the server. Please upload an image under 4MB.");
+    }
+    if (res.status === 504 || res.status === 408) {
+      throw new Error("Upload connection timed out. Please check your internet connection and try again.");
+    }
+    throw new Error(`${endpointLabel} failed (HTTP ${res.status}: ${res.statusText || "Server error"}). Please try again.`);
+  }
+}
 import { Check, X, Loader2, Upload, FileText } from "lucide-react";
 
 type ReferringType = "student" | "faculty";
@@ -68,20 +84,31 @@ function FileInput({
   errorKey: string;
   errors: Record<string, string>;
 }) {
+  const [compressing, setCompressing] = useState(false);
+
   return (
     <div>
       <label className="block text-sm font-semibold text-white mb-1 flex items-center justify-between">
         <span>{label}</span>
-        <span className="text-[11px] text-[#F3C87A] font-normal">Required</span>
+        {compressing ? (
+          <span className="text-[11px] text-[#F3C87A] animate-pulse">Optimizing image size...</span>
+        ) : (
+          <span className="text-[11px] text-[#F3C87A] font-normal">Required</span>
+        )}
       </label>
       <p className="text-xs text-gray-400 mb-2.5">{hint}</p>
       <div
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !compressing && inputRef.current?.click()}
         className={`cursor-pointer border-2 border-dashed ${
           errors[errorKey] ? "border-red-500 bg-red-950/10" : "border-[rgba(212,163,89,0.35)] bg-[#101016]"
         } rounded-xl p-4 text-center hover:border-[#F3C87A] hover:bg-[#15151e] transition-all`}
       >
-        {file ? (
+        {compressing ? (
+          <div className="flex items-center justify-center gap-2 text-[#F3C87A] py-1">
+            <span className="w-4 h-4 border-2 border-[#F3C87A] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-medium">Compressing image for fast upload...</span>
+          </div>
+        ) : file ? (
           <div className="flex items-center justify-center gap-2 text-green-400">
             <span className="font-bold text-base">&#x2713;</span>
             <span className="text-sm truncate max-w-[220px] text-white font-medium">{file.name}</span>
@@ -109,7 +136,7 @@ function FileInput({
             <p className="text-sm text-gray-200 font-semibold">
               Click to select and upload <span className="text-[#F3C87A]">College ID Card</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP or PDF (max 5 MB)</p>
+            <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP or PDF (max 10 MB - auto optimized)</p>
           </div>
         )}
         <input
@@ -117,13 +144,25 @@ function FileInput({
           type="file"
           accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
           className="hidden"
-          onChange={(e) => {
+          onChange={async (e) => {
             const selected = e.target.files?.[0];
-            if (selected) {
-              if (selected.size > 5 * 1024 * 1024) {
-                alert("File size exceeds 5MB limit. Please select a smaller file.");
-                return;
+            if (!selected) return;
+            if (selected.size > 15 * 1024 * 1024) {
+              alert("File size exceeds 15MB limit. Please select a smaller file.");
+              return;
+            }
+            if (selected.type.startsWith("image/")) {
+              try {
+                setCompressing(true);
+                const compressed = await compressImage(selected);
+                setFile(compressed);
+              } catch (cErr) {
+                console.warn("Image compression fallback to original:", cErr);
+                setFile(selected);
+              } finally {
+                setCompressing(false);
               }
+            } else {
               setFile(selected);
             }
           }}
@@ -237,11 +276,16 @@ export default function AlumniRegistrationPage() {
     if (form.contact) fd.append("userPhone", form.contact);
     if (referringName) fd.append("referringName", referringName);
 
-    const res = await fetch("/api/alumni-registration/upload-proof", {
-      method: "POST",
-      body: fd,
-    });
-    const data = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/alumni-registration/upload-proof", {
+        method: "POST",
+        body: fd,
+      });
+    } catch (netErr: any) {
+      throw new Error("Network connection error uploading ID proof. Please check your connection and try again.");
+    }
+    const data = await parseJsonResponse(res, "ID proof upload");
     if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
     const fileId: string = data.fileId;
     const fileUrl: string = data.fileUrl || data.url || `https://drive.google.com/file/d/${fileId}/view`;
@@ -279,26 +323,31 @@ export default function AlumniRegistrationPage() {
 
       // 2. Submit alumni registration with referral info and ID proof
       setSubmittingStatus("Submitting alumni registration...");
-      const res = await fetch("/api/alumni-registration/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          department: form.department,
-          passedOutYear: form.passedOutYear,
-          contact: form.contact.trim(),
-          referringType: form.referringType,
-          referringName: form.referringName.trim(),
-          referringDepartment: form.referringDepartment.trim(),
-          referringYear: form.referringType === "student" ? form.referringYear : "",
-          referringIdFileId,
-          referringIdFileUrl,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/alumni-registration/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            department: form.department,
+            passedOutYear: form.passedOutYear,
+            contact: form.contact.trim(),
+            referringType: form.referringType,
+            referringName: form.referringName.trim(),
+            referringDepartment: form.referringDepartment.trim(),
+            referringYear: form.referringType === "student" ? form.referringYear : "",
+            referringIdFileId,
+            referringIdFileUrl,
+          }),
+        });
+      } catch (netErr: any) {
+        throw new Error("Network connection error submitting registration. Please check your connection and try again.");
+      }
 
-      const data = await res.json();
+      const data = await parseJsonResponse(res, "Alumni registration");
       if (!data.success) throw new Error(data.error || "Registration failed.");
 
       const registrationId: string = data.id;
@@ -318,9 +367,10 @@ export default function AlumniRegistrationPage() {
             referringType: form.referringType,
           }),
         });
-        emailSent = (await emailRes.json()).success === true;
-      } catch {
-        console.warn("Alumni email failed");
+        const emData = await parseJsonResponse(emailRes, "Confirmation email");
+        emailSent = emData?.success === true;
+      } catch (emErr) {
+        console.warn("Confirmation email failed:", emErr);
       }
 
       setResult({ success: true, emailSent, id: registrationId });
