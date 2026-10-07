@@ -27,14 +27,14 @@ interface FormState {
 // Dynamic Rules generator
 const getRulesText = (fee: number) => [
   "You must be referred by a current student or faculty member of Carmel College of Engineering & Technology.",
-  "You must be registered in at least onne Sparkz 2K26 departmental event.",
+  "You must be registered in at least one Sparkz 2K26 departmental event.",
   "You must upload and carry your valid College ID card for entry verification.",
-  `Your visitor pass is valid for 08 & 09 Oct, granting access to Abheri & Proshow. The registration fee is ₹${fee}.`,
+  `Your visitor pass is valid for 08th & 09th Oct, granting access to Abheri & Proshow. The registration fee is ₹${fee}.`,
   "Visitor passes are non-transferable. Your details will be verified at the gate.",
 ];
 const RULES_COUNT = 5;
 // Last rule rendered separately so we can embed a hyperlink
-const LAST_RULE_TEXT = "Any violation of rules or misconduct will result in immediate removal from the premises.";
+const LAST_RULE_TEXT = "Any violation of rules or misconduct will result in immediate removal from the college premises.";
 
 const YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 
@@ -589,8 +589,8 @@ export default function VisitorRegistrationPage() {
                 {!registrationOpen
                   ? "Registrations Closed by Admin"
                   : isSoldOut
-                  ? `All ${totalCapacity} Passes Sold Out`
-                  : `${remainingTickets} of ${totalCapacity} Tickets Remaining`}
+                    ? `All ${totalCapacity} Passes Sold Out`
+                    : `${remainingTickets} of ${totalCapacity} Tickets Remaining`}
               </span>
             </div>
           </div>
@@ -899,8 +899,8 @@ export default function VisitorRegistrationPage() {
                   {(["student", "faculty"] as const).map((type) => (
                     <button key={type} type="button" onClick={() => setForm({ ...form, referringType: type, referringYear: "" })}
                       className={`py-3 px-4 rounded-xl border font-semibold capitalize transition-all ${form.referringType === type
-                          ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E]"
-                          : "border-[rgba(212,163,89,0.3)] text-gray-300 hover:border-[#F3C87A] hover:text-[#F3C87A]"
+                        ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E]"
+                        : "border-[rgba(212,163,89,0.3)] text-gray-300 hover:border-[#F3C87A] hover:text-[#F3C87A]"
                         }`}>
                       {type === "student" ? "🎓 Student" : "👨‍🏫 Faculty"}
                     </button>
