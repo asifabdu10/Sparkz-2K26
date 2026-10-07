@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
 
     // ── 5. Store Candidate in Firebase ─────────────────────────────────────
     // Name is stored in Firebase as the email used for login as requested
-    const candidateName = verifiedEmail;
+    const candidateName = googleDisplayName || verifiedEmail;
 
     const docData: Record<string, unknown> = {
       userId: verifiedUid,
