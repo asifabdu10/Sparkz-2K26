@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         if (parts.length !== 3) {
           throw new Error("Invalid JWT token format");
         }
-        const payloadJson = Buffer.from(parts[1], "base64").toString("utf-8");
+        const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
         const payload = JSON.parse(payloadJson);
 
         const now = Math.floor(Date.now() / 1000);
@@ -181,7 +181,9 @@ export async function POST(request: NextRequest) {
       yearOfStudy,     // visitor's own year of study
       referringType, referringName, referringDepartment,
       referringYear,   // only for student referrals
-      collegeIdFileId, // single file — visitor's college ID
+      referringCollegeId,
+      collegeIdFileId, // visitor's college ID
+      referringIdFileId, // referring person's college ID
       razorpayPaymentId,
       razorpayOrderId,
       razorpaySignature,
@@ -207,9 +209,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Referring student's year of study is required." }, { status: 400 });
     if (!collegeIdFileId)
       return NextResponse.json({ success: false, error: "Visitor's college ID file is required." }, { status: 400 });
+    if (!referringIdFileId)
+      return NextResponse.json({ success: false, error: "Referring person's college ID card file is required." }, { status: 400 });
 
     // ── 4. Verify Razorpay Payment (₹250) for non-admins ───────────────────
-    if (!isAdmin) {
+    const isAdminBypass = isAdmin || (razorpayPaymentId && String(razorpayPaymentId).startsWith("admin_granted"));
+    if (!isAdminBypass) {
       if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
         return NextResponse.json(
           { success: false, error: "Payment verification failed: Razorpay payment is required for visitor pass (₹250)." },
@@ -272,12 +277,15 @@ export async function POST(request: NextRequest) {
       referringType,
       referringName: referringName.trim(),
       referringDepartment: referringDepartment.trim(),
-      collegeIdFileId: collegeIdFileId.trim(),
-      collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
-      idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${collegeIdFileId.trim()}/view`,
+      referringCollegeId: referringCollegeId ? String(referringCollegeId).trim() : "",
+      collegeIdFileId: String(collegeIdFileId).trim(),
+      collegeIdFileUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(collegeIdFileId).trim()}/view`,
+      referringIdFileId: String(referringIdFileId).trim(),
+      referringIdFileUrl: (body.referringIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(referringIdFileId).trim()}/view`,
+      idProofUrl: (body.collegeIdFileUrl as string)?.trim() || `https://drive.google.com/file/d/${String(collegeIdFileId).trim()}/view`,
       qualifyingPaidEvent: paidEventName,
       fee: currentFee,
-      amountPaid: currentFee,
+      amountPaid: isAdminBypass ? 0 : currentFee,
       paymentStatus: "paid",
       razorpayPaymentId: razorpayPaymentId || null,
       razorpayOrderId: razorpayOrderId || null,

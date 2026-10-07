@@ -38,12 +38,18 @@ export async function POST(request: NextRequest) {
       passValidity = "08 & 09 Oct",
       collegeIdFileUrl,
       collegeIdFileId,
+      referringIdFileUrl,
+      referringIdFileId,
     } = body;
     registrationIdToUpdate = registrationId || "";
 
     const idProofLink =
       collegeIdFileUrl ||
       (collegeIdFileId ? `https://drive.google.com/file/d/${collegeIdFileId}/view` : "");
+
+    const referringProofLink =
+      referringIdFileUrl ||
+      (referringIdFileId ? `https://drive.google.com/file/d/${referringIdFileId}/view` : "");
 
     if (!email) return NextResponse.json({ success: false, error: "Email address is required." }, { status: 400 });
 
@@ -148,6 +154,19 @@ export async function POST(request: NextRequest) {
               <td style="padding:10px 0;">
                 <a href="${escapeHtml(idProofLink)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:bold;text-decoration:underline;">
                   View Uploaded ID Proof &rarr;
+                </a>
+              </td>
+            </tr>`
+                : ""
+            }
+            ${
+              referringProofLink
+                ? `
+            <tr>
+              <td style="padding:10px 0;font-weight:600;color:#64748b;">Referee ID Proof</td>
+              <td style="padding:10px 0;">
+                <a href="${escapeHtml(referringProofLink)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:bold;text-decoration:underline;">
+                  View Referee ID Proof &rarr;
                 </a>
               </td>
             </tr>`

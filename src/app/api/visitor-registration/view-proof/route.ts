@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       try {
         const parts = idToken.split(".");
         if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+          const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
           uid = payload.user_id || payload.sub || "";
           email = payload.email || "";
         }

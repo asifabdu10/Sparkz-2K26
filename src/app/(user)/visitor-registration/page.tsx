@@ -110,6 +110,9 @@ export default function VisitorRegistrationPage() {
   const [collegeIdFile, setCollegeIdFile] = useState<File | null>(null);
   const collegeIdRef = useRef<HTMLInputElement>(null);
 
+  const [referringIdFile, setReferringIdFile] = useState<File | null>(null);
+  const referringIdRef = useRef<HTMLInputElement>(null);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submittingStatus, setSubmittingStatus] = useState<string>("");
@@ -238,6 +241,7 @@ export default function VisitorRegistrationPage() {
     if (!form.referringDepartment.trim()) e.referringDepartment = "Referring person's department is required.";
     if (form.referringType === "student" && !form.referringYear) e.referringYear = "Year of study is required.";
     if (!collegeIdFile) e.collegeId = "Your College ID photo/scan is required.";
+    if (!referringIdFile) e.referringId = `Referring ${form.referringType === "faculty" ? "faculty" : "student"}'s College ID card is required.`;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -254,7 +258,7 @@ export default function VisitorRegistrationPage() {
     });
   };
 
-  const uploadFile = async (file: File, proofType: string): Promise<{ fileId: string; fileUrl: string }> => {
+  const uploadFile = async (file: File, proofType: string, refName?: string): Promise<{ fileId: string; fileUrl: string }> => {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("proofType", proofType);
@@ -262,6 +266,7 @@ export default function VisitorRegistrationPage() {
     if (form.name) fd.append("userName", form.name);
     if (form.phone) fd.append("userPhone", form.phone);
     if (paidEventName) fd.append("qualifyingEvent", paidEventName);
+    if (refName) fd.append("referringName", refName);
     const res = await fetch("/api/visitor-registration/upload-proof", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok || !data.fileId) throw new Error(data.error || "File upload failed.");
@@ -277,11 +282,78 @@ export default function VisitorRegistrationPage() {
     if (!hasPaidEvent) { setErrors({ submit: "You must have at least one confirmed paid departmental event registration." }); return; }
 
     setSubmitting(true);
-    setSubmittingStatus("Uploading ID proof document...");
+    setSubmittingStatus("Uploading ID proof documents...");
 
     try {
       const idToken = await user.getIdToken(true);
       const { fileId: collegeIdFileId, fileUrl: collegeIdFileUrl } = await uploadFile(collegeIdFile!, "college_id");
+      const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(referringIdFile!, "referring_id", form.referringName);
+
+      // ── Admin Direct Bypass (Free testing without Razorpay) ───────────────
+      if (isAdmin) {
+        setSubmittingStatus("Admin verified! Finalizing visitor pass registration...");
+        const submitPayload = {
+          ...form,
+          collegeIdFileId,
+          collegeIdFileUrl,
+          referringIdFileId,
+          referringIdFileUrl,
+          userId: user.uid,
+          userEmail: user.email,
+          razorpayPaymentId: "admin_granted_" + Date.now(),
+          razorpayOrderId: "admin_order_" + Date.now(),
+          razorpaySignature: "admin_signature",
+        };
+
+        const subRes = await fetch("/api/visitor-registration/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify(submitPayload),
+        });
+        const subData = await subRes.json();
+        if (!subData.success) {
+          throw new Error(subData.error || "Failed to finalize visitor registration.");
+        }
+
+        const registrationId: string = subData.id;
+        let emailSent = false;
+        try {
+          const emailRes = await fetch("/api/visitor-registration/send-confirmation-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: user.email,
+              name: form.name,
+              college: form.college,
+              department: form.department,
+              yearOfStudy: form.yearOfStudy,
+              referringType: form.referringType,
+              referringName: form.referringName,
+              registrationId,
+              amountPaid: `₹0 (Admin Direct Pass)`,
+              paymentId: "admin_granted",
+              passValidity: "08 & 09 Oct",
+              collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
+              referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
+            }),
+          });
+          const emData = await emailRes.json();
+          emailSent = emData?.success === true;
+        } catch (emErr) {
+          console.warn("Email sending failed (non-fatal):", emErr);
+        }
+
+        setResult({
+          success: true,
+          emailSent,
+          regId: registrationId,
+          paymentId: "admin_direct_grant",
+        });
+        setStep("done");
+        setSubmitting(false);
+        setSubmittingStatus("");
+        return;
+      }
 
       // ── Razorpay Payment ─────────────────────────────────────────────────
       setSubmittingStatus(`Initializing payment gateway (₹${passFee})...`);
@@ -343,6 +415,8 @@ export default function VisitorRegistrationPage() {
               ...form,
               collegeIdFileId,
               collegeIdFileUrl,
+              referringIdFileId,
+              referringIdFileUrl,
               userId: user.uid,
               userEmail: user.email,
               razorpayPaymentId: paymentResponse.razorpay_payment_id,
@@ -382,6 +456,7 @@ export default function VisitorRegistrationPage() {
                   paymentId: paymentResponse.razorpay_payment_id,
                   passValidity: "08 & 09 Oct",
                   collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
+                  referringIdFileUrl: referringIdFileUrl || `https://drive.google.com/file/d/${referringIdFileId}/view`,
                 }),
               });
               emailSent = (await emailRes.json()).success === true;
@@ -845,7 +920,11 @@ export default function VisitorRegistrationPage() {
                 </h3>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   {(["student", "faculty"] as const).map((type) => (
-                    <button key={type} type="button" onClick={() => setForm({ ...form, referringType: type, referringYear: "" })}
+                    <button key={type} type="button" onClick={() => {
+                      setForm({ ...form, referringType: type, referringYear: "" });
+                      setReferringIdFile(null);
+                      if (referringIdRef.current) referringIdRef.current.value = "";
+                    }}
                       className={`py-3 px-4 rounded-xl border font-semibold capitalize transition-all ${form.referringType === type
                           ? "bg-[#F3C87A] border-[#F3C87A] text-[#0B0B0E]"
                           : "border-[rgba(212,163,89,0.3)] text-gray-300 hover:border-[#F3C87A] hover:text-[#F3C87A]"
@@ -881,7 +960,7 @@ export default function VisitorRegistrationPage() {
 
                         {/* Year of study — only for student */}
                         {form.referringType === "student" && (
-                          <div className="md:col-span-2">
+                          <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Student&apos;s Year of Study *</label>
                             <select value={form.referringYear} onChange={(e) => setForm({ ...form, referringYear: e.target.value })} className={inputClass("referringYear")}>
                               <option value="">Select year</option>
@@ -890,6 +969,38 @@ export default function VisitorRegistrationPage() {
                             {errors.referringYear && <p className="text-red-400 text-xs mt-1">{errors.referringYear}</p>}
                           </div>
                         )}
+
+                        {/* Referring Person College ID / Roll Number */}
+                        <div className={form.referringType === "student" ? "" : "md:col-span-2"}>
+                          <label className="block text-sm font-medium text-gray-300 mb-1">
+                            {form.referringType === "student" ? "Student College ID / Roll No" : "Faculty ID"} (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={form.referringType === "student" ? "e.g. 21CS042 or CCET21CS042" : "e.g. CCET/FAC/102"}
+                            value={form.referringCollegeId}
+                            onChange={(e) => setForm({ ...form, referringCollegeId: e.target.value })}
+                            className={inputClass("referringCollegeId")}
+                          />
+                        </div>
+
+                        {/* Referring Person's College ID Card Upload */}
+                        <div className="md:col-span-2 pt-2 border-t border-[rgba(212,163,89,0.15)]">
+                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300 mb-3">
+                            <strong>Required:</strong> Upload photo or scanned copy of referring {form.referringType === "student" ? "student" : "faculty"}&apos;s Carmel College ID card.
+                          </div>
+                          <FileInput
+                            label={`Referring ${form.referringType === "student" ? "Student" : "Faculty"}'s College ID Card *`}
+                            hint={`Upload photo or scanned copy of referring ${
+                              form.referringType === "student" ? "student" : "faculty"
+                            }'s Carmel College ID card (JPG, PNG, WEBP or PDF — max 5 MB)`}
+                            file={referringIdFile}
+                            setFile={setReferringIdFile}
+                            inputRef={referringIdRef}
+                            errorKey="referringId"
+                            errors={errors}
+                          />
+                        </div>
                       </div>
                     </motion.div>
                   )}
