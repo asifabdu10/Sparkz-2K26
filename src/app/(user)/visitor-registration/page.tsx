@@ -5,7 +5,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/utils/firebase";
-import { collection, query, where, getDocs, doc, getDoc, DocumentSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { compressImage } from "@/utils/imageUtils";
 
 async function parseJsonResponse(res: Response, endpointLabel: string) {
@@ -172,6 +172,7 @@ export default function VisitorRegistrationPage() {
   const [checkingPaidEvent, setCheckingPaidEvent] = useState(false);
   const [hasPaidEvent, setHasPaidEvent] = useState<boolean | null>(null);
   const [paidEventName, setPaidEventName] = useState("");
+  const [paidRegistrationId, setPaidRegistrationId] = useState("");
   const [existingVisitorReg, setExistingVisitorReg] = useState<{
     id: string;
     approvalStatus?: string;
@@ -234,7 +235,7 @@ export default function VisitorRegistrationPage() {
 
   // Check paid event registration and existing visitor pass whenever user logs in
   useEffect(() => {
-    if (!user) { setHasPaidEvent(null); setExistingVisitorReg(null); return; }
+    if (!user) { setHasPaidEvent(null); setPaidRegistrationId(""); setExistingVisitorReg(null); return; }
     (async () => {
       setCheckingPaidEvent(true);
       try {
@@ -258,14 +259,17 @@ export default function VisitorRegistrationPage() {
 
         if (paidDoc) {
           setHasPaidEvent(true);
+          setPaidRegistrationId(paidDoc.id);
           const first = paidDoc.data();
           setPaidEventName(first.eventTitle || first.eventName || "Sparkz Departmental Event");
         } else if (isAdmin) {
           // Allow admins to access the registration form for testing
           setHasPaidEvent(true);
+          setPaidRegistrationId("");
           setPaidEventName("Sparkz Departmental Event");
         } else {
           setHasPaidEvent(false);
+          setPaidRegistrationId("");
           setPaidEventName("");
         }
 
@@ -375,37 +379,36 @@ export default function VisitorRegistrationPage() {
     setSubmittingStatus("Uploading ID proof documents...");
 
     try {
-      const idToken = await user.getIdToken(true);
       const { fileId: collegeIdFileId, fileUrl: collegeIdFileUrl } = await uploadFile(collegeIdFile!, "college_id");
       const { fileId: referringIdFileId, fileUrl: referringIdFileUrl } = await uploadFile(referringIdFile!, "referring_id", form.referringName);
 
       // ── Admin Direct Bypass (Free testing without Razorpay) ───────────────
       if (isAdmin) {
         setSubmittingStatus("Admin verified! Finalizing visitor pass registration...");
-        const submitPayload = {
+        const docRef = await addDoc(collection(db, "visitor_registrations"), {
           ...form,
+          userId: user.uid,
+          email: user.email?.toLowerCase() || "",
           collegeIdFileId,
           collegeIdFileUrl,
           referringIdFileId,
           referringIdFileUrl,
-          userId: user.uid,
-          userEmail: user.email,
-          razorpayPaymentId: "admin_granted_" + Date.now(),
+          idProofUrl: collegeIdFileUrl,
+          qualifyingPaidEvent: paidEventName,
+          qualifyingRegistrationId: paidRegistrationId || null,
+          fee: 0,
+          amountPaid: 0,
+          paymentStatus: "paid",
+          razorpayPaymentId: "admin_granted",
           razorpayOrderId: "admin_order_" + Date.now(),
-          razorpaySignature: "admin_signature",
-        };
-
-        const subRes = await fetch("/api/visitor-registration/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify(submitPayload),
+          passValidity: "08 & 09 Oct",
+          approvalStatus: "approved",
+          emailStatus: "pending",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-        const subData = await parseJsonResponse(subRes, "Visitor pass registration");
-        if (!subData.success) {
-          throw new Error(subData.error || "Failed to finalize visitor registration.");
-        }
 
-        const registrationId: string = subData.id;
+        const registrationId: string = docRef.id;
         let emailSent = false;
         try {
           const emailRes = await fetch("/api/visitor-registration/send-confirmation-email", {
@@ -428,6 +431,11 @@ export default function VisitorRegistrationPage() {
           });
           const emData = await parseJsonResponse(emailRes, "Confirmation email");
           emailSent = emData?.success === true;
+          await updateDoc(doc(db, "visitor_registrations", registrationId), {
+            emailStatus: emailSent ? "sent" : "failed",
+            ...(emailSent ? { emailSentAt: serverTimestamp() } : { emailError: emData?.error || "Confirmation email could not be sent." }),
+            updatedAt: serverTimestamp(),
+          });
         } catch (emErr) {
           console.warn("Email sending failed (non-fatal):", emErr);
         }
@@ -518,22 +526,43 @@ export default function VisitorRegistrationPage() {
               razorpaySignature: paymentResponse.razorpay_signature,
             };
 
+            const submitPayload = {
+              ...form,
+              collegeIdFileId,
+              collegeIdFileUrl,
+              referringIdFileId,
+              referringIdFileUrl,
+              userId: user.uid,
+              userEmail: user.email,
+              qualifyingRegistrationId: paidRegistrationId,
+              qualifyingPaidEvent: paidEventName,
+              passFee,
+              razorpayPaymentId: paymentResponse.razorpay_payment_id,
+              razorpayOrderId: paymentResponse.razorpay_order_id,
+              razorpaySignature: paymentResponse.razorpay_signature,
+            };
+
             let subRes: Response;
             try {
+              const idToken = await user.getIdToken(true);
               subRes = await fetch("/api/visitor-registration/submit", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${idToken}`,
+                },
                 body: JSON.stringify(submitPayload),
               });
-            } catch (netErr: any) {
-              throw new Error("Network connection error finalizing registration. Your payment ID is " + paymentResponse.razorpay_payment_id + ". Please contact helpdesk.");
+            } catch {
+              throw new Error("Payment verification server could not be reached. Your payment ID is " + paymentResponse.razorpay_payment_id + ". Please contact the helpdesk if money was deducted.");
             }
             const subData = await parseJsonResponse(subRes, "Finalizing registration");
-            if (!subData.success) {
-              throw new Error(subData.error || "Failed to finalize visitor registration after payment.");
+            if (!subData.success || !subData.id) {
+              throw new Error(subData.error || "Failed to save visitor registration after payment.");
             }
 
             const registrationId: string = subData.id;
+
             let emailSent = false;
 
             // ONLY AFTER SUCCESSFUL REGISTRATION: Send confirmation email
@@ -557,7 +586,13 @@ export default function VisitorRegistrationPage() {
                   collegeIdFileUrl: collegeIdFileUrl || `https://drive.google.com/file/d/${collegeIdFileId}/view`,
                 }),
               });
-              emailSent = (await emailRes.json()).success === true;
+              const emData = await emailRes.json();
+              emailSent = emData?.success === true;
+              await updateDoc(doc(db, "visitor_registrations", registrationId), {
+                emailStatus: emailSent ? "sent" : "failed",
+                ...(emailSent ? { emailSentAt: serverTimestamp() } : { emailError: emData?.error || "Confirmation email could not be sent." }),
+                updatedAt: serverTimestamp(),
+              });
             } catch (emErr) {
               console.warn("Email sending failed (non-fatal):", emErr);
             }
